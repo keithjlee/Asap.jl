@@ -1,6 +1,3 @@
-using Base: Float64, Symbol
-using Statistics, LinearAlgebra, SparseArrays, GeometryBasics
-
 mutable struct Node
     position :: Vector{Float64} # [x, y, z], z is optional
     DOFS :: Vector{Bool} # [dof1, dof2, dof3, ...] type of analysis deduced from length
