@@ -18,9 +18,8 @@ const allWhite = cgrad([:white, :white])
 const whiteTransparentWhite = cgrad([:white, :transparent, :white])
 const transparent2white = cgrad([:transparent, :white])
 # custom arrowheads for support conditions
-const pin = load("src//customObjects//pinSupport.obj")
-const fix = load("src//customObjects//fixSupport.obj")
-
+const pin = load(joinpath(@__DIR__, "customObjects", "pinSupport.obj"))
+const fix = load(joinpath(@__DIR__, "customObjects", "fixSupport.obj"))
 
 function fixedArrow(N)
     if N == 2
