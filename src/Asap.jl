@@ -22,9 +22,10 @@ export analyze
 export dofMaker
 export pseudoSize
 export pseudoSize!
+export structureMass
 
 include("visualization.jl")
-
-
+export axo
+export structurePlot
 
 end

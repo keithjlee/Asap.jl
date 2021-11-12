@@ -2,8 +2,6 @@
 Functions and packages for visualizing structural analysis
 ```
 
-using FileIO, ColorSchemes, Colors, GLMakie, CairoMakie
-
 # define custom colors for tension/compression
 const keithBlue = colorant"#2F5597"
 const keithGreen = colorant"#0D5E00"
@@ -20,8 +18,8 @@ const allWhite = cgrad([:white, :white])
 const whiteTransparentWhite = cgrad([:white, :transparent, :white])
 const transparent2white = cgrad([:transparent, :white])
 # custom arrowheads for support conditions
-const pin = load("customObjects//pinSupport.obj")
-const fix = load("customObjects//fixSupport.obj")
+const pin = load("src//customObjects//pinSupport.obj")
+const fix = load("src//customObjects//fixSupport.obj")
 
 
 function fixedArrow(N)
