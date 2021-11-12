@@ -38,18 +38,6 @@ function pinArrow(N)
     end
 end
 
-#scales displacement s.t. maximum displacement is 10% of the longest element length
-function autoScaleFactor(structure::Structure; proportion = 0.10)
-    lengths = [e.length for e in structure.elements]
-    if structure.dims == 2
-        displacements = vcat([structure.U[n.globalIndex[1:2]] for n in structure.nodes]...)
-    else
-        displacements = vcat([structure.U[n.globalIndex[1:3]] for n in structure.nodes]...)
-    end
-    factor = proportion / maximum(abs.(displacements)) * maximum(lengths)
-    return round(factor)
-end
-
 # converts loads to proper position + vector for plotting
 function loadConverter(structure::Structure; scaleFactor = :auto)
     loads = vcat([load.load for load in structure.loads]...)
