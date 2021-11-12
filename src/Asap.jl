@@ -10,6 +10,7 @@ using ColorSchemes
 using Colors
 using GLMakie
 
+# data types used for analysis
 include("types.jl")
 export Node
 export Element
@@ -17,6 +18,7 @@ export Load
 export Structure
 export Geometry
 
+# structural analysis
 include("structuralAnalysis.jl")
 export analyze
 export dofMaker
