@@ -372,7 +372,7 @@ function structurePlot(geo::Geometry;
         lineSize = 2,
         lineColor = :black, 
         backgroundColor = :transparent,
-        colorMap = redWhiteBlue,
+        colorMap = red2blue,
         nodeColor = :green,
         elementColor = :black,
         lineSizeRange = 0.1:0.1:10,
