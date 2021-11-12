@@ -1,3 +1,4 @@
 /Manifest.toml
 src/privateTests.jl
 .vscode
+.github
