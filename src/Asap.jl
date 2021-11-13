@@ -26,6 +26,7 @@ export pseudoSize
 export pseudoSize!
 export structureMass
 
+# viz tools
 include("visualization.jl")
 export axo
 export structurePlot

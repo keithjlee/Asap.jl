@@ -95,7 +95,7 @@ function k_elemental(element::Element, dims::Int; return_k = false, tol = 1e-3)
 
             element.k = Symmetric(R' * [a b -a b; b' c b d; -a' b' a -b; b' d' -b' c] * R)
         elseif dims == 2
-            l, m = (element.posStart .- element.posEnd) ./ element.length
+            l, m = (element.posEnd .- element.posStart) ./ element.length
 
             # rotation matrix
             R = [l m 0 0 0 0;

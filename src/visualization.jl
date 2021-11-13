@@ -18,9 +18,8 @@ const allWhite = cgrad([:white, :white])
 const whiteTransparentWhite = cgrad([:white, :transparent, :white])
 const transparent2white = cgrad([:transparent, :white])
 # custom arrowheads for support conditions
-const pin = load("src//customObjects//pinSupport.obj")
-const fix = load("src//customObjects//fixSupport.obj")
-
+const pin = load(joinpath(@__DIR__, "customObjects", "pinSupport.obj"))
+const fix = load(joinpath(@__DIR__, "customObjects", "fixSupport.obj"))
 
 function fixedArrow(N)
     if N == 2
@@ -36,18 +35,6 @@ function pinArrow(N)
     else
         return pin
     end
-end
-
-#scales displacement s.t. maximum displacement is 10% of the longest element length
-function autoScaleFactor(structure::Structure; proportion = 0.10)
-    lengths = [e.length for e in structure.elements]
-    if structure.dims == 2
-        displacements = vcat([structure.U[n.globalIndex[1:2]] for n in structure.nodes]...)
-    else
-        displacements = vcat([structure.U[n.globalIndex[1:3]] for n in structure.nodes]...)
-    end
-    factor = proportion / maximum(abs.(displacements)) * maximum(lengths)
-    return round(factor)
 end
 
 # converts loads to proper position + vector for plotting
@@ -384,7 +371,7 @@ function structurePlot(geo::Geometry;
         lineSize = 2,
         lineColor = :black, 
         backgroundColor = :transparent,
-        colorMap = redWhiteBlue,
+        colorMap = red2blue,
         nodeColor = :green,
         elementColor = :black,
         lineSizeRange = 0.1:0.1:10,

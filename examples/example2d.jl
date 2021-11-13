@@ -48,7 +48,7 @@ begin
     elements = [e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,e11,e12,e13]
 end
 
-# create loads
+# create force vectors [Fx, Fy (, M)]
 if structureType == :truss
     forces = [0.0, -20.0]
 else
@@ -57,6 +57,7 @@ end
 
 begin
     p1 = Load(nodes, nodes[6].position, forces)
+    p1 = Load(nodes, [22.5, 0.], forces) #equivalent
     p2 = Load(nodes, nodes[7].position, forces)
     p3 = Load(nodes, nodes[8].position, forces)
 
@@ -65,6 +66,9 @@ end
 
 # assemble structure
 truss = Structure(nodes, elements, loads)
+
+# mass of structure
+mass = structureMass(truss, 8000) #kg
 
 # analyze
 @time analyze(truss)
@@ -75,4 +79,3 @@ geo = Geometry(truss)
 # display figure (this is quite crude at the moment)
 # scaleToForce scales line thicknesses to axial force values
 fig = structurePlot(geo; scaleToForce = true)
-
