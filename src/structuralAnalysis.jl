@@ -74,26 +74,51 @@ function k_elemental(element::Element, dims::Int; return_k = false, tol = 1e-3)
             R = [Λ zeros(3,9); zeros(3,3) Λ zeros(3,6); zeros(3,6) Λ zeros(3,3); zeros(3,9) Λ]
             element.R = R
 
+            # Faulty method from Ferreira "MATLAB Codes for Finite Element Analysis"
             #stiffness matrix
             #nodal stiffnesses
-            k1 = element.E * element.A / element.length
-            k2 = 12 * element.E * element.Iz / element.length^3
-            k3 = 6 * element.E * element.Iz / element.length^2
-            k4 = 4 * element.E * element.Iz / element.length
-            k5 = 2 * element.E * element.Iz / element.length
-            k6 = 12 * element.E * element.Iy / element.length^3
-            k7 = 6 * element.E * element.Iy / element.length^2
-            k8 = 4 * element.E * element.Iy / element.length
-            k9 = 2 * element.E * element.Iy / element.length
-            k10 = element.G * element.J / element.length
+            # k1 = element.E * element.A / element.length
+            # k2 = 12 * element.E * element.Iz / element.length^3
+            # k3 = 6 * element.E * element.Iz / element.length^2
+            # k4 = 4 * element.E * element.Iz / element.length
+            # k5 = 2 * element.E * element.Iz / element.length
+            # k6 = 12 * element.E * element.Iy / element.length^3
+            # k7 = 6 * element.E * element.Iy / element.length^2
+            # k8 = 4 * element.E * element.Iy / element.length
+            # k9 = 2 * element.E * element.Iy / element.length
+            # k10 = element.G * element.J / element.length
 
-            #stiffness blocks
-            a = [k1 0 0; 0 k2 0; 0 0 k6]
-            b = [0 0 0; 0 0 k3; 0 -k7 0]
-            c = [k10 0 0; 0 k8 0; 0 0 k4]
-            d = [-k10 0 0; 0 k9 0; 0 0 k5]
+            # #stiffness blocks
+            # a = [k1 0 0; 0 k2 0; 0 0 k6]
+            # b = [0 0 0; 0 0 k3; 0 -k7 0]
+            # c = [k10 0 0; 0 k8 0; 0 0 k4]
+            # d = [-k10 0 0; 0 k9 0; 0 0 k5]
 
-            element.k = Symmetric(R' * [a b -a b; b' c b d; -a' b' a -b; b' d' -b' c] * R)
+            # element.k = Symmetric(R' * [a b -a b; b' c b d; -a' b' a -b; b' d' -b' c] * R)
+
+            E = element.E
+            length = element.length
+            A = element.A
+            Iz = element.Iz
+            Iy = element.Iy
+            G = element.G
+            J = element.J
+            k = E / length^3 * [
+                A*length^2 0 0 0 0 0 -A*length^2 0 0 0 0 0;
+                0 12Iz 0 0 0 6length*Iz 0 -12Iz 0 0 0 6length*Iz;
+                0 0 12Iy 0 -6length*Iy 0 0 0 -12Iy 0 -6length*Iy 0;
+                0 0 0 G*J*length^2/E 0 0 0 0 0 -G*J*length^2/E 0 0;
+                0 0 -6length*Iy 0 4length^2*Iy 0 0 0 6length*Iy 0 2length^2*Iy 0;
+                0 6length*Iz 0 0 0 4length^2*Iz 0 -6length*Iz 0 0 0 2length^2*Iz;
+                -A*length^2 0 0 0 0 0 A*length^2 0 0 0 0 0;
+                0 -12Iz 0 0 0 -6length*Iz 0 12Iz 0 0 0 -6length*Iz;
+                0 0 -12Iy 0 6length*Iy 0 0 0 12Iy 0 6length*Iy 0;
+                0 0 0 -G*J*length^2/E 0 0 0 0 0 G*J*length^2/E 0 0;
+                0 0 -6length*Iy 0 2length^2*Iy 0 0 0 6length*Iy 0 4length^2*Iy 0;
+                0 6length*Iz 0 0 0 2length^2*Iz 0 -6length*Iz 0 0 0 4length^2*Iz
+                ]
+
+            element.k = Symmetric(R' * k * R)
         elseif dims == 2
             l, m = (element.posEnd .- element.posStart) ./ element.length
 
