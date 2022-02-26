@@ -48,6 +48,7 @@ mutable struct Node
     end
 end
 
+
 mutable struct Element
     nodeIndex :: Vector{Int64} # index of start/end nodes
     type :: Symbol # :truss or :dims
@@ -65,7 +66,9 @@ mutable struct Element
     Iz :: Float64 # strong axis moment of inertia, OPTIONAL
     Iy :: Float64 # weak axis moment of inertia, OPTIONAL
     J :: Float64 # torsional constant, OPTIONAL
+    Ψ :: Float64 # angle of roll w/r/t local x axis, for 3d frames
     R :: Matrix{Float64} # rotation matrix
+    LCS :: Vector{Vec3{Float64}} #local coordinate system
 
     # Basic generator without material properties
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, type::Symbol)
@@ -114,7 +117,9 @@ mutable struct Element
         element.Iz = Iz
         element.Iy = Iy
         element.J = J
+        element.Ψ = pi/2 #default
         element.type = :frame
+        element.LCS = lcs(element, element.Ψ)
         return element
     end
 
@@ -196,7 +201,6 @@ mutable struct Structure
     end
 
 end
-
 
 mutable struct Geometry
     structure :: Structure

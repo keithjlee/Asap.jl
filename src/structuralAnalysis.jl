@@ -1,3 +1,8 @@
+# global axes
+const globalX = [1., 0., 0.]
+const globalY = [0., 1., 0.]
+const globalZ = [0., 0., 1.]
+
 # expands elemental start/end nodes to global DOF indices
 function dofExpander(element::Element, nodes::Vector{Node})
     element.dofIndex = vcat(nodes[element.nodeIndex[1]].globalIndex, nodes[element.nodeIndex[2]].globalIndex)
@@ -17,6 +22,30 @@ function nodeGlobalIndex(nodes::Vector{Node})
     for i = 1:n
         nodes[i].globalIndex = i * nNodalDOFS - (nNodalDOFS-1) .+ collect(0:nNodalDOFS-1)
     end
+end
+
+```
+Local coordinate system of element
+```
+function lcs(element::Element, Ψ; tol = 0.001)
+
+    # local x vector
+    xvec = normalize(element.posEnd .- element.posStart)
+    
+    if norm(cross(xvec, globalY)) < tol
+        CYx = xvec[2] #cosine to global Y axis
+        xvec = CYx * globalY
+        yvec = -CYx * globalX * cos(Ψ) + sin(Ψ) * globalZ
+        zvec = CYx * globalX * sin(Ψ) + cos(Ψ) * globalZ 
+    else
+        zbar = normalize(cross(xvec, [0, 1, 0]))
+        ybar = normalize(cross(zbar, xvec))
+
+        yvec = cos(Ψ) * ybar + sin(Ψ) * zbar
+        zvec = -sin(Ψ) * ybar + cos(Ψ) * zbar
+    end
+
+    return Vec3.([xvec, yvec, zvec])
 end
 
 # creates the elemental stiffness matrix in global coordinate system
@@ -51,24 +80,51 @@ function k_elemental(element::Element, dims::Int; return_k = false, tol = 1e-3)
     elseif type == :frame
         if dims == 3
 
+            ##
+            # deprecated
+            ##
             #rotation matrix
-            CXx, CYx, CZx = (element.posEnd .- element.posStart) ./ element.length
-            D = sqrt(CXx^2 + CYx^2)
-            CXy = -CYx / D
-            CYy = CXx / D
-            CZy = 0
-            CXz = -CXx * CZx / D
-            CYz = -CYx * CZx / D
-            CZz = D
+            # CXx, CYx, CZx = (element.posEnd .- element.posStart) ./ element.length
+            # D = sqrt(CXx^2 + CYx^2)
+            # CXy = -CYx / D
+            # CYy = CXx / D
+            # CZy = 0
+            # CXz = -CXx * CZx / D
+            # CYz = -CYx * CZx / D
+            # CZz = D
             
-            if abs(element.posStart[1]-element.posEnd[1]) < tol && abs(element.posStart[2]-element.posEnd[2]) < tol
-                if element.posEnd[3] > element.posStart[3]
-                    Λ = [0 0 1; 0 1 0; -1 0 0]
-                else
-                    Λ = [0 0 -1; 0 1 0; 1 0 0]
-                end
-            else
-                Λ = [CXx CYx CZx; CXy CYy CZy; CXz CYz CZz]
+            # if abs(element.posStart[1]-element.posEnd[1]) < tol && abs(element.posStart[2]-element.posEnd[2]) < tol
+            #     if element.posEnd[3] > element.posStart[3]
+            #         Λ = [0 0 1; 0 1 0; -1 0 0]
+            #     else
+            #         Λ = [0 0 -1; 0 1 0; 1 0 0]
+            #     end
+            # else
+            #     Λ = [CXx CYx CZx; CXy CYy CZy; CXz CYz CZz]
+            # end
+
+            ##
+            # New method provides precise pitch angle control w/r/t local x axis
+            xvec = normalize(element.posEnd .- element.posStart) # local x vector
+            CXx, CYx, CZx = xvec # local x cosines
+
+            
+            if norm(cross(xvec, globalY)) < tol #special case for horizontal members aligned with global Y
+                Λ = [0. CYx 0.;
+                    -CYx*cos(element.Ψ) 0 sin(element.Ψ);
+                    CYx*sin(element.Ψ) 0 cos(element.Ψ)]
+            else # all other
+                b1 = (-CXx * CYx * cos(element.Ψ) - CZx * sin(element.Ψ)) / sqrt(CXx^2 + CZx^2)
+                b2 = sqrt(CXx^2 + CZx^2) * cos(element.Ψ)
+                b3 = (-CYx * CZx * cos(element.Ψ) + CXx * sin(element.Ψ)) / sqrt(CXx^2 + CZx^2)
+
+                c1 = (CXx * CYx * sin(element.Ψ) - CZx * cos(element.Ψ)) / sqrt(CXx^2 + CZx^2)
+                c2 = -sqrt(CXx^2 + CZx^2) * sin(element.Ψ)
+                c3 = (CYx * CZx * sin(element.Ψ) + CXx * cos(element.Ψ)) / sqrt(CXx^2 + CZx^2)
+
+                Λ = [CXx CYx CZx; 
+                    b1 b2 b3; 
+                    c1 c2 c3]
             end
             
             R = [Λ zeros(3,9); zeros(3,3) Λ zeros(3,6); zeros(3,6) Λ zeros(3,3); zeros(3,9) Λ]
