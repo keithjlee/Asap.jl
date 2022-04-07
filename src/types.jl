@@ -51,7 +51,7 @@ end
 
 mutable struct Element
     nodeIndex :: Vector{Int64} # index of start/end nodes
-    type :: Symbol # :truss or :dims
+    type :: Symbol # :truss or :frame
     posStart :: Vector{Float64} # coordinates of start node
     posEnd :: Vector{Float64} # coordinates of end node
     length :: Float64 # element length
