@@ -26,6 +26,9 @@ export pseudoSize
 export pseudoSize!
 export structureMass
 
+# method extensions/general QOL utilities
+include("utilities.jl")
+
 # viz tools
 include("visualization.jl")
 export axo

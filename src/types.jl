@@ -1,4 +1,4 @@
-mutable struct Node
+Base.@kwdef mutable struct Node
     position :: Vector{Float64} # [x, y, z], z is optional
     DOFS :: Vector{Bool} # [dof1, dof2, dof3, ...] type of analysis deduced from length
     x :: Float64 # individual cartesian coordinates of Node
@@ -9,6 +9,7 @@ mutable struct Node
     disp :: Vector{Float64} # displacements of dofs (after analysis)
     elements :: Vector{Tuple{Int64,Int64}} # [(element index, 0 = start / 1 = end), ...]
     globalIndex :: Vector{Int64} #positions in global DOF order
+    id :: Union{Symbol, Nothing} #group ID
 
     # create node with assigned DOFs
     function Node(position, DOFS::Vector{Bool})
@@ -49,7 +50,7 @@ mutable struct Node
 end
 
 
-mutable struct Element
+Base.@kwdefmutable struct Element
     nodeIndex :: Vector{Int64} # index of start/end nodes
     type :: Symbol # :truss or :dims
     posStart :: Vector{Float64} # coordinates of start node
@@ -69,6 +70,7 @@ mutable struct Element
     Ψ :: Float64 # angle of roll w/r/t local x axis, for 3d frames
     R :: Matrix{Float64} # rotation matrix
     LCS :: Vector{Vec3{Float64}} #local coordinate system
+    id :: Union{Symbol, Nothing}  #group ID
 
     # Basic generator without material properties
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, type::Symbol)
@@ -126,10 +128,11 @@ mutable struct Element
 end
 
 # creates a Load type with proper DOF indexing
-mutable struct Load
+Base.@kwdef mutable struct Load
     position :: Vector{Float64} #approximate position of load
     load :: Vector{Float64} #value of load [p1, p2, p3, ..., pdof]
     index :: Int64 #index of node assigned to load
+    id :: Union{Symbol, Nothing}  #group ID
 
     function Load(nodes::Vector{Node}, position::Vector{Float64}, load::Vector{Float64}; tol = 0.5)
         load = new(position, load)
@@ -138,7 +141,7 @@ mutable struct Load
     end
 end
 
-mutable struct Structure
+Base.@kwdef mutable struct Structure
     nodes :: Vector{Node} # array of Nodes
     elements :: Vector{Element} # array of Elements
     loads :: Vector{Load} # array of Loads
@@ -202,7 +205,7 @@ mutable struct Structure
 
 end
 
-mutable struct Geometry
+Base.@kwdef mutable struct Geometry
     structure :: Structure
     nodes :: Vector #{Point3{Float64}}
     elements :: Vector{Vector} #Vector{Vector{Point3{Float64}}}
