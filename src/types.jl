@@ -1,4 +1,4 @@
-Base.@kwdef mutable struct Node
+mutable struct Node
     position :: Vector{Float64} # [x, y, z], z is optional
     DOFS :: Vector{Bool} # [dof1, dof2, dof3, ...] type of analysis deduced from length
     x :: Float64 # individual cartesian coordinates of Node
@@ -20,6 +20,7 @@ Base.@kwdef mutable struct Node
             node.x, node.y = node.position
         end
         node.elements = Vector{Tuple{Int64,Int64}}([])
+        node.id = nothing
         return node
     end
 
@@ -33,6 +34,7 @@ Base.@kwdef mutable struct Node
             node.x, node.y = node.position
         end
         node.elements = Vector{Tuple{Int64,Int64}}([])
+        node.id = nothing
         return node
     end
 
@@ -45,12 +47,13 @@ Base.@kwdef mutable struct Node
             node.x, node.y = node.position
         end
         node.elements = Vector{Tuple{Int64,Int64}}([])
+        node.id = nothing
         return node
     end
 end
 
 
-Base.@kwdefmutable struct Element
+mutable struct Element
     nodeIndex :: Vector{Int64} # index of start/end nodes
     type :: Symbol # :truss or :dims
     posStart :: Vector{Float64} # coordinates of start node
@@ -79,6 +82,7 @@ Base.@kwdefmutable struct Element
         element.posEnd = nodes[nodeIndex[2]].position
         element.length = norm(element.posEnd .- element.posStart)
         element.type = type
+        element.id = nothing
         return element
     end
 
@@ -91,6 +95,7 @@ Base.@kwdefmutable struct Element
         element.E = E
         element.A = A
         element.type = :truss
+        element.id = nothing
         return element
     end
 
@@ -104,6 +109,7 @@ Base.@kwdefmutable struct Element
         element.A = A
         element.Iz = I
         element.type = :frame
+        element.id = nothing
         return element
     end
 
@@ -122,13 +128,14 @@ Base.@kwdefmutable struct Element
         element.Ψ = pi/2 #default
         element.type = :frame
         element.LCS = lcs(element, element.Ψ)
+        element.id = nothing
         return element
     end
 
 end
 
 # creates a Load type with proper DOF indexing
-Base.@kwdef mutable struct Load
+mutable struct Load
     position :: Vector{Float64} #approximate position of load
     load :: Vector{Float64} #value of load [p1, p2, p3, ..., pdof]
     index :: Int64 #index of node assigned to load
@@ -137,11 +144,12 @@ Base.@kwdef mutable struct Load
     function Load(nodes::Vector{Node}, position::Vector{Float64}, load::Vector{Float64}; tol = 0.5)
         load = new(position, load)
         load.index = findmin([norm(n.position .- load.position) for n in nodes])[2]
+        load.id = nothing
         return load
     end
 end
 
-Base.@kwdef mutable struct Structure
+mutable struct Structure
     nodes :: Vector{Node} # array of Nodes
     elements :: Vector{Element} # array of Elements
     loads :: Vector{Load} # array of Loads
@@ -205,7 +213,7 @@ Base.@kwdef mutable struct Structure
 
 end
 
-Base.@kwdef mutable struct Geometry
+mutable struct Geometry
     structure :: Structure
     nodes :: Vector #{Point3{Float64}}
     elements :: Vector{Vector} #Vector{Vector{Point3{Float64}}}

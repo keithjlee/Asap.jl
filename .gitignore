@@ -2,3 +2,4 @@
 src/privateTests.jl
 .vscode
 .github
+scratch.jl
