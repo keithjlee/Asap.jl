@@ -25,6 +25,33 @@ function nodeGlobalIndex(nodes::Vector{Node})
 end
 
 ```
+SHAPE FUNCTIONS gives displacement orthogonal to local x axis based on end moments and shear forces
+u1 = shear displacement at beginning node
+u2 = moment displacement at beginning node
+u3 = shear displacement at end node
+u4 = moment displacement at end node
+
+These displacements should be w/r/t local coordinate system
+```
+
+# 
+function N1(x, element::Element)
+    return 1 - 3 * (x / element.length)^2 + 2 * (x / element.length)^3
+end
+
+function N2(x, element::Element)
+    return x * (1 - x / element.length)^2
+end
+
+function N3(x, element::Element)
+    return 3 * (x / element.length)^2 - 2 * (x / element.length)^3
+end
+
+function N4(x, element::Element)
+    return x^2 / element.length * (x / element.length - 1)
+end
+
+```
 Local coordinate system of element
 ```
 function lcs(element::Element, Ψ; tol = 0.001)
@@ -64,10 +91,10 @@ function k_elemental(element::Element, dims::Int; return_k = false, tol = 1e-3)
 
             element.k = Symmetric(R' * K * R)
         elseif dims == 2
-            l, m = (element.posEnd .- element.posStart) ./ element.length
+            Cx, Cy = (element.posEnd .- element.posStart) ./ element.length
 
             # rotation matrix
-            R = [l m 0 0; 0 0 l m]
+            R = [Cx Cy 0 0; 0 0 Cx Cy]
             element.R = R
 
             # stiffness matrix
