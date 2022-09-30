@@ -91,10 +91,10 @@ function k_elemental(element::Element, dims::Int; return_k = false, tol = 1e-3)
 
             element.k = Symmetric(R' * K * R)
         elseif dims == 2
-            l, m = (element.posEnd .- element.posStart) ./ element.length
+            Cx, Cy = (element.posEnd .- element.posStart) ./ element.length
 
             # rotation matrix
-            R = [l m 0 0; 0 0 l m]
+            R = [Cx Cy 0 0; 0 0 Cx Cy]
             element.R = R
 
             # stiffness matrix
