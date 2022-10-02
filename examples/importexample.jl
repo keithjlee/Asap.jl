@@ -21,7 +21,7 @@ J = mp["Jx"] #cm^4
 # Create nodes
 nodes = Vector{Node}()
 
-for i = 1:length(ns)
+for i = 1:lastindex(ns)
     n = ns[i]
     position = [n["point"]["X"], n["point"]["Y"], n["point"]["Z"]] ./ 10
 
@@ -52,7 +52,7 @@ end
 
 structure = Structure(nodes, elements, loads)
 
-analyze(structure)
+@time analyze(structure)
 
 geo = Geometry(structure)
 structurePlot(geo; scaleToForce = true)
