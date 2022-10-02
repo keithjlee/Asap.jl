@@ -383,11 +383,15 @@ function structurePlot(geo::Geometry;
         constructionPath = false)
     
     # Initialize
-    fig, ax = scatter(geo.nodes, 
-        markersize = 0,
-        figure = (resolution = res, 
-        backgroundcolor = backgroundColor),
-        show_axis = false)
+    # fig, ax = scatter(geo.nodes, 
+    #     markersize = 0,
+    #     figure = (resolution = res, 
+    #     backgroundcolor = backgroundColor),
+    #     show_axis = false)
+
+    fig = Figure(resolution = res)
+    ax = Axis3(fig[1,1],
+        aspect = :data)
 
     # Alternative method using Axis3... provides orthographic viewmode
     # fig = Figure(resolution = res)
