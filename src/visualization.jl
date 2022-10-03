@@ -715,24 +715,24 @@ function plot(geo::Geometry;
 
     # Slider values
     areas = geo.areas ./ maximum(geo.areas)
-    lw = lift(lsgrid[1].value) do v
+    lw = lift(lsgrid.sliders[1].value) do v
         areas .* v
     end
 
     forces = geo.axialForce ./ maximum(abs.(geo.axialForce))
-    lw2 = lift(lsgrid[1].value) do v
-        forces .* v
+    lw2 = lift(lsgrid.sliders[1].value) do v
+        2 .* forces .* v
     end
 
-    objectSize1 = lift(lsgrid[2].value) do v
+    objectSize1 = lift(lsgrid.sliders[2].value) do v
         v
     end
 
-    objectSize2 = lift(lsgrid[2].value) do v
+    objectSize2 = lift(lsgrid.sliders[2].value) do v
         v / 3
     end
 
-    textSize = lift(lsgrid[3].value) do v
+    textSize = lift(lsgrid.sliders[3].value) do v
         v * 10
     end
 
@@ -750,9 +750,8 @@ function plot(geo::Geometry;
     # plot features
     bars = linesegments!(vcat(geo.elements...),
         color = :black,
-        linewidth = lw)
-
-    connect!(bars.visible, !toggles[1].active)
+        linewidth = lw,
+        visible = opp)
 
     loadArrows = arrows!(geo.loads...,
         color = (:red, 0.5),
@@ -787,7 +786,7 @@ function plot(geo::Geometry;
         colormap = red2blue,
         colorrange = (-colorLimit, colorLimit))
 
-    connect!(displacedBars, toggles[1].active)
+    connect!(displacedBars.visible, toggles[1].active)
 
     pinDofs = arrows!(geo.pinDOFS..., 
         arrowhead = pin, 

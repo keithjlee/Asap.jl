@@ -71,7 +71,7 @@ truss = Structure(nodes, elements, loads)
 mass = structureMass(truss, 8000) #kg
 
 # analyze
-@time analyze(truss)
+@time analyze!(truss)
 
 # output geometry
 geo = Geometry(truss)
