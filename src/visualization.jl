@@ -684,3 +684,127 @@ function prePlot(structure::Structure; lineSize = 2,
         
     end
 end
+
+
+function plot(geo::Geometry;
+        showaxis = true)
+
+    fig = Figure()
+
+    if length(geo.nodes[1]) == 2
+        ax = Axis(fig[1,1],
+            aspect = DataAspect())
+    else
+        ax = Axis3(fig[1,1],
+            aspect = :data)
+    end
+
+    # hide axes
+    if !showaxis
+        hidedecorations!(ax)
+        hidespines!(ax)
+    end
+
+    colorLimit = maximum(abs.(geo.axialForce))
+
+    # Slider grid
+    lsgrid = SliderGrid(fig[2,1],
+        (label = "Line Scale", range = 0.1:0.1:10, startvalue = 1.),
+        (label = "Object Scale", range = 0.1:0.1:10, startvalue = 1.),
+        (label = "Text Scale", range = 0.1:0.1:10, startvalue = 1.))
+
+    # Slider values
+    areas = geo.areas ./ maximum(geo.areas)
+    lw = lift(lsgrid[1].value) do v
+        areas .* v
+    end
+
+    forces = geo.axialForce ./ maximum(abs.(geo.axialForce))
+    lw2 = lift(lsgrid[1].value) do v
+        forces .* v
+    end
+
+    objectSize1 = lift(lsgrid[2].value) do v
+        v
+    end
+
+    objectSize2 = lift(lsgrid[2].value) do v
+        v / 3
+    end
+
+    textSize = lift(lsgrid[3].value) do v
+        v * 10
+    end
+
+    #toggles
+    toggles = [Toggle(fig, active = active) for active in [false, true, false, true]]
+    labels = [Label(fig, "Displaced"),
+        Label(fig, "Loads"),
+        Label(fig, "Labels"),
+        Label(fig, "DOFs")]
+
+    opp = lift(t -> !t[], toggles[1].active)
+    
+    fig[1,2] = grid!(hcat(toggles, labels), tellheight = false)
+
+    # plot features
+    bars = linesegments!(vcat(geo.elements...),
+        color = :black,
+        linewidth = lw)
+
+    connect!(bars.visible, !toggles[1].active)
+
+    loadArrows = arrows!(geo.loads...,
+        color = (:red, 0.5),
+        arrowsize = objectSize1,
+        linewidth = objectSize2)
+
+    connect!(loadArrows.visible, toggles[2].active)
+
+    reactionArrows = arrows!(geo.nodes .- geo.reactions, geo.reactions,
+        color = :green,
+        arrowsize = objectSize1,
+        linewidth = objectSize2)
+
+    connect!(reactionArrows.visible, toggles[2].active)
+
+    nodeLabels = text!(geo.nodeLabels, position = geo.nodes,
+        align = (:center, :bottom),
+        color = :green,
+        textsize = textSize)
+
+    connect!(nodeLabels.visible, toggles[3].active)
+
+    elementLabels = text!(geo.elementLabels, position = geo.midpoints,
+        color = :gray,
+        textsize = textSize)
+
+    connect!(elementLabels.visible, toggles[3].active)
+
+    displacedBars = linesegments!(vcat(geo.displacedElements...),
+        linewidth = lw2,
+        color = geo.axialForce,
+        colormap = red2blue,
+        colorrange = (-colorLimit, colorLimit))
+
+    connect!(displacedBars, toggles[1].active)
+
+    pinDofs = arrows!(geo.pinDOFS..., 
+        arrowhead = pin, 
+        arrowsize = objectSize1, 
+        arrowcolor = (:black,0.6), 
+        linewidth = 0)
+
+    connect!(pinDofs.visible, toggles[4].active)
+
+    fixDofs = arrows!(geo.fixDOFS..., 
+        arrowhead = fix, 
+        arrowsize = objectSize1, 
+        arrowcolor = (:black,0.6), 
+        linewidth = 0)
+
+    connect!(fixDofs.visible, toggles[4].active)
+
+    display(fig)
+    return fig
+end
