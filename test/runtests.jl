@@ -31,7 +31,7 @@ using Test
     ex38 = Structure(nodes, elements, loads)
 
     # Analyze
-    analyze(ex38)
+    analyze!(ex38)
 
     # value in textbook
     d_textbook = [0.21552, -0.13995]
@@ -66,7 +66,7 @@ using Test
 
     # assembly + analysis
     ex66 = Structure(nodes, elements, loads)
-    analyze(ex66)
+    analyze!(ex66)
 
     d_textbook = [0.021302, -0.06732, -0.0025499]
 
@@ -101,7 +101,7 @@ using Test
     loads = [l1]
 
     ex81 = Structure(nodes, elements, loads)
-    analyze(ex81)
+    analyze!(ex81)
 
     d_textbook = [.10913, .57202, -.12104]
 
@@ -138,7 +138,7 @@ using Test
     loads = [l]
 
     ex83 = Structure(nodes, elements, loads)
-    analyze(ex83)
+    analyze!(ex83)
     
     d_textbook = [-7.05e-6, -7e-8, 1.418e-5, 1.45e-6, 1.75e-6, 1.14e-6]
 

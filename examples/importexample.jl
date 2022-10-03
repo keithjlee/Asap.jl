@@ -52,7 +52,7 @@ end
 
 structure = Structure(nodes, elements, loads)
 
-@time analyze(structure)
+@time analyze!(structure)
 
 geo = Geometry(structure)
 structurePlot(geo; scaleToForce = true)
