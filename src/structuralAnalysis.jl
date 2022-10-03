@@ -24,32 +24,7 @@ function nodeGlobalIndex!(nodes::Vector{Node})
     end
 end
 
-```
-SHAPE FUNCTIONS gives displacement orthogonal to local x axis based on end moments and shear forces
-u1 = shear displacement at beginning node
-u2 = moment displacement at beginning node
-u3 = shear displacement at end node
-u4 = moment displacement at end node
 
-These displacements should be w/r/t local coordinate system
-```
-
-# 
-function N1(x, element::Element)
-    return 1 - 3 * (x / element.length)^2 + 2 * (x / element.length)^3
-end
-
-function N2(x, element::Element)
-    return x * (1 - x / element.length)^2
-end
-
-function N3(x, element::Element)
-    return 3 * (x / element.length)^2 - 2 * (x / element.length)^3
-end
-
-function N4(x, element::Element)
-    return x^2 / element.length * (x / element.length - 1)
-end
 
 ```
 Local coordinate system of element
@@ -248,96 +223,6 @@ function axialLoad(element::Element)
                 return norm(element.globalForce[7:9])
             end
         end
-    end
-end
-
-
-
-```
-Typical DOF settings:
-dims : 2 or 3
-type : :truss or :frame
-fixity : :x/y/zfree, x/y/zfixed, :free, :fixed, :pinfixed
-```
-function dofMaker(dims::Int64, type::Symbol, fixity::Symbol)
-    if dims == 2
-        if type == :truss
-            if fixity == :free
-                return [true, true]
-            elseif fixity == :fixed
-                return [false, false]
-            elseif fixity == :xfree
-                return [true, false]
-            elseif fixity == :yfree
-                return [false, true]
-            else
-                error("unknown fixity, use :free, :fixed, :xfree, :yfree")
-            end
-        elseif type == :frame
-            if fixity == :free
-                return [true, true, true]
-            elseif fixity == :pinfixed
-                return [false, false, true]
-            elseif fixity == :fixed
-                return [false, false, false]
-            elseif fixity == :xfree
-                return [true, false, true]
-            elseif fixity == :yfree
-                return [false, true, false]
-            else
-                error("unknown fixity, use :free, :pinfixed, :fixed, :xfree, :yfree")
-            end
-        else
-            error("type must be :truss or :frame")
-        end
-    elseif dims == 3
-        if type == :truss
-            if fixity == :free
-                return [true, true, true]
-            elseif fixity == :fixed
-                return [false, false, false]
-            elseif fixity == :zfixed
-                return [true, true, false]
-            elseif fixity == :xfixed
-                return [false, true, true]
-            elseif fixity == :yfixed
-                return [true, false, true]
-            elseif fixity == :xfree
-                return [true, false, false]
-            elseif fixity == :yfree
-                return [false, true, false]
-            elseif fixity == :zfree
-                return [false, false, true]
-            else
-                error("unknown fixity, use :free, :fixed, :x/y/zfixed, :x/y/zfree")
-            end
-        elseif type == :frame
-            if fixity == :free
-                return [true, true, true, true, true, true]
-            elseif fixity == :pinfixed
-                return [false, false, false, true, true, true]
-            elseif fixity == :fixed
-                return [false, false, false, false, false, false]
-            elseif fixity == :zfixed
-                return [true, true, false, true, true, true]
-            elseif fixity == :xfixed
-                return  [false, true, true, true, true, true]
-            elseif fixity == :yfixed
-                return [true, false, true, true, true, true]
-            elseif fixity == :xfree
-                return [true, false, false, true, true, true]
-            elseif fixity == :yfree
-                return [false, true, false, true, true, true]
-            elseif fixity == :zfree
-                return [false, false, true, true, true, true]
-            else
-                error("unknown fixity, use :free, :pinfixed, :fixed, :x/y/zfixed, :x/y/zfree")
-            end
-        else
-            error("type must be :truss or :frame")
-        end
-    else
-        error("dims must be 2 or 3")
     end
 end
 
