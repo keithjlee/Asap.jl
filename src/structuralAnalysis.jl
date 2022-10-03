@@ -4,19 +4,19 @@ const globalY = [0., 1., 0.]
 const globalZ = [0., 0., 1.]
 
 # expands elemental start/end nodes to global DOF indices
-function dofExpander(element::Element, nodes::Vector{Node})
+function dofExpander!(element::Element, nodes::Vector{Node})
     element.dofIndex = vcat(nodes[element.nodeIndex[1]].globalIndex, nodes[element.nodeIndex[2]].globalIndex)
 end
 
 # dofExpander for a vector of elements
-function dofExpander(elements::Vector{Element}, nodes::Vector{Node})
+function dofExpander!(elements::Vector{Element}, nodes::Vector{Node})
     for element in elements
         element.dofIndex = vcat(nodes[element.nodeIndex[1]].globalIndex, nodes[element.nodeIndex[2]].globalIndex)
     end
 end
 
 # global dof index of each node
-function nodeGlobalIndex(nodes::Vector{Node})
+function nodeGlobalIndex!(nodes::Vector{Node})
     n = length(nodes)
     nNodalDOFS = length(nodes[1].DOFS)
     for i = 1:n
@@ -88,7 +88,7 @@ function autoScaleFactor(structure::Structure)
     return round(factor)
 end
 
-function postProcess(structure::Structure; scaleFactor = :auto)
+function postProcess!(structure::Structure; scaleFactor = :auto)
 
     ### create displaced nodes and elements (scaled)
     if scaleFactor == :auto
@@ -124,7 +124,7 @@ function postProcess(structure::Structure; scaleFactor = :auto)
     end
 end
 
-function reactions(structure::Structure)
+function reactions!(structure::Structure)
     if isdefined(structure, :U) == false
         error("Perform analysis before solving reactions.")
     end
@@ -143,7 +143,7 @@ function reactions(structure::Structure)
 end
 
 
-function addNodeElements(elements::Vector{Element}, nodes::Vector{Node})
+function addNodeElements!(elements::Vector{Element}, nodes::Vector{Node})
     for i = 1:length(elements)
         j, k = elements[i].nodeIndex
         push!(nodes[j].elements, (i, -1))
@@ -157,21 +157,21 @@ function addNodeElements(elements::Vector{Element}, nodes::Vector{Node})
     end
 end
 
-function addNodeLoads(loads::Vector{Load}, nodes::Vector{Node})
+function addNodeLoads!(loads::Vector{Load}, nodes::Vector{Node})
    for i = 1:length(loads)
     nodes[loads[i].index].load = loads[i].load 
    end
 end
 
-function analyze(structure::Structure; forceK = false, SF = :auto)
+function analyze!(structure::Structure; forceK = false, SF = :auto)
     if !isdefined(structure, :F)
         error("No loads defined.")
     end
 
     # associated elements to each node
-    addNodeElements(structure.elements, structure.nodes)
+    addNodeElements!(structure.elements, structure.nodes)
     # associated load vectors to individual nodes
-    addNodeLoads(structure.loads, structure.nodes)
+    addNodeLoads!(structure.loads, structure.nodes)
 
     # prevents rebuilding of stiffness matrix if structure stays the same
     # setting forceK = true rebuilds the stiffness matrix
@@ -184,13 +184,13 @@ function analyze(structure::Structure; forceK = false, SF = :auto)
         return
     end
     #create nodal DOF indices
-    nodeGlobalIndex(structure.nodes)
+    nodeGlobalIndex!(structure.nodes)
 
     #create elemental DOF indices
-    dofExpander(structure.elements, structure.nodes)
+    dofExpander!(structure.elements, structure.nodes)
 
     #create elemental stiffness matrices
-    k_elemental.(structure.elements, structure.dims)
+    k_elemental!.(structure.elements, structure.dims)
 
     #create global stiffness matrix
     structure.K = K(structure.elements, structure.nDOFS)
@@ -206,10 +206,10 @@ function analyze(structure::Structure; forceK = false, SF = :auto)
     structure.U[structure.freeDOFS] = U
 
     #reactions
-    reactions(structure)
+    reactions!(structure)
 
     #post processing
-    postProcess(structure; scaleFactor = SF)
+    postProcess!(structure; scaleFactor = SF)
 end
 
 
@@ -374,14 +374,14 @@ function pseudoSize!(structure::Structure,
 
     # perform analysis
 
-    analyze(structure)
+    analyze!(structure)
 
     iter = 0
     while iter < maxIters
         for element in structure.elements
             element.A = trussSizer(element.axialForce, k, element.length, element.E, dDratio, maxStress, minArea)
         end
-        analyze(structure; forceK = true)
+        analyze!(structure; forceK = true)
         iter += 1
     end
 end
@@ -395,7 +395,7 @@ function pseudoSize(structure::Structure,
 
     # perform analysis
     newstructure = deepcopy(structure)
-    analyze(newstructure)
+    analyze!(newstructure)
 
     iter = 0
     while iter < maxIters
@@ -408,7 +408,7 @@ function pseudoSize(structure::Structure,
                 push!(areas, element.A)
             end
         end
-        analyze(newstructure; forceK = true)
+        analyze!(newstructure; forceK = true)
 
         iter += 1
     end

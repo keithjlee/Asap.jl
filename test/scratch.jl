@@ -22,4 +22,4 @@ loads = [l1]
 
 # assembly + analysis
 ex66 = Structure(nodes, elements, loads)
-analyze(ex66)
+analyze!(ex66)

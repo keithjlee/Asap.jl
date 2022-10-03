@@ -22,7 +22,7 @@ export Geometry
 include("R.jl")
 include("K.jl")
 include("structuralAnalysis.jl")
-export analyze
+export analyze!
 export dofMaker
 export pseudoSize
 export pseudoSize!

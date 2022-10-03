@@ -51,7 +51,7 @@ function K3d_frame(element::Element)
 end
 
 # creates the elemental stiffness matrix in global coordinate system
-function k_elemental(element::Element, dims::Int; return_k = false, tol = 1e-3)
+function k_elemental!(element::Element, dims::Int; return_k = false, tol = 1e-3)
     type = element.type
     if type == :truss
         if dims == 3
