@@ -19,6 +19,8 @@ export Structure
 export Geometry
 
 # structural analysis
+include("R.jl")
+include("K.jl")
 include("structuralAnalysis.jl")
 export analyze
 export dofMaker

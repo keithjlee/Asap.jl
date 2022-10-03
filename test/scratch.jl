@@ -1,42 +1,25 @@
 using Asap
-# Nodes
-a = Node([0., 0., 0.], :frame, :fixed)
-b = Node([0., 1., 0.], :frame, :free)
-c = Node([1., 1., 0.] / sqrt(2), :frame, :free)
-nodes = [a, b]
-nodes2 = [a, c]
+n1 = Node([0., 0.] .* 12, :frame, :fixed)
+n2 = Node([10., 20.] .* 12, :frame, :free)
+n3 = Node([30., 20.] .* 12, :frame, :fixed)
+
+nodes = [n1, n2, n3]
+
 # elements
-begin
-    E = 200e6
-    A = 9290/1e6
-    G = 77e6
-    I1 = 113e-6
-    I2 = 38.8e-6
-    J = 575e-3
-end
+E = 29e3 #ksi
+A = 11.8 # in^2
+I = 310. # in^4
 
-# Iz is strong axis, Iy is weak axis
-e = Element(nodes, [1, 2], E, A, G, I1, I2, J)
-elements = [e]
+e1 = Element(nodes, [1,2], E, A, I)
+e2 = Element(nodes, [2,3], E, A, I)
 
-# load
-l = Load(nodes, b.position, [0., 0., -10., 0., 0., 0.])
-loads = [l]
+elements = [e1, e2]
 
-#structure
-s = Structure(nodes, elements, loads)
-analyze(s)
+# loads
+l1 = Load(nodes, n2.position, [0., -60., -750.])
 
-u1 = s.U
-r1 = s.reactions
+loads = [l1]
 
-# Iz is weak axis, Iy is strong axis
-e2 = Element(nodes, [1, 2], E, A, G, I2, I1, J)
-e2.Ψ = 0.
-elements2 = [e2]
-
-s2 = Structure(nodes, elements2, loads)
-analyze(s2)
-
-u2 = s2.U
-r2 = s2.reactions
+# assembly + analysis
+ex66 = Structure(nodes, elements, loads)
+analyze(ex66)
