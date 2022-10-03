@@ -229,7 +229,7 @@ mutable struct Geometry
     pinDOFS :: NTuple #{6, Vector{Float64}}
     fixDOFS :: NTuple #{6, Vector{Float64}}
 
-    function Geometry(structure::Structure; nodeAnalysis = false, SF = :auto)
+    function Geometry(structure::Structure; SF = :auto)
         geometry = new(structure)
 
         if structure.dims == 3
@@ -257,8 +257,8 @@ mutable struct Geometry
                 geometry.displacedNodes = Point3.([node.position for node in structure.displacedNodes])
                 geometry.displacedElements = [[Point3(element.posStart), Point3(element.posEnd)] for element in structure.displacedElements]
             else
-                geometry.displacedNodes = Point3.([[node.position; 0.0] for node in structure.displacedNodes])
-                geometry.displacedElements = [[Point3([element.posStart; 0.0]), Point3([element.posEnd; 0.0])] for element in structure.displacedElements]
+                geometry.displacedNodes = Point2.([node.position for node in structure.displacedNodes])
+                geometry.displacedElements = [[Point2(element.posStart), Point2(element.posEnd)] for element in structure.displacedElements]
             end
         end
 

@@ -52,7 +52,8 @@ function loadConverter(structure::Structure; scaleFactor = :auto)
     
     if structure.dims == 2
         loads = [load.load[1:2] ./ denom .* scaleFactor for load in structure.loads]
-        return [[p[1] for p in positions], [p[2] for p in positions], [0.0 for p in positions], [l[1] for l in loads], [l[2] for l in loads], [0.0 for l in loads]]
+        return [[p[1] for p in positions], [p[2] for p in positions], [l[1] for l in loads], [l[2] for l in loads]]
+        # return [[p[1] for p in positions], [p[2] for p in positions], [0.0 for p in positions], [l[1] for l in loads], [l[2] for l in loads], [0.0 for l in loads]]
     else
         loads = [load.load[1:3] ./ denom .* scaleFactor for load in structure.loads]
         return [[p[1] for p in positions], [p[2] for p in positions], [p[3] for p in positions], [l[1] for l in loads], [l[2] for l in loads], [l[3] for l in loads]]
