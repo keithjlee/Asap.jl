@@ -23,3 +23,5 @@ loads = [l1]
 # assembly + analysis
 ex66 = Structure(nodes, elements, loads)
 analyze!(ex66)
+
+f1 = Rdict[(2, :truss)]

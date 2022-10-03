@@ -31,7 +31,7 @@ function K2d_frame(element::Element)
 end
 
 """
-3d frame K
+3d frame K (dis is nasty)
 """
 function K3d_frame(element::Element)
     return element.E / element.length^3 * [
@@ -50,42 +50,36 @@ function K3d_frame(element::Element)
         ]
 end
 
-# creates the elemental stiffness matrix in global coordinate system
+"""
+matches condition to appropriate stiffness matrix
+"""
+Kdict = Dict(
+    (2, :truss) => K_truss,
+    (3, :truss) => K_truss,
+    (2, :frame) => K2d_frame,
+    (3, :frame) => K3d_frame
+)
+
+"""
+Creates elemental stiffness matrix in GCS
+"""
 function k_elemental!(element::Element, dims::Int; return_k = false, tol = 1e-3)
-    type = element.type
-    if type == :truss
-        if dims == 3
-            R3d_truss!(element) # rotation matrix
-            K = K_truss(element) # LCS stiffness matrix
-            element.k = Symmetric(element.R' * K * element.R)
-        elseif dims == 2
-            R2d_truss!(element) # rotation matrix
-            K = K_truss(element) # LCS stiffness matrix
-            element.k = Symmetric(element.R' * K * element.R)
-        else
-            error("dims must be 2 or 3")
-        end
-    elseif type == :frame
-        if dims == 3
-            R3d_frame!(element) # rotation matrix
-            K = K3d_frame(element) # LCS stiffness matrix
-            element.k = Symmetric(element.R' * K * element.R)
-        elseif dims == 2
-            R2d_frame!(element) # rotation matrix
-            K = K2d_frame(element) # LCS stiffness matrix
-            element.k = Symmetric(element.R' * K * element.R)
-        else
-            error("dims must be 2 or 3")
-        end
-    else
-        error("type must be :truss or :frame")
-    end
+
+    rFunction = Rdict[(dims, element.type)] # rotation matrix generator
+    kFunction = Kdict[(dims, element.type)] # stiffness matrix generator
+
+    rFunction(element) # add R to element.R
+    K = kFunction(element) # LCS stiffness matrix
+    element.k = Symmetric(element.R' * K * element.R) #GCS stiffness matrix
 
     if return_k
         return element.k
     end
 end
 
+"""
+Creates global stiffness matrix K
+"""
 function K(elements::Array{Element}, nDOFS::Int)
     K = spzeros(nDOFS, nDOFS)
 

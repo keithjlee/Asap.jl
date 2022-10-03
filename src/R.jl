@@ -81,3 +81,13 @@ end
 function R3d_frame!(element::Element)
     element.R = R3d_frame(element)
 end
+
+"""
+Matches element condition to appropriate rotation matrix
+"""
+Rdict = Dict(
+    (2, :truss) => R2d_truss!,
+    (3, :truss) => R3d_truss!,
+    (2, :frame) => R2d_frame!,
+    (3, :frame) => R3d_frame!
+)
