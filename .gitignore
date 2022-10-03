@@ -3,3 +3,4 @@ src/privateTests.jl
 .vscode
 .github
 scratch.jl
+test/scratch.jl
