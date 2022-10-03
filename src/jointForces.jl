@@ -17,7 +17,7 @@ function frame2d_point(element::Element, P::Union{Int64, Float64}, t::Float64)
     FSe = P * l1^2 / L^3 * (l1 + 3l2)
     FMe = - P * l1^2 * l2 / L^2
 
-    return [Fsb, FMb, FSe, FMb]
+    return [FSb, FMb, FSe, FMe]
 end
 
 """
