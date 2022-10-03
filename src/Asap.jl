@@ -19,9 +19,9 @@ export Structure
 export Geometry
 
 # structural analysis
-include("R.jl")
-include("K.jl")
-include("structuralAnalysis.jl")
+include("R.jl") # rotation matrices
+include("K.jl") # stiffness matrices
+include("structuralAnalysis.jl") #operations
 export analyze!
 export dofMaker
 export pseudoSize
