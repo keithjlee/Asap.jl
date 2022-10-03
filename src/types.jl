@@ -215,13 +215,13 @@ end
 
 mutable struct Geometry
     structure :: Structure
-    nodes :: Vector #{Point3{Float64}}
-    elements :: Vector{Vector} #Vector{Vector{Point3{Float64}}}
+    nodes :: Union{Vector{Point3{Float64}}, Vector{Point2{Float64}}}
+    elements :: Union{Vector{Vector{Point2{Float64}}}, Vector{Vector{Point3{Float64}}}} #Vector{Vector{Point3{Float64}}}
     axialForce :: Vector{Float64}
     areas :: Vector{Float64}
-    displacedNodes :: Vector #Vector{Point3{Float64}}
-    displacedElements :: Vector{Vector} #Vector{Vector{Point3{Float64}}}
-    midpoints :: Vector #Vector{Point3{Float64}}
+    displacedNodes :: Union{Vector{Point3{Float64}}, Vector{Point2{Float64}}} #Vector{Point3{Float64}}
+    displacedElements :: Union{Vector{Vector{Point2{Float64}}}, Vector{Vector{Point3{Float64}}}} #Vector{Vector{Point3{Float64}}}
+    midpoints :: Union{Vector{Point3{Float64}}, Vector{Point2{Float64}}} #Vector{Point3{Float64}}
     loads :: Vector{Vector{Float64}}
     reactions :: Vector #Vector{Vec3{Float64}}
     nodeLabels :: Vector{String}
@@ -236,8 +236,8 @@ mutable struct Geometry
             geometry.nodes = Point3.([node.position for node in structure.nodes])
             geometry.elements = [[Point3(element.posStart), Point3(element.posEnd)] for element in structure.elements]
         else
-            geometry.nodes = Point3.([[node.position; 0.0] for node in structure.nodes])
-            geometry.elements = [[Point3([element.posStart; 0.0]), Point3([element.posEnd; 0.0])] for element in structure.elements]
+            geometry.nodes = Point2.([node.position for node in structure.nodes])
+            geometry.elements = [[Point2(element.posStart), Point2(element.posEnd)] for element in structure.elements]
         end
 
         areas = [element.A for element in structure.elements]
