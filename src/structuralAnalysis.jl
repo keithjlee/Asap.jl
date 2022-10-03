@@ -187,6 +187,44 @@ function analyze!(structure::Structure; forceK = false, SF = :auto)
     postProcess!(structure; scaleFactor = SF)
 end
 
+function axial2d_truss(element::Element)
+    if dot(element.posEnd - element.posStart, element.globalForce[3:4]) < 0
+        return - norm(element.globalForce[3:4])
+    else
+        return norm(element.globalForce[3:4])
+    end
+end
+
+function axial3d_truss(element::Element)
+    if dot(element.posEnd - element.posStart, element.globalForce[4:6]) < 0
+        return - norm(element.globalForce[4:6])
+    else
+        return norm(element.globalForce[4:6])
+    end
+end
+
+function axial2d_frame(element::Element)
+    if dot(element.posEnd - element.posStart, element.globalForce[4:5]) < 0
+        return - norm(element.globalForce[4:5])
+    else
+        return norm(element.globalForce[4:5])
+    end
+end
+
+function axial3d_frame(element::Element)
+    if dot(element.posEnd - element.posStart, element.globalForce[7:9]) < 0
+        return - norm(element.globalForce[7:9])
+    else
+        return norm(element.globalForce[7:9])
+    end
+end
+
+axialDict = Dict(
+    (2, :truss) => axial2d_truss,
+    (3, :truss) => axial3d_truss,
+    (2, :frame) => axial2d_frame,
+    (3, :frame) => axial3d_frame
+)
 
 function axialLoad(element::Element)
     if isdefined(element, :globalForce) == false
@@ -194,36 +232,8 @@ function axialLoad(element::Element)
     end
 
     dims = length(element.posStart)
-
-    if element.type == :truss
-        if dims == 2
-            if dot(element.posEnd - element.posStart, element.globalForce[3:4]) < 0
-                return - norm(element.globalForce[3:4])
-            else
-                return norm(element.globalForce[3:4])
-            end
-        else
-            if dot(element.posEnd - element.posStart, element.globalForce[4:6]) < 0
-                return - norm(element.globalForce[4:6])
-            else
-                return norm(element.globalForce[4:6])
-            end
-        end
-    else
-        if dims == 2
-            if dot(element.posEnd - element.posStart, element.globalForce[4:5]) < 0
-                return - norm(element.globalForce[4:5])
-            else
-                return norm(element.globalForce[4:5])
-            end
-        else
-            if dot(element.posEnd - element.posStart, element.globalForce[7:9]) < 0
-                return - norm(element.globalForce[7:9])
-            else
-                return norm(element.globalForce[7:9])
-            end
-        end
-    end
+    axialFunc = axialDict[(dims, element.type)]
+    return axialFunc(element)
 end
 
 function trussSizer(P, k, L, E, ρ, σ, minA)
