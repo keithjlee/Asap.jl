@@ -296,9 +296,6 @@ function pseudoSize(structure::Structure,
     while iter < maxIters
         for element in newstructure.elements
             element.A = trussSizer(element.axialForce, k, element.length, element.E, dDratio, maxStress, minArea)
-            if storeAreas
-                push!(areas, element.A)
-            end
         end
         analyze!(newstructure; forceK = true)
 
