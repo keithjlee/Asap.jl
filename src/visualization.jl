@@ -459,7 +459,7 @@ function structurePlot(geo::Geometry;
         arrowsize = arrow_size, 
         linewidth = arrow_thickness)
     reactionArrows = arrows!(geo.nodes .- geo.reactions, geo.reactions,
-        color = keithGreen,
+        color = green,
         arrowsize = arrow_size,
         linewidth = arrow_thickness)
     nodeLabels = text!(geo.nodeLabels, position = geo.nodes, 
