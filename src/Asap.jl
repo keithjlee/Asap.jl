@@ -29,7 +29,9 @@ export pseudoSize!
 export structureMass
 
 # method extensions/general QOL utilities
+using JSON
 include("utilities.jl")
+export karamba2asap
 
 # viz tools
 include("visualization.jl")
