@@ -3,20 +3,14 @@ Functions and packages for visualizing structural analysis
 ```
 
 # define custom colors for tension/compression
-const keithBlue = colorant"#2F5597"
-const keithGreen = colorant"#0D5E00"
-const mitGray = colorant"#C2C0BF"
-const mitRed = colorant"#A31F34"
-const red2blue = cgrad([mitRed, mitGray, keithBlue])
-const redBlackBlue = cgrad([mitRed, colorant"#000000", keithBlue])
-const redWhiteBlue = cgrad([mitRed, colorant"#FFFFFF", keithBlue])
-const blueWhiteRed = cgrad([keithBlue, colorant"#FFFFFF", mitRed])
-const gray2blue = cgrad([mitGray, keithBlue])
-const white2blue = cgrad([:white, keithBlue])
-const caitlinBlue = colorant"#00B0F0"
-const allWhite = cgrad([:white, :white])
-const whiteTransparentWhite = cgrad([:white, :transparent, :white])
-const transparent2white = cgrad([:transparent, :white])
+gray1 = colorant"#B2B2B2"
+const blue = colorant"#3EA8DE"
+const pink = colorant"#FF7BAC"
+const red = colorant"#EA2127"
+const redWhiteBlue = cgrad([pink, :white, blue])
+const green  = colorant"#48B674"
+const gray2blue = cgrad([gray1, blue])
+
 # custom arrowheads for support conditions
 const pin = load(joinpath(@__DIR__, "customObjects", "pinSupport.obj"))
 const fix = load(joinpath(@__DIR__, "customObjects", "fixSupport.obj"))
@@ -294,7 +288,7 @@ function axo(geo::Geometry;
 
     if mode == :undisplaced && forces
         arrows!(geo.loads...,
-            color = (:red, 0.5),
+            color = (red, 0.5),
             arrowsize = arrowSize,
             linewidth = arrowSize / 3)
     end
@@ -372,8 +366,8 @@ function structurePlot(geo::Geometry;
         lineSize = 2,
         lineColor = :black, 
         backgroundColor = :transparent,
-        colorMap = red2blue,
-        nodeColor = :green,
+        colorMap = redWhiteBlue,
+        nodeColor = green,
         elementColor = :black,
         lineSizeRange = 0.1:0.1:10,
         arrowSize = 0.3, 
@@ -461,11 +455,11 @@ function structurePlot(geo::Geometry;
         linewidth= element_thickness, 
         visible = opposite)
     loadArrows = arrows!(geo.loads..., 
-        color = (:red, 0.5), 
+        color = (red, 0.5), 
         arrowsize = arrow_size, 
         linewidth = arrow_thickness)
     reactionArrows = arrows!(geo.nodes .- geo.reactions, geo.reactions,
-        color = keithGreen,
+        color = green,
         arrowsize = arrow_size,
         linewidth = arrow_thickness)
     nodeLabels = text!(geo.nodeLabels, position = geo.nodes, 
@@ -582,11 +576,11 @@ function prePlot(structure::Structure; lineSize = 2,
             color = lineColor, 
             linewidth= element_thickness)
         loadArrows = arrows!(geo.loads..., 
-            color = (:red, 0.5), 
+            color = (red, 0.5), 
             arrowsize = arrow_size, 
             linewidth = arrow_thickness)
         nodeLabels = text!(geo.nodeLabels, position = geo.nodes, align = (:center, :bottom), 
-            color = :green, 
+            color = green, 
             textsize=  ts)
         elementLabels = text!(geo.elementLabels, 
             position = geo.midpoints, 
@@ -656,7 +650,7 @@ function prePlot(structure::Structure; lineSize = 2,
         nodeLabels = text!(geo.nodeLabels, 
             position = geo.nodes, 
             align = (:center, :bottom), 
-            color = :green, 
+            color = green, 
             textsize=  ts)
         elementLabels = text!(geo.elementLabels, 
             position = geo.midpoints, 
@@ -754,14 +748,14 @@ function plot(geo::Geometry;
         visible = opp)
 
     loadArrows = arrows!(geo.loads...,
-        color = (:red, 0.5),
+        color = (red, 0.5),
         arrowsize = objectSize1,
         linewidth = objectSize2)
 
     connect!(loadArrows.visible, toggles[2].active)
 
     reactionArrows = arrows!(geo.nodes .- geo.reactions, geo.reactions,
-        color = :green,
+        color = green,
         arrowsize = objectSize1,
         linewidth = objectSize2)
 
@@ -769,7 +763,7 @@ function plot(geo::Geometry;
 
     nodeLabels = text!(geo.nodeLabels, position = geo.nodes,
         align = (:center, :bottom),
-        color = :green,
+        color = green,
         textsize = textSize)
 
     connect!(nodeLabels.visible, toggles[3].active)
@@ -783,7 +777,7 @@ function plot(geo::Geometry;
     displacedBars = linesegments!(vcat(geo.displacedElements...),
         linewidth = lw2,
         color = geo.axialForce,
-        colormap = red2blue,
+        colormap = redWhiteBlue,
         colorrange = (-colorLimit, colorLimit))
 
     connect!(displacedBars.visible, toggles[1].active)

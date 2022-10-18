@@ -185,15 +185,6 @@ mutable struct Structure
         structure.nDOFS = length(structure.DOFS)
         structure.freeDOFS = findall(structure.DOFS)
 
-        # create global load vector
-        structure.F = zeros(structure.nDOFS)
-        nodalDOFLength = length(nodes[1].DOFS)
-
-        for load in loads
-            idx = load.index * nodalDOFLength - (nodalDOFLength - 1) .+ collect(0:nodalDOFLength-1)
-            structure.F[idx] .= load.load
-        end
-
         return structure
     end
 
