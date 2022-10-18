@@ -138,10 +138,26 @@ function addNodeLoads!(loads::Vector{Load}, nodes::Vector{Node})
    end
 end
 
+function generateF!(structure::Structure)
+    # create global load vector
+    structure.F = zeros(structure.nDOFS)
+    
+    #frame or truss, 2 or 3d?
+    nodalDOFLength = length(structure.nodes[1].DOFS)
+
+    for load in structure.loads
+        idx = load.index * nodalDOFLength - (nodalDOFLength - 1) .+ collect(0:nodalDOFLength-1)
+        structure.F[idx] .= load.load
+    end
+end
+
 function analyze!(structure::Structure; forceK = false, SF = :auto)
-    if !isdefined(structure, :F)
+    if !isdefined(structure, :loads)
         error("No loads defined.")
     end
+
+    #create global load vector f
+    generateF!(structure)
 
     # associated elements to each node
     addNodeElements!(structure.elements, structure.nodes)
