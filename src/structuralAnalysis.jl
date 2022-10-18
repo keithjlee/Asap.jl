@@ -25,7 +25,6 @@ function nodeGlobalIndex!(nodes::Vector{Node})
 end
 
 
-
 ```
 Local coordinate system of element
 ```
