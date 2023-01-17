@@ -1,146 +1,208 @@
 using Asap
 using Test
+using LinearAlgebra
 
 @testset "Asap.jl" begin
-    # 2D truss test: Example 3.8 from Kassimali "Matrix Analysis of Structures 2e"
+    #tol
+    tol = 0.1
+    # 2D truss test: Example 3.9 from Kassimali "Matrix Analysis of Structures 2e"
     # in kips, ft
 
-    #nodes
-    n1 = Node([0., 0.] .* 12, :truss, :fixed)
-    n2 = Node([12., 0.] .* 12, :truss, :fixed)
-    n3 = Node([24., 0.] .* 12, :truss, :fixed)
-    n4 = Node([12., 16.] .* 12, :truss, :free)
+    n1 = TrussNode([0., 0., 0.], :fixed)
+    n2 = TrussNode([10., 0., 0.], :fixed)
+    n3 = TrussNode([0., 8., 0.], :yfree)
+    n4 = TrussNode([6., 8., 0.], :free)
 
     nodes = [n1, n2, n3, n4]
+    planarize!(nodes)
 
-    # elements
-    E = 29e3 #ksi
+    E = 70. #kN/m^2
+    A = 4e3 / 1e6 #m^2
 
-    e1 = Element(nodes, [1,4], E, 8.)
-    e2 = Element(nodes, [2,4], E, 6.)
-    e3 = Element(nodes, [3,4], E, 8.)
+    sec = TrussSection(A, E)
 
-    elements = [e1, e2, e3]
+    e1 = TrussElement(nodes, [1,3], sec)
+    e2 = TrussElement(nodes, [3,4], sec)
+    e3 = TrussElement(nodes, [1,4], sec)
+    e4 = TrussElement(nodes, [2,3], sec)
+    e5 = TrussElement(nodes, [2,4], sec)
 
-    # load
-    l1 = Load(nodes, n4.position, [150., -300.])
+    elements = [e1,e2,e3,e4,e5]
 
-    loads = [l1]
+    l1 = NodeForce(n3, [0., -400., 0.])
+    l2 = NodeForce(n4, [800., -400., 0.])
 
-    # assemble
-    ex38 = Structure(nodes, elements, loads)
+    loads = [l1, l2]
 
-    # Analyze
-    analyze!(ex38)
+    model = TrussModel(nodes, elements, loads)
+    solve!(model)
 
-    # value in textbook
-    d_textbook = [0.21552, -0.13995]
+    reactions = model.reactions[model.fixedDOFs]
+    reactions2d = reactions[reactions .!= 0]
 
-    @test round.(d_textbook, sigdigits = 4) ≈ round.(n4.disp, sigdigits = 4)
+    reactions_textbook = [-.57994,
+        320.82,
+        -298.39,
+        479.17,
+        -501.05]
+
+    err = norm(reactions_textbook .- reactions2d)
+
+    @test err <= tol
 
 
     #2D frame test: Example 6.6
     # in kips, in
 
-    # nodes
-    n1 = Node([0., 0.] .* 12, :frame, :fixed)
-    n2 = Node([10., 20.] .* 12, :frame, :free)
-    n3 = Node([30., 20.] .* 12, :frame, :fixed)
-
+    n1 = Node([0., 0., 0.], :fixed)
+    n2 = Node([10., 20., 0.] .* 12, :free)
+    n3 = Node([30., 20., 0.] .* 12, :fixed)
     nodes = [n1, n2, n3]
+    planarize!(nodes)
 
-    # elements
-    E = 29e3 #ksi
-    A = 11.8 # in^2
-    I = 310. # in^4
+    E = 29e3
+    A = 11.8
+    I = 310.
 
-    e1 = Element(nodes, [1,2], E, A, I)
-    e2 = Element(nodes, [2,3], E, A, I)
+    sec = Section(A, E, 1., I, I, 1.)
+
+    e1 = Element(nodes, [1,2], sec)
+    e1.Ψ = 0.
+    e2 = Element(nodes, [2,3], sec)
+    e2.Ψ = 0.
 
     elements = [e1, e2]
 
-    # loads
-    l1 = Load(nodes, n2.position, [0., -60., -750.])
+    l1 = PointLoad(e1, 0.5, [0., -90., 0.])
+    l2 = NodeMoment(n2, [0., 0., -125 * 12.])
+    l3 = LineLoad(e2, [0., -1.5/12, 0.])
 
-    loads = [l1]
+    loads = [l1, l2, l3]
 
-    # assembly + analysis
-    ex66 = Structure(nodes, elements, loads)
-    analyze!(ex66)
+    model = Model(nodes, elements, loads)
+    solve!(model)
 
-    d_textbook = [0.021302, -0.06732, -0.0025499]
+    reactions = model.reactions[model.fixedDOFs]
+    reactions = reactions[reactions .!= 0]
 
-    @test round.(d_textbook, sigdigits = 4) ≈ round.(n2.disp, sigdigits = 4)
+    reactions_textbook = [30.371,
+        102.09,
+        1216.,
+        -30.372,
+        17.913,
+        -854.07]
+
+    err = norm(reactions_textbook .- reactions)
+
+    @test err <= tol
 
     # 3D truss test: Example 8.1
     # in kips, in
 
-    # nodes
-    n1 = Node([0., 0., 0.] .* 12, :truss, :fixed)
-    n2 = Node([18., 0., 0.] .* 12, :truss, :fixed)
-    n3 = Node([12., 16., 0.] .* 12, :truss, :fixed)
-    n4 = Node([-6., 16., 0.] .* 12, :truss, :fixed)
-    n5 = Node([6., 8., 24.] .* 12, :truss, :free)
+    E = 10e3
+    A = 8.4
+    sec = TrussSection(A, E)
+
+    n1 = TrussNode([-6., 0., 8.] .* 12, :fixed)
+    n2 = TrussNode([12., 0., 8.] .* 12, :fixed)
+    n3 = TrussNode([6., 0., -8.] .* 12, :fixed)
+    n4 = TrussNode([-12., 0., -8.] .* 12, :fixed)
+    n5 = TrussNode([0., 24., 0.] .* 12, :free)
 
     nodes = [n1, n2, n3, n4, n5]
 
-    # elements
-    E = 10e3 #ksi
-    A = 8.4 #in^2
-
-    e1 = Element(nodes, [1,5], E, A)
-    e2 = Element(nodes, [2,5], E, A)
-    e3 = Element(nodes, [3,5], E, A)
-    e4 = Element(nodes, [4,5], E, A)
+    e1 = TrussElement(nodes, [1,5], sec)
+    e2 = TrussElement(nodes, [2,5], sec)
+    e3 = TrussElement(nodes, [3,5], sec)
+    e4 = TrussElement(nodes, [4,5], sec)
 
     elements = [e1, e2, e3, e4]
 
-    # loads
-    l1 = Load(nodes, n5.position, [0., 50., -100.])
-
+    l1 = NodeForce(n5, [0., -100., -50.])
     loads = [l1]
 
-    ex81 = Structure(nodes, elements, loads)
-    analyze!(ex81)
+    model = TrussModel(nodes, elements, loads)
+    solve!(model)
 
-    d_textbook = [.10913, .57202, -.12104]
+    reactions = model.reactions[model.fixedDOFs]
 
-    @test round.(d_textbook, sigdigits = 4) ≈ round.(n5.disp, sigdigits = 4)
+    reactions_textbook = [-5.5581,
+        -22.232,
+        7.4108,
+        1.3838,
+        -2.7677,
+        0.92255,
+        -19.442,
+        77.768,
+        25.923,
+        23.616,
+        47.232,
+        15.744
+        ]
 
-    # 3D frame test: Example 8.3 Ferreira "MATLAB Codes for Finite Element Analysis"
+    err = norm(reactions_textbook .- reactions)
+
+    @test err <= tol
+
+    # 3D frame test: Example 8.4
     # in kN, m
 
-    # nodes
-    n1 = Node([0., 0., 0.], :frame, :free)
-    n2 = Node([3., 0., 0.], :frame, :fixed)
-    n3 = Node([0., 0., -3.], :frame, :fixed)
-    n4 = Node([0., -4., 0.], :frame, :fixed)
+    n1 = Node([0., 0., 0.], :free)
+    n2 = Node([-240., 0., 0.], :fixed)
+    n3 = Node([0., -240., 0.], :fixed)
+    n4 = Node([0., 0., -240.], :fixed)
 
     nodes = [n1, n2, n3, n4]
 
-    # elements
-    E = 210e6
-    A = 0.02
-    Iy = 10e-5
-    Iz = 20e-5
-    J = 5e-5
-    G = 84e6
 
-    e1 = Element(nodes, [1,2], E, A, G, Iz, Iy, J)
-    e2 = Element(nodes, [1,3], E, A, G, Iz, Iy, J)
-    e3 = Element(nodes, [1,4], E, A, G, Iz, Iy, J)
+    E = 29e3
+    G = 11.5e3 
+    A = 32.9
+    Iz = 716.
+    Iy = 236.
+    J = 15.1
+
+    sec = Section(A, E, G, Iz, Iy, J)
+
+    e1 = Element(nodes, [2,1], sec)
+    e1.Ψ = 0.
+    e2 = Element(nodes, [3,1], sec)
+    e2.Ψ  = pi/2
+    e3 = Element(nodes, [4,1], sec)
+    e3.Ψ = pi/6
 
     elements = [e1, e2, e3]
 
-    # loads
-    l = Load(nodes, n1.position, [-10., 0., 20., 0., 0., 0.])
+    l1 = LineLoad(e1, [0., -3/12, 0.])
+    l2 = NodeMoment(n1, [-150. * 12, 0., 150. * 12])
 
-    loads = [l]
+    loads = [l1, l2]
 
-    ex83 = Structure(nodes, elements, loads)
-    analyze!(ex83)
-    
-    d_textbook = [-7.05e-6, -7e-8, 1.418e-5, 1.45e-6, 1.75e-6, 1.14e-6]
+    model = Model(nodes, elements, loads)
+    solve!(model)
 
-    @test round.(d_textbook, digits = 8) ≈ round.(n1.disp, digits = 8)
+    reactions = model.reactions[model.fixedDOFs]
+
+    reactions_textbook = [5.3757,
+        44.106,
+        -0.74272,
+        2.1722,
+        58.987,
+        2330.5,
+        -4.6249,
+        11.117,
+        -6.4607,
+        -515.55,
+        -0.76472,
+        369.67,
+        -0.75082,
+        4.7763,
+        7.2034,
+        -383.5,
+        -60.166,
+        -4.702]
+
+    err = norm(reactions_textbook .- reactions)
+
+    @test err <= tol
 end

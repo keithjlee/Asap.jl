@@ -1,329 +1,422 @@
-# global axes
-const globalX = [1., 0., 0.]
-const globalY = [0., 1., 0.]
-const globalZ = [0., 0., 1.]
+"""
+populate global DOF indices of nodes and elements
+"""
+function populateDOF!(model::Model)
 
-# expands elemental start/end nodes to global DOF indices
-function dofExpander!(element::Element, nodes::Vector{Node})
-    element.dofIndex = vcat(nodes[element.nodeIndex[1]].globalIndex, nodes[element.nodeIndex[2]].globalIndex)
-end
+    model.DOFs = vcat([node.dof for node in model.nodes]...)
+    model.nDOFs = length(model.DOFs)
+    model.nNodes = length(model.nodes)
+    model.nElements = length(model.elements)
+    model.freeDOFs = findall(model.DOFs)
+    model.fixedDOFs = findall(.!model.DOFs)
 
-# dofExpander for a vector of elements
-function dofExpander!(elements::Vector{Element}, nodes::Vector{Node})
-    for element in elements
-        element.dofIndex = vcat(nodes[element.nodeIndex[1]].globalIndex, nodes[element.nodeIndex[2]].globalIndex)
+    n_dof = 6
+    for (i, node) in enumerate(model.nodes)
+        node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
+    end
+
+    for element in model.elements
+        idStart = model.nodes[element.nodeIDs[1]].globalID
+        idEnd = model.nodes[element.nodeIDs[2]].globalID
+
+        element.globalID = [idStart; idEnd]
     end
 end
 
-# global dof index of each node
-function nodeGlobalIndex!(nodes::Vector{Node})
-    n = length(nodes)
-    nNodalDOFS = length(nodes[1].DOFS)
-    for i = 1:n
-        nodes[i].globalIndex = i * nNodalDOFS - (nNodalDOFS-1) .+ collect(0:nNodalDOFS-1)
+"""
+populate global DOF indices of nodes and elements
+"""
+function populateDOF!(model::TrussModel)
+
+    model.DOFs = vcat([node.dof for node in model.nodes]...)
+    model.nDOFs = length(model.DOFs)
+    model.nNodes = length(model.nodes)
+    model.nElements = length(model.elements)
+    model.freeDOFs = findall(model.DOFs)
+    model.fixedDOFs = findall(.!model.DOFs)
+
+    n_dof = 3
+    for (i, node) in enumerate(model.nodes)
+        node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
+    end
+
+    for element in model.elements
+        idStart = model.nodes[element.nodeIDs[1]].globalID
+        idEnd = model.nodes[element.nodeIDs[2]].globalID
+
+        element.globalID = [idStart; idEnd]
     end
 end
 
-
-```
-Local coordinate system of element
-```
-function lcs(element::Element, Ψ; tol = 0.001)
-
-    # local x vector
-    xvec = normalize(element.posEnd .- element.posStart)
-    
-    if norm(cross(xvec, globalY)) < tol
-        CYx = xvec[2] #cosine to global Y axis
-        xvec = CYx * globalY
-        yvec = -CYx * globalX * cos(Ψ) + sin(Ψ) * globalZ
-        zvec = CYx * globalX * sin(Ψ) + cos(Ψ) * globalZ 
-    else
-        zbar = normalize(cross(xvec, [0, 1, 0]))
-        ybar = normalize(cross(zbar, xvec))
-
-        yvec = cos(Ψ) * ybar + sin(Ψ) * zbar
-        zvec = -sin(Ψ) * ybar + cos(Ψ) * zbar
+"""
+Process elements: get transformation matrix and global elemental stiffness matrix
+"""
+function processElements!(model::Model)
+    for element in model.elements
+        element.Q = zeros(12) # reset Qf
+        element.R = R(element)
+        element.LCS = lcs(element, element.Ψ)
+        makeK!(element)
     end
+end
 
-    return Vec3.([xvec, yvec, zvec])
+"""
+Process elements: get transformation matrix and global elemental stiffness matrix
+"""
+function processElements!(model::TrussModel)
+    for element in model.elements
+        element.R = R(element)
+        makeK!(element)
+    end
+end
+
+"""
+Populate a node force load
+"""
+function populateLoad!(model::Model, load::NodeForce)
+    idx = load.node.globalID[1:3]
+    model.P[idx] += load.value
+end
+
+"""
+Populate a node force load
+"""
+function populateLoad!(model::TrussModel, load::NodeForce)
+    idx = load.node.globalID
+    model.P[idx] += load.value
 end
 
 
-#scales displacement s.t. maximum displacement is 30% of the mean element length
-function autoScaleFactor(structure::Structure)
-    lengths = [e.length for e in structure.elements]
-    if structure.dims == 2
-        displacements = vcat([structure.U[n.globalIndex[1:2]] for n in structure.nodes]...)
-    else
-        displacements = vcat([structure.U[n.globalIndex[1:3]] for n in structure.nodes]...)
-    end
-    factor = 0.30 / maximum(abs.(displacements)) * mean(lengths)
-    return round(factor)
+function populateLoad!(P::Vector{Float64}, load::NodeForce)
+    idx = load.node.globalID[1:3]
+    P[idx] += load.value
 end
 
-function postProcess!(structure::Structure; scaleFactor = :auto)
+"""
+Populate a node moment load
+"""
+function populateLoad!(model::Model, load::NodeMoment)
+    idx = load.node.globalID[4:6]
+    model.P[idx] += load.value
+end
 
-    ### create displaced nodes and elements (scaled)
-    if scaleFactor == :auto
-        scaleFactor = autoScaleFactor(structure)
+function populateLoad!(P::Vector{Float64}, load::NodeMoment)
+    idx = load.node.globalID[4:6]
+    P[idx] += load.value
+end
+
+"""
+Populate element loads
+"""
+function populateLoad!(model::Model, load::ElementLoad)
+    idx = load.element.globalID
+    load.element.Q += load.element.R' * Q(load)
+    model.Pf[idx] += load.element.Q
+end
+
+function populateLoad!(P::Vector{Float64}, load::ElementLoad)
+    idx = load.element.globalID
+    P[idx] += load.element.R' * Q(load)
+end
+
+"""
+Create load vectors P and Pf
+"""
+function populateLoads!(model::Model)
+    #initialize
+    model.P = zeros(model.nDOFs)
+    model.Pf = zeros(model.nDOFs)
+
+    #create load vectors
+    for load in model.loads
+        populateLoad!(model, load)
     end
+end
 
-    positions = [node.position for node in structure.nodes]
+"""
+Create load vectors P and Pf
+"""
+function populateLoads!(model::TrussModel)
+    #initialize
+    model.P = zeros(model.nDOFs)
 
-    if structure.dims == 2
-        displacements = vcat([structure.U[n.globalIndex[1:2]] for n in structure.nodes])
-    else
-        displacements = vcat([structure.U[n.globalIndex[1:3]] for n in structure.nodes])
+    #create load vectors
+    for load in model.loads
+        populateLoad!(model, load)
     end
+end
 
-    newpositions = [positions[i] .+ scaleFactor .* displacements[i] for i = 1:length(structure.nodes)]
+"""
+create load vector F = P-Pf
+"""
+function createF(model::Model, loads::Vector{Load})
 
-    structure.displacedNodes = Node.(newpositions)
-    structure.displacedElements = [Element(structure.displacedNodes, element.nodeIndex, element.type) for element in structure.elements]
+    P = zeros(model.nDOFs)
+    Pf = zeros(model.nDOFs)
 
-    ### Internal forces in local CS
-    for element in structure.elements
-        element.localForce = element.R * element.k * structure.U[element.dofIndex]
-        element.globalForce = element.k * structure.U[element.dofIndex]
-        element.axialForce = axialLoad(element)
-    end
-
-    ### Nodal displacements and reactions
-    for node in structure.nodes
-        node.disp = structure.U[node.globalIndex]
-        if any(node.DOFS .== false)
-            node.reaction = structure.reactions[node.globalIndex]
+    for load in loads
+        if typeof(load) <: ElementLoad
+            populateLoad!(Pf, load)
+        else
+            populateLoad!(P, load)
         end
     end
+
+    return P - Pf
 end
 
-function reactions!(structure::Structure)
-    if isdefined(structure, :U) == false
-        error("Perform analysis before solving reactions.")
+"""
+create load vector F = P-Pf
+"""
+function createF(model::TrussModel, loads::Vector{NodeForce})
+
+    P = zeros(model.nDOFs)
+
+    for load in loads
+        populateLoad!(P, load)
     end
 
-    # index of boundary condition DOFs
-    fixedDOFS = findall(structure.DOFS .== false)
-
-    # solve for loads at reactions
-    reactions = structure.K[fixedDOFS, :] * structure.U
-
-    # initialize
-    structure.reactions = zeros(structure.nDOFS)
-    
-    # update
-    structure.reactions[fixedDOFS] = reactions
+    return P
 end
 
 
-function addNodeElements!(elements::Vector{Element}, nodes::Vector{Node})
-    for i = 1:length(elements)
-        j, k = elements[i].nodeIndex
-        push!(nodes[j].elements, (i, -1))
-        push!(nodes[k].elements, (i, 1))
+
+"""
+Create global stiffness matrix
+"""
+function globalS!(model::Union{Model, TrussModel})
+    S = spzeros(model.nDOFs, model.nDOFs)
+
+    for element in model.elements
+        idx = element.globalID
+        S[idx, idx] .+= element.K
     end
 
-    if isdefined(nodes[1], :elements)
-        for i = 1:length(nodes)
-            nodes[i].elements = unique(nodes[i].elements)
-        end
+    model.S = Symmetric(S)
+end
+
+"""
+Reaction forces
+"""
+function reactions!(model::Model)
+    model.reactions = zeros(model.nDOFs)
+    model.reactions[model.fixedDOFs] = model.S[model.fixedDOFs, :] * model.u + model.Pf[model.fixedDOFs]
+end
+
+"""
+Reaction forces
+"""
+function reactions!(model::TrussModel)
+    model.reactions = zeros(model.nDOFs)
+    model.reactions[model.fixedDOFs] = model.S[model.fixedDOFs, :] * model.u
+end
+
+"""
+Populate node reactions and displacements
+"""
+function postprocessnodes!(model::Union{Model, TrussModel})
+    for node in model.nodes
+        node.reaction = model.reactions[node.globalID]
+        node.displacement = model.u[node.globalID]
     end
 end
 
-function addNodeLoads!(loads::Vector{Load}, nodes::Vector{Node})
-   for i = 1:length(loads)
-    nodes[loads[i].index].load = loads[i].load 
-   end
-end
-
-function generateF!(structure::Structure)
-    # create global load vector
-    structure.F = zeros(structure.nDOFS)
-    
-    #frame or truss, 2 or 3d?
-    nodalDOFLength = length(structure.nodes[1].DOFS)
-
-    for load in structure.loads
-        idx = load.index * nodalDOFLength - (nodalDOFLength - 1) .+ collect(0:nodalDOFLength-1)
-        structure.F[idx] .= load.load
+"""
+Populate elemental forces
+"""
+function postprocesselements!(model::Model)
+    for element in model.elements
+        element.forces = element.R * (element.K * model.u[element.globalID] + element.Q)
     end
 end
 
-function analyze!(structure::Structure; forceK = false, SF = :auto)
-    if !isdefined(structure, :loads)
-        error("No loads defined.")
+"""
+Populate elemental forces
+"""
+function postprocesselements!(model::TrussModel)
+    for element in model.elements
+        element.forces = element.R * (element.K * model.u[element.globalID])
+    end
+end
+
+"""
+process a network
+"""
+function process!(model::Union{Model, TrussModel})
+
+    #global DOF 
+    populateDOF!(model)
+
+    #elements 
+    processElements!(model)
+
+    #loads
+    populateLoads!(model)
+
+    #stiffness matrix
+    globalS!(model)
+
+    #processing finished
+    model.processed = true
+end
+
+"""
+post-process a network
+"""
+function postprocess!(model::Union{Model, TrussModel})
+    reactions!(model)
+    postprocessnodes!(model)
+    postprocesselements!(model)
+end
+
+"""
+Solve a network
+"""
+function solve!(model::Model; reprocess = false)
+
+    if !model.processed || reprocess
+        process!(model)
     end
 
-    #create global load vector f
-    generateF!(structure)
-
-    # associated elements to each node
-    addNodeElements!(structure.elements, structure.nodes)
-    # associated load vectors to individual nodes
-    addNodeLoads!(structure.loads, structure.nodes)
-
-    # prevents rebuilding of stiffness matrix if structure stays the same
-    # setting forceK = true rebuilds the stiffness matrix
-    if isdefined(structure, :K) && !forceK
-        #displacement
-        U = structure.K[structure.freeDOFS, structure.freeDOFS] \ structure.F[structure.freeDOFS]
-
-        #compliance
-        structure.compliance = U' * structure.F[structure.freeDOFS]
-        return
-    end
-    #create nodal DOF indices
-    nodeGlobalIndex!(structure.nodes)
-
-    #create elemental DOF indices
-    dofExpander!(structure.elements, structure.nodes)
-
-    #create elemental stiffness matrices
-    k_elemental!.(structure.elements, structure.dims)
-
-    #create global stiffness matrix
-    structure.K = K(structure.elements, structure.nDOFS)
-
-    #displacement
-    U = structure.K[structure.freeDOFS, structure.freeDOFS] \ structure.F[structure.freeDOFS]
+    # reduce scope of problem and solve
+    idx = model.freeDOFs
+    F = model.P[idx] - model.Pf[idx]
+    U = model.S[idx, idx] \ F
 
     #compliance
-    structure.compliance = U' * structure.F[structure.freeDOFS]
+    model.compliance = U' * F
 
-    #long form displacement
-    structure.U = zeros(structure.nDOFS)
-    structure.U[structure.freeDOFS] = U
+    #full DOF displacement vector
+    model.u = zeros(model.nDOFs)
+    model.u[idx] = U
 
-    #reactions
-    reactions!(structure)
-
-    #post processing
-    postProcess!(structure; scaleFactor = SF)
+    # post process
+    postprocess!(model)
 end
 
-function axial2d_truss(element::Element)
-    if dot(element.posEnd - element.posStart, element.globalForce[3:4]) < 0
-        return - norm(element.globalForce[3:4])
-    else
-        return norm(element.globalForce[3:4])
-    end
-end
+"""
+Solve a network
+"""
+function solve!(model::TrussModel; reprocess = false)
 
-function axial3d_truss(element::Element)
-    if dot(element.posEnd - element.posStart, element.globalForce[4:6]) < 0
-        return - norm(element.globalForce[4:6])
-    else
-        return norm(element.globalForce[4:6])
-    end
-end
-
-function axial2d_frame(element::Element)
-    if dot(element.posEnd - element.posStart, element.globalForce[4:5]) < 0
-        return - norm(element.globalForce[4:5])
-    else
-        return norm(element.globalForce[4:5])
-    end
-end
-
-function axial3d_frame(element::Element)
-    if dot(element.posEnd - element.posStart, element.globalForce[7:9]) < 0
-        return - norm(element.globalForce[7:9])
-    else
-        return norm(element.globalForce[7:9])
-    end
-end
-
-axialDict = Dict(
-    (2, :truss) => axial2d_truss,
-    (3, :truss) => axial3d_truss,
-    (2, :frame) => axial2d_frame,
-    (3, :frame) => axial3d_frame
-)
-
-function axialLoad(element::Element)
-    if isdefined(element, :globalForce) == false
-        error("No internal loads defined; run analysis and/or postprocessing")
+    if !model.processed || reprocess
+        process!(model)
     end
 
-    dims = length(element.posStart)
-    axialFunc = axialDict[(dims, element.type)]
-    return axialFunc(element)
+    # reduce scope of problem and solve
+    idx = model.freeDOFs
+    U = model.S[idx, idx] \ model.P[idx]
+
+    #compliance
+    model.compliance = U' * model.P[idx]
+
+    #full DOF displacement vector
+    model.u = zeros(model.nDOFs)
+    model.u[idx] = U
+
+    # post process
+    postprocess!(model)
 end
 
-function trussSizer(P, k, L, E, ρ, σ, minA)
+"""
+Solve a network and return displacement vector
+"""
+function solve(model::Model)
+    idx = model.freeDOFs
+
+    F = model.P[idx] - model.Pf[idx]
+
+    U = model.S[idx, idx] \ F
+
+    u = zeros(model.nDOFs)
+    u[idx] = U
+
+    return u
+end
+
+"""
+Solve a network and return displacement vector
+"""
+function solve(model::TrussModel)
+    idx = model.freeDOFs
+
+    F = model.P[idx]
+
+    U = model.S[idx, idx] \ F
+
+    u = zeros(model.nDOFs)
+    u[idx] = U
+
+    return u
+end
+
+"""
+Solve a network with a new load vector
+"""
+function solve(model::Model, F::Vector{Float64})
+    if length(F) != model.nDOFs
+        error("Length of F must equal total number of DOFs")
+    end
+
+    idx = model.freeDOFs
+
+    U = model.S[idx, idx] \ F[idx]
+
+    u = zeros(model.nDOFs)
+    u[idx] = U
+
+    return u
+end
+
+"""
+Solve a network with a new load vector
+"""
+function solve(model::TrussModel, F::Vector{Float64})
+
+    if length(F) != model.nDOFs
+        error("Length of F must equal total number of DOFs")
+    end
+
+    idx = model.freeDOFs
+
+    U = model.S[idx, idx] \ F[idx]
+
+    u = zeros(model.nDOFs)
+    u[idx] = U
+
+    return u
+end
+
+"""
+Solve a network with a new set of loads
+"""
+function solve(model::Model, L::Vector{Load})
     
-    Astress = P/σ
+    F = createF(model, L)
+    
+    idx = model.freeDOFs
 
-    if sign(P) < 0
-        D = (64 * abs(P) * (k * L)^2 / pi^3 / E / (1-ρ^4))^(1/4)
-        Abuckling = pi/4 * D^2 *(1-ρ^2)
-        if !isnothing(minA)
-            A = max(Abuckling, Astress, minA)
-        else
-            A = max(Abuckling, Astress)
-        end
-    else
-        if !isnothing(minA)
-            A = max(Astress, minA)
-        else
-            A = Astress
-        end
-    end
+    U = model.S[idx, idx] \ F[idx]
 
-    return A
+    u = zeros(model.nDOFs)
+    u[idx] = U
+
+    return u
 end
 
-# pseudo size is an approximated optimization function for sizing member areas. It performs a linear elastic analysis using uniform section properties, then resizes members to meet stress and buckling limitiations
-function pseudoSize!(structure::Structure,
-        maxStress;
-        minArea = nothing,
-        dDratio = 0.9,
-        k = 1,
-        maxIters = 1)
+"""
+Solve a network with a new set of loads
+"""
+function solve(model::TrussModel, L::Vector{NodeForce})
+    
+    F = createF(model, L)
+    
+    idx = model.freeDOFs
 
-    # perform analysis
+    U = model.S[idx, idx] \ F[idx]
 
-    analyze!(structure)
+    u = zeros(model.nDOFs)
+    u[idx] = U
 
-    iter = 0
-    while iter < maxIters
-        for element in structure.elements
-            element.A = trussSizer(element.axialForce, k, element.length, element.E, dDratio, maxStress, minArea)
-        end
-        analyze!(structure; forceK = true)
-        iter += 1
-    end
-end
-
-function pseudoSize(structure::Structure,
-    maxStress;
-    minArea = nothing,
-    dDratio = 0.9,
-    k = 1,
-    maxIters = 1)
-
-    # perform analysis
-    newstructure = deepcopy(structure)
-    analyze!(newstructure)
-
-    iter = 0
-    while iter < maxIters
-        for element in newstructure.elements
-            element.A = trussSizer(element.axialForce, k, element.length, element.E, dDratio, maxStress, minArea)
-        end
-        analyze!(newstructure; forceK = true)
-
-        iter += 1
-    end
-
-    return newstructure
-end
-
-function structureMass(structure::Structure, ρ)
-    volume = 0.0
-    for element in structure.elements
-        volume += element.A * element.length
-    end
-    return volume * ρ
+    return u
 end
