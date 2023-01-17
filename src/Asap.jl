@@ -1,41 +1,42 @@
 module Asap
 
-using Base: StackFrame, Float64, Symbol
-using Statistics
-using LinearAlgebra
-using SparseArrays
-using GeometryBasics
-using FileIO
-using ColorSchemes
-using Colors
-using GLMakie
+using LinearAlgebra, SparseArrays, Statistics
 
-# data types used for analysis
-include("types.jl")
+include("meta.jl")
+export Material
+export Section
+export TrussSection
+export Steel_Nmm
+export Steel_kNm
+
+
+include("nodes.jl")
 export Node
+export TrussNode
+export planarize!
+
+include("elements.jl")
+include("elementAnalysis.jl")
 export Element
-export Load
-export Structure
-export Geometry
+export TrussElement
+export release!
 
-# structural analysis
-include("R.jl") # rotation matrices
-include("K.jl") # stiffness matrices
-include("structuralAnalysis.jl") #operations
-export analyze!
-export dofMaker
-export pseudoSize
-export pseudoSize!
-export structureMass
+include("loads.jl")
+export NodeForce
+export NodeMoment
+export LineLoad
+export GravityLoad
+export PointLoad
 
-# method extensions/general QOL utilities
-using JSON
+include("model.jl")
+export Model
+export TrussModel
+
+include("structuralAnalysis.jl")
+export process!
+export solve!
+export solve
+
 include("utilities.jl")
-export karamba2asap
 
-# viz tools
-include("visualization.jl")
-export axo
-export structurePlot
-
-end
+end 
