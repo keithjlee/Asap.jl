@@ -7,7 +7,7 @@ mutable struct GeometricNode
     function GeometricNode(node::AbstractNode)
         gnode = new(node.position)
         gnode.initPosition = node.position
-        gnode.displacement = zeros(6)
+        gnode.displacement = node.displacement
         gnode.id = node.id
         return gnode
     end
@@ -159,7 +159,7 @@ mutable struct Geometry
         delems = Vector{GeometricElement}()
         for element in model.elements
             if typeof(element) == Element
-                push!(delems, GeometricElement(dnodes, element, factor, n))
+                push!(delems, GeometricElement(nodes, element, factor, n))
             else
                 push!(delems, GeometricElement(dnodes, element))
             end
@@ -175,7 +175,7 @@ function updateFactor!(geo::Geometry, factor::Union{Int64, Float64})
     newdelems = Vector{GeometricElement}()
     for element in geo.displacedElements
         if length(element.positions) > 2
-            push!(newdelems, GeometricElement(newdnodes, element, factor, element.nsegments))
+            push!(newdelems, GeometricElement(geo.nodes, element, factor, element.nsegments))
         else
             push!(newdelems, GeometricElement(newdnodes, element))
         end
