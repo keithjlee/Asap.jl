@@ -1,114 +1,50 @@
 mutable struct GeometricNode
+    node::AbstractNode
     position::Vector{Float64}
-    initPosition::Vector{Float64}
-    displacement::Vector{Float64}
-    id::Union{Symbol, Nothing}
+    displacedPosition::Vector{Float64}
 
     function GeometricNode(node::AbstractNode)
-        gnode = new(node.position)
-        gnode.initPosition = node.position
-        gnode.displacement = node.displacement
-        gnode.id = node.id
-        return gnode
-    end
-
-    function GeometricNode(node::AbstractNode, factor::Union{Float64, Int64})
-        position = node.position .+ node.displacement[1:3] .* factor
-        gnode = new(position)
-        gnode.initPosition = node.position
-        gnode.displacement = node.displacement
-        gnode.id = node.id
+        gnode = new(node, node.position)
+        gnode.displacedPosition = zeros(3)
 
         return gnode
     end
 
-    function GeometricNode(node::GeometricNode, factor::Union{Float64, Int64})
-        position = node.position .+ node.displacement[1:3] .* factor
-        gnode = new(position)
-        gnode.initPosition = node.initPosition
-        gnode.displacement = node.displacement
-        gnode.id = node.id
+    function GeometricNode(node::GeometricNode)
+        gnode = new(node.node, node.position)
+        gnode.displacedPosition = zeros(3)
 
         return gnode
     end
+end
 
+function displace!(node::GeometricNode, factor::Union{Float64, Int64})
+    node.displacedPosition = node.node.position .+ node.node.displacement[1:3] .* factor
 end
 
 mutable struct GeometricElement
-    posStart::Vector{Float64}
-    posEnd::Vector{Float64}
-    length::Float64
-    LCS::Vector{Vector{Float64}}
-    R::Matrix{Float64}
+    element::AbstractElement
+    nodeStart::GeometricNode
+    nodeEnd::GeometricNode
     positions::Vector{Vector{Float64}}
-    displacement::Vector{Float64}
-    id::Union{Symbol, Nothing}
     nsegments::Int64
+    displacedPositions::Vector{Vector{Float64}}
+    midpoints::Vector{Vector{Float64}}
+    LCS::Vector{Vector{Float64}}
 
 
     """
     Displaced bending element
     """
-    function GeometricElement(nodes::Vector{GeometricNode}, element::Element, factor::Union{Float64, Int64}, nsegments::Int64)
+    function GeometricElement(nodes::Vector{GeometricNode}, element::Element; nsegments::Int64 = 20)
         
-        pstart = nodes[element.nodeIDs[1]].position
-        pend = nodes[element.nodeIDs[2]].position
-        l = norm(pend .- pstart)
+        gnstart = nodes[element.nodeIDs[1]]
+        gnend = nodes[element.nodeIDs[2]]
+        undisplaced = [gnstart.position, gnend.position]
 
-        gelement = new(pstart, pend, l)
-        gelement.LCS = lcs(gelement, element.Ψ)
-        gelement.R = R(gelement)
-        gelement.nsegments = nsegments
-
-        gelement.displacement = [nodes[element.nodeIDs[1]].displacement; nodes[element.nodeIDs[2]].displacement]
-
-        gelement.positions = disp(gelement.posStart, gelement.displacement, gelement.length, gelement.R, gelement.LCS, nsegments, factor)
-
-        gelement.id = element.id
-
-        return gelement
-    end
-
-    """
-    Displaced bending element
-    """
-    function GeometricElement(nodes::Vector{GeometricNode}, element::GeometricElement, factor::Union{Float64, Int64}, nsegments::Int64)
-        
-        pstart = element.posStart
-        pend = element.posEnd
-        l = norm(pend .- pstart)
-
-        gelement = new(pstart, pend, l)
+        gelement = new(element, gnstart, gnend, undisplaced, nsegments)
+        gelement.midpoints = repeat([(gnstart.position .+ gnend.position) ./ 2], 3)
         gelement.LCS = element.LCS
-        gelement.R = R(gelement)
-        gelement.nsegments = nsegments
-
-        gelement.displacement = element.displacement
-
-        gelement.positions = disp(gelement.posStart, gelement.displacement, gelement.length, gelement.R, gelement.LCS, nsegments, factor)
-
-        gelement.id = element.id
-
-        return gelement
-    end
-
-    """
-    Bending element
-    """
-    function GeometricElement(nodes::Vector{GeometricNode}, element::Element)
-        
-        pstart = nodes[element.nodeIDs[1]].position
-        pend = nodes[element.nodeIDs[2]].position
-        l = norm(pend .- pstart)
-
-        gelement = new(pstart, pend, l)
-        gelement.LCS = lcs(gelement, element.Ψ)
-        gelement.R = element.R
-        gelement.nsegments = 1
-
-        gelement.positions = [pstart, pend]
-
-        gelement.id = element.id
 
         return gelement
     end
@@ -116,73 +52,150 @@ mutable struct GeometricElement
     """
     Truss element
     """
-    function GeometricElement(nodes::Vector{GeometricNode}, element::TrussElement)
+    function GeometricElement(nodes::Vector{GeometricNode}, element::TrussElement; nsegments::Int64 = 20)
         
-        pstart = nodes[element.nodeIDs[1]].position
-        pend = nodes[element.nodeIDs[2]].position
-        l = norm(pend .- pstart)
+        gnstart = nodes[element.nodeIDs[1]]
+        gnend = nodes[element.nodeIDs[2]]
+        undisplaced = [gnstart.position, gnend.position]
 
-        gelement = new(pstart, pend, l)
-        gelement.LCS = Vector{Vector{Float64}}()
-        gelement.R = element.R
-        gelement.nsegments = 1
-
-        gelement.positions = [pstart, pend]
-
-        gelement.id = element.id
+        gelement = new(element, gnstart, gnend, undisplaced, 1)
+        gelement.midpoints = repeat([(gnstart.position .+ gnend.position) ./ 2], 3)
+        gelement.LCS = element.LCS
 
         return gelement
+    end
+end
+
+"""
+try replacing all instances of .displacedPosition with regular .position
+"""
+function displace!(element::GeometricElement, factor::Union{Float64, Int64})
+    n1 = element.nodeStart
+    n2 = element.nodeEnd
+
+    if typeof(element.element) == TrussElement
+        element.displacedPositions = [n1.displacedPosition, n2.displacedPosition]
+    else
+        u = [n1.node.displacement; n2.node.displacement]
+        # posStart = n1.displacedPosition
+        # posEnd = n2.displacedPosition
+        # x = posEnd .- posStart
+        # L = norm(x)
+        # psi = element.element.Ψ
+        # LCS = lcs(x, psi)
+        # r = R(x, psi)
+
+        posStart = n1.position
+        L = element.element.length
+        LCS = element.element.LCS
+        r = element.element.R
+
+        element.displacedPositions = disp(posStart, u, L, r, LCS, element.nsegments, factor)
+    end
+
+end
+
+mutable struct GeometricLoad
+    starts::Vector{Vector{Float64}}
+    vecs::Vector{Vector{Float64}}
+    scalefactor::Union{Int64, Float64}
+
+    function GeometricLoad(load::NodeForce; scalefactor = 10, n = 20)
+        vec = normalize(load.value) .* scalefactor
+        
+        return new([load.node.position], [vec], scalefactor)
+    end
+
+    function GeometricLoad(load::NodeMoment; scalefactor = 10, n = 20)
+        return new(Vector{Vector{Float64}}(), Vector{Vector{Float64}}(), scalefactor)
+    end
+
+    function GeometricLoad(load::LineLoad; scalefactor = 10, n = 20)
+        vec = normalize(load.value) .* scalefactor
+
+        increment = load.element.length / n
+        starts = Vector{Vector{Float64}}()
+        dirs = Vector{Vector{Float64}}()
+
+        for i = 1:n-1
+            step = increment * i
+            push!(starts, load.element.posStart .+ step * load.element.LCS[1])
+            push!(dirs, vec)
+        end
+
+        return new(starts, dirs, scalefactor)
+    end
+
+    function GeometricLoad(load::GravityLoad; scalefactor = 10, n = 20)
+        vec = normalize(load.value .* [0., 0., -1.]) .* scalefactor
+
+        increment = load.element.length / n
+        starts = Vector{Vector{Float64}}()
+        dirs = Vector{Vector{Float64}}()
+
+        for i = 1:n-1
+            step = increment * i
+            push!(starts, load.element.posStart .+ step * load.element.LCS[1])
+            push!(dirs, vec)
+        end
+
+        return new(starts, dirs, scalefactor)
+    end
+
+    function GeometricLoad(load::PointLoad; scalefactor = 10, n = 20)
+        vec = normalize(load.value) .* scalefactor
+        position = load.element.posStart .+ load.position .* load.element.length .* load.element.LCS[1] 
+
+        return new([position], [vec], scalefactor)
     end
 end
 
 mutable struct Geometry
     nodes::Vector{GeometricNode}
     elements::Vector{GeometricElement}
-    displacedNodes::Vector{GeometricNode}
-    displacedElements::Vector{GeometricElement}
-    displacementFactor::Union{Int64, Float64}
+    loads::Vector{GeometricLoad}
+    dispfactor::Union{Int64, Float64}
+    loadfactor::Union{Int64, Float64}
 
     function Geometry(model::AbstractModel)
         nodes = [GeometricNode(node) for node in model.nodes]
         elems = [GeometricElement(nodes, element) for element in model.elements]
-        dnodes = Vector{GeometricNode}()
-        delems = Vector{GeometricElement}()
+        loads = [GeometricLoad(load) for load in model.loads]
         factor = 1
 
-        return new(nodes, elems, dnodes, delems, factor)
+        displace!.(nodes, factor)
+        displace!.(elems, factor)
+
+        return new(nodes, elems, loads, factor, factor)
     end
     
-    function Geometry(model::AbstractModel, factor::Union{Int64, Float64}, n::Int64)
-        nodes = [GeometricNode(node) for node in model.nodes]
-        elems = [GeometricElement(nodes, element) for element in model.elements]
-        dnodes = [GeometricNode(node, factor) for node in model.nodes]
-        delems = Vector{GeometricElement}()
-        for element in model.elements
-            if typeof(element) == Element
-                push!(delems, GeometricElement(nodes, element, factor, n))
-            else
-                push!(delems, GeometricElement(dnodes, element))
-            end
-        end
+    # function Geometry(model::AbstractModel, dispfactor::Union{Int64, Float64}, loadfactor::Union{Int64, Float64}, n::Int64)
+    #     nodes = [GeometricNode(node) for node in model.nodes]
+    #     elems = [GeometricElement(nodes, element; nsegments = n) for element in model.elements]
+    #     loads = [GeometricLoad(load; scalefactor = loadfactor, n = n) for load in model.loads]
 
-        return new(nodes, elems, dnodes, delems, factor)
+    #     displace!.(nodes, dispfactor)
+    #     displace!.(elems, dispfactor)
+
+    #     return new(nodes, elems, loads, dispfactor, loadfactor)
+    # end
+
+    function Geometry(model::AbstractModel, dispfactor::Union{Int64, Float64}, loadfactor::Union{Int64, Float64}, n::Int64)
+        nodes = [GeometricNode(node) for node in model.nodes]
+        elems = [GeometricElement(nodes, element; nsegments = n) for element in model.elements]
+        loads = [GeometricLoad(load; scalefactor = loadfactor, n = n) for load in model.loads]
+
+        displace!.(nodes, dispfactor)
+        displace!.(elems, dispfactor)
+
+        return new(nodes, elems, loads, dispfactor, loadfactor)
     end
 end
 
 function updateFactor!(geo::Geometry, factor::Union{Int64, Float64})
-    geo.displacementFactor = factor
-    newdnodes = [GeometricNode(node, factor) for node in geo.nodes]
-    newdelems = Vector{GeometricElement}()
-    for element in geo.displacedElements
-        if length(element.positions) > 2
-            push!(newdelems, GeometricElement(geo.nodes, element, factor, element.nsegments))
-        else
-            push!(newdelems, GeometricElement(newdnodes, element))
-        end
-    end
-
-    geo.displacedNodes = newdnodes
-    geo.displacedElements = newdelems
+    geo.dispfactor = factor
+    displace!.(geo.nodes, factor)
+    displace!.(geo.elements, factor)
 end
 
 

@@ -146,12 +146,43 @@ end
 """
 Transformation matrix
 """
-function R(element::Union{Element, GeometricElement}; tol = 1e-4)
+function R(element::Element; tol = 1e-4)
     xvec = normalize(element.posEnd .- element.posStart) # local x vector
     CXx, CYx, CZx = xvec # local x cosines
 
     cΨ = cos(element.Ψ)
     sΨ = sin(element.Ψ)
+
+
+    if norm(cross(xvec, globalY)) < tol #special case for horizontal members aligned with global Y
+        Λ = [0. CYx 0.;
+            -CYx*cΨ 0 sΨ;
+            CYx*sΨ 0 cΨ]
+    else # all other
+        b1 = (-CXx * CYx * cΨ - CZx * sΨ) / sqrt(CXx^2 + CZx^2)
+        b2 = sqrt(CXx^2 + CZx^2) * cΨ
+        b3 = (-CYx * CZx * cΨ + CXx * sΨ) / sqrt(CXx^2 + CZx^2)
+
+        c1 = (CXx * CYx * sΨ - CZx * cΨ) / sqrt(CXx^2 + CZx^2)
+        c2 = -sqrt(CXx^2 + CZx^2) * sΨ
+        c3 = (CYx * CZx * sΨ + CXx * cΨ) / sqrt(CXx^2 + CZx^2)
+
+        Λ = [CXx CYx CZx; 
+            b1 b2 b3; 
+            c1 c2 c3]
+    end
+    
+    R = [Λ zeros(3,9); zeros(3,3) Λ zeros(3,6); zeros(3,6) Λ zeros(3,3); zeros(3,9) Λ]
+
+    return R
+end
+
+function R(xvec::Vector{Float64}, Ψ; tol = 1e-4)
+
+    CXx, CYx, CZx = normalize(xvec) # local x cosines
+
+    cΨ = cos(Ψ)
+    sΨ = sin(Ψ)
 
 
     if norm(cross(xvec, globalY)) < tol #special case for horizontal members aligned with global Y
@@ -189,11 +220,31 @@ end
 """
 Local coordinate system of element
 """
-function lcs(element::Element, Ψ; tol = 0.001)
+function lcs(element::Union{Element, TrussElement}, Ψ::Float64; tol = 0.001)
 
     # local x vector
     xvec = normalize(element.posEnd .- element.posStart)
     
+    if norm(cross(xvec, globalY)) < tol
+        CYx = xvec[2] #cosine to global Y axis
+        xvec = CYx * globalY
+        yvec = -CYx * globalX * cos(Ψ) + sin(Ψ) * globalZ
+        zvec = CYx * globalX * sin(Ψ) + cos(Ψ) * globalZ 
+    else
+        zbar = normalize(cross(xvec, [0, 1, 0]))
+        ybar = normalize(cross(zbar, xvec))
+
+        yvec = cos(Ψ) * ybar + sin(Ψ) * zbar
+        zvec = -sin(Ψ) * ybar + cos(Ψ) * zbar
+    end
+
+    return [xvec, yvec, zvec]
+end
+
+function lcs(xin::Vector{Float64}, Ψ::Float64; tol = 0.001)
+
+    xvec = normalize(copy(xin))
+    # local x vector
     if norm(cross(xvec, globalY)) < tol
         CYx = xvec[2] #cosine to global Y axis
         xvec = CYx * globalY

@@ -76,6 +76,8 @@ mutable struct TrussNode <: AbstractNode
         node = new(position, dofs)
 
         node.x, node.y, node.z = node.position
+        node.displacement = zeros(6)
+        node.reaction = zeros(6)
 
         node.id = nothing
         return node
@@ -96,6 +98,9 @@ mutable struct TrussNode <: AbstractNode
 
         node = new(position, dofs)
         node.x, node.y, node.z = node.position
+        node.displacement = zeros(3)
+        node.reaction = zeros(3)
+
         node.id = nothing
         return node
     end
@@ -137,5 +142,14 @@ function planarize!(nodes::Vector{TrussNode}; plane = :XY)
 
     for node in nodes
         node.dof[idx] = false
+    end
+end
+
+function planarize!(model::AbstractModel; plane = :XY)
+    planarize!(model.nodes; plane = plane)
+    if plane == :XY
+        for element in model.elements
+            element.Ψ = 0.
+        end
     end
 end

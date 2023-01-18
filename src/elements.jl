@@ -86,6 +86,8 @@ mutable struct TrussElement <: AbstractElement
     K::Matrix{Float64} # stiffness matrix in GCS
     R::Matrix{Float64} # transformation matrix
     forces::Vector{Float64} #elemental forces in LCS
+    Ψ::Float64
+    LCS::Vector{Vector{Float64}}
     id::Union{Symbol, Nothing} #optional identifier
 
     """
@@ -101,6 +103,8 @@ mutable struct TrussElement <: AbstractElement
         element.posEnd = nodes[nodeIndex[2]].position
         element.length = norm(element.posEnd .- element.posStart)
         element.id = nothing
+
+        element.Ψ = pi/2
 
         return element
     end
