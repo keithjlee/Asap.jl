@@ -1,4 +1,4 @@
-# Asap: Another structural analysis package
+# aSAP: (another) Structural Analysis Package
 
 For when you want to know what's going on in your structure as soon as possible.
 
