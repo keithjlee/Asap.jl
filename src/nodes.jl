@@ -153,3 +153,10 @@ function planarize!(model::AbstractModel; plane = :XY)
         end
     end
 end
+
+"""
+Set the DOF of a node to a common type
+"""
+function fixnode!(node::Node, fixity::Symbol)
+    node.dof = copy(fixDict[fixity])
+end

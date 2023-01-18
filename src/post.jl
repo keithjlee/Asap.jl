@@ -113,11 +113,11 @@ mutable struct GeometricLoad
     function GeometricLoad(load::LineLoad; scalefactor = 10, n = 20)
         vec = normalize(load.value) .* scalefactor
 
-        increment = load.element.length / n
+        increment = load.element.length / (n-2)
         starts = Vector{Vector{Float64}}()
         dirs = Vector{Vector{Float64}}()
 
-        for i = 1:n-1
+        for i = 1:(n-2)
             step = increment * i
             push!(starts, load.element.posStart .+ step * load.element.LCS[1])
             push!(dirs, vec)
@@ -129,11 +129,11 @@ mutable struct GeometricLoad
     function GeometricLoad(load::GravityLoad; scalefactor = 10, n = 20)
         vec = normalize(load.value .* [0., 0., -1.]) .* scalefactor
 
-        increment = load.element.length / n
+        increment = load.element.length / (n-2)
         starts = Vector{Vector{Float64}}()
         dirs = Vector{Vector{Float64}}()
 
-        for i = 1:n-1
+        for i = 1:n-2
             step = increment * i
             push!(starts, load.element.posStart .+ step * load.element.LCS[1])
             push!(dirs, vec)

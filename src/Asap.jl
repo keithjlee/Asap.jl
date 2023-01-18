@@ -9,7 +9,6 @@ export TrussSection
 export Steel_Nmm
 export Steel_kNm
 
-
 include("nodes.jl")
 export Node
 export TrussNode
@@ -38,11 +37,13 @@ export solve!
 export solve
 
 include("utilities.jl")
+export fixnode!
 
 include("post.jl")
 export Geometry
 export GeometricElement
 export GeometricNode
+export GeometricLoad
 export updateFactor!
 
 end 
