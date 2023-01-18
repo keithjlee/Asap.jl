@@ -37,7 +37,7 @@ function populateDOF!(model::TrussModel)
 
     n_dof = 3
     for (i, node) in enumerate(model.nodes)
-        node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
+        node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof -  1)
     end
 
     for element in model.elements

@@ -4,7 +4,7 @@ const globalY = [0., 1., 0.]
 const globalZ = [0., 0., 1.]
 
 """
-k for frame element
+K: Fixed-Fixed
 """
 function k_fixedfixed(element::Element)
     E = element.section.E
@@ -35,7 +35,7 @@ function k_fixedfixed(element::Element)
 end
 
 """
-Hinge-Fixed
+K: Hinge-Fixed
 """
 function k_freefixed(element::Element)
     E = element.section.E
@@ -62,7 +62,7 @@ function k_freefixed(element::Element)
 end
 
 """
-Fixed-Hinge
+K: Fixed-Hinge
 """
 function k_fixedfree(element::Element)
     E = element.section.E
@@ -89,7 +89,7 @@ function k_fixedfree(element::Element)
 end
 
 """
-Hinge-Hinge
+K: Hinge-Hinge
 """
 function k_freefree(element::Element)
     E = element.section.E
@@ -114,7 +114,7 @@ const kDict = Dict(:fixedfixed => k_fixedfixed,
     :truss => k_freefree)
 
 """
-make global k
+make elemental stiffness matrix in GCS
 """
 function makeK!(element::Element)
     kfunction = kDict[element.release]
@@ -122,7 +122,7 @@ function makeK!(element::Element)
 end
 
 """
-make global k
+make elemental stiffness matrix in GCS
 """
 function makeK!(element::TrussElement)
     k = element.section.E * element.section.A / element.length .* [1 -1; -1 1]
@@ -144,7 +144,7 @@ end
 
 
 """
-Transformation matrix
+Transformation matrix of an element
 """
 function R(element::Element; tol = 1e-4)
     xvec = normalize(element.posEnd .- element.posStart) # local x vector
@@ -177,6 +177,9 @@ function R(element::Element; tol = 1e-4)
     return R
 end
 
+"""
+Transformation matrix of a directional vector and roll angle
+"""
 function R(xvec::Vector{Float64}, Ψ; tol = 1e-4)
 
     CXx, CYx, CZx = normalize(xvec) # local x cosines
@@ -209,7 +212,7 @@ function R(xvec::Vector{Float64}, Ψ; tol = 1e-4)
 end
 
 """
-Transformation matrix
+Truss transformation matrix
 """
 function R(element::TrussElement)
     Cx, Cy, Cz = (element.posEnd .- element.posStart) ./ element.length
@@ -241,6 +244,10 @@ function lcs(element::Union{Element, TrussElement}, Ψ::Float64; tol = 0.001)
     return [xvec, yvec, zvec]
 end
 
+
+"""
+Local coordinate system of a directional vector and roll angle
+"""
 function lcs(xin::Vector{Float64}, Ψ::Float64; tol = 0.001)
 
     xvec = normalize(copy(xin))
