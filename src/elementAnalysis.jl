@@ -146,7 +146,7 @@ end
 """
 Transformation matrix
 """
-function R(element::Element; tol = 1e-4)
+function R(element::Union{Element, GeometricElement}; tol = 1e-4)
     xvec = normalize(element.posEnd .- element.posStart) # local x vector
     CXx, CYx, CZx = xvec # local x cosines
 

@@ -57,7 +57,7 @@ mutable struct GeometricElement
 
         gelement = new(pstart, pend, l)
         gelement.LCS = lcs(gelement, element.Ψ)
-        gelement.R = element.R
+        gelement.R = R(gelement)
         gelement.nsegments = nsegments
 
         gelement.displacement = [nodes[element.nodeIDs[1]].displacement; nodes[element.nodeIDs[2]].displacement]
@@ -80,7 +80,7 @@ mutable struct GeometricElement
 
         gelement = new(pstart, pend, l)
         gelement.LCS = element.LCS
-        gelement.R = element.R
+        gelement.R = R(gelement)
         gelement.nsegments = nsegments
 
         gelement.displacement = element.displacement
