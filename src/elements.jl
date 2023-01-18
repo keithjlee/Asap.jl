@@ -1,7 +1,9 @@
+abstract type AbstractElement end
+
 """
 An element
 """
-mutable struct Element
+mutable struct Element <: AbstractElement
     section::Section #cross section
     nodeIDs::Vector{Int64} #indices of start/end nodes 
     posStart::Vector{Float64} #start position
@@ -74,7 +76,7 @@ end
 """
 A truss element
 """
-mutable struct TrussElement
+mutable struct TrussElement <: AbstractElement
     section::TrussSection #cross section
     nodeIDs::Vector{Int64} #indices of start/end nodes 
     posStart::Vector{Float64} #start position

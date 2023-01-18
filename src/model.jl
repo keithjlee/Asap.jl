@@ -1,8 +1,9 @@
+abstract type AbstractModel end
 
 """
 Model
 """
-mutable struct Model
+mutable struct Model <: AbstractModel
     nodes::Vector{Node}
     elements::Vector{Element}
     loads::Vector{Load}
@@ -39,7 +40,7 @@ end
 """
 Truss model
 """
-mutable struct TrussModel
+mutable struct TrussModel <: AbstractModel
     nodes::Vector{TrussNode}
     elements::Vector{TrussElement}
     loads::Vector{NodeForce}

@@ -1,7 +1,9 @@
+abstract type AbstractNode end
+
 """
 A node in a system
 """
-mutable struct Node
+mutable struct Node <: AbstractNode
     position::Vector{Float64}
     dof::Vector{Bool}
     x::Float64
@@ -50,7 +52,7 @@ mutable struct Node
     end
 end
 
-mutable struct TrussNode
+mutable struct TrussNode <: AbstractNode
     position::Vector{Float64}
     dof::Vector{Bool}
     x::Float64

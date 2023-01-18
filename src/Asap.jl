@@ -39,4 +39,10 @@ export solve
 
 include("utilities.jl")
 
+include("post.jl")
+export Geometry
+export GeometricElement
+export GeometricNode
+export updateFactor!
+
 end 

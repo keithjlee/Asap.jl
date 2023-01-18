@@ -186,9 +186,9 @@ function R(element::TrussElement)
 end
 
 
-```
+"""
 Local coordinate system of element
-```
+"""
 function lcs(element::Element, Ψ; tol = 0.001)
 
     # local x vector
@@ -208,4 +208,29 @@ function lcs(element::Element, Ψ; tol = 0.001)
     end
 
     return [xvec, yvec, zvec]
+end
+
+
+"""
+displacement function
+"""
+function N(x::Float64, L::Float64)
+    n1 = 1 - 3(x/L)^2 + 2(x/L)^3
+    n2 = x*(1 - x/L)^2
+    n3 = 3(x/L)^2 - 2(x/L)^3
+    n4 = x^2/L * (-1 + x/L)
+
+    return [n1 n2 n3 n4]
+end
+
+"""
+stress function
+"""
+function B(y::Float64, x::Float64, L::Float64)
+    b1 = 6 * (-1 + 2 * x / L)
+    b2 = 2L * (-2 + 3 * x / L)
+    b3 = 6 * (1 - 2 * x / L)
+    b4 = 2L * (-1 + 3 * x / L)
+
+    return -y/L^2 .* [b1 b2 b3 b4]
 end
