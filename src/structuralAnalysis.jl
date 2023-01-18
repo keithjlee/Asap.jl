@@ -66,6 +66,7 @@ Process elements: get transformation matrix and global elemental stiffness matri
 function processElements!(model::TrussModel)
     for element in model.elements
         element.R = R(element)
+        element.LCS = lcs(element, element.Ψ)
         makeK!(element)
     end
 end

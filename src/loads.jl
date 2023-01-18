@@ -193,7 +193,7 @@ function Qlocal(load::GravityLoad)
 
     LCS = load.element.LCS
     l = load.element.length
-    value = [0., 0., -1.] .* load.density .* load.element.section.A
+    value = [0., 0., -1.] .* load.element.ρ .* load.element.section.A
 
     # load vector in LCS
     plocal = element.R[1:3, 1:3] * value .* LCS
