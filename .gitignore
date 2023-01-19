@@ -4,3 +4,4 @@ src/privateTests.jl
 .github
 scratch.jl
 test/scratch.jl
+scaletes.jl
