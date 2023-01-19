@@ -83,7 +83,7 @@ function displace!(element::GeometricElement, factor::Union{Float64, Int64})
         LCS = element.element.LCS
         r = element.element.R
 
-        element.displacedPositions = disp(n1.position, n2.displacedPosition, u, L, r, LCS, element.nsegments, factor)
+        element.displacedPositions = disp(n1.position, n1.displacedPosition, n2.displacedPosition, u, L, r, LCS, element.nsegments, factor)
     end
 
 end
@@ -289,7 +289,7 @@ function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matr
     return [posStart .+ shift for shift in fullshift]
 end
 
-function disp(posStart::Vector{Float64}, posEnd::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matrix{Float64}, LCS::Vector{Vector{Float64}}, n::Int64, factor::Union{Int64,Float64})
+function disp(posStart::Vector{Float64}, posStartDisplaced::Vector{Float64}, posEndDisplaced::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matrix{Float64}, LCS::Vector{Vector{Float64}}, n::Int64, factor::Union{Int64,Float64})
     
  
     #displacement vector in LCS
@@ -320,16 +320,16 @@ function disp(posStart::Vector{Float64}, posEnd::Vector{Float64}, u::Vector{Floa
     fullshift = xshift .+ yshift .+ zshift
 
 
-    slack = posEnd .- (posStart .+ fullshift[end])
+    slack = posEndDisplaced .- (posStart .+ fullshift[end])
     slacksingle = slack ./ (length(fullshift) - 1)
 
 
     # return [posStart .+ shift for shift in fullshift]
     d = [posStart .+ shift .+ slacksingle for shift in fullshift[2:end-1]]
-    p = [posStart .+ fullshift[1]]
+    p = [posStartDisplaced]
 
     push!(p, d...)
-    push!(p, posEnd)
+    push!(p, posEndDisplaced)
 
     return p
 end
