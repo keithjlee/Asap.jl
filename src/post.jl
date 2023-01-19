@@ -287,6 +287,23 @@ function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matr
     #shape function
     shapeFunction = vcat([N(i, L) for i in xrange]...)
 
+    ####TEST
+
+    #axial displacements w/r/t xy displacements
+    ulocalx1 = ulocal[iLocalx1]
+
+    #axial displacements w/r/t xz displacements
+    ulocalx2 = ulocal[iLocalx2]
+    shapeFunctionAxial = vcat([Naxial(i, L) for i in xrange]...)
+
+    #shift factors
+    xrange1 = shapeFunctionAxial * ulocalx1 * factor
+    xrange2 = shapeFunctionAxial * ulocalx2 * factor
+
+    crange = xrange1 .+ xrange2
+
+    ###TEST
+
     #shift factors
     yrange = shapeFunction * ulocaly * factor
     zrange = shapeFunction * ulocalz * factor
