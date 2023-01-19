@@ -77,20 +77,12 @@ function displace!(element::GeometricElement, factor::Union{Float64, Int64})
         element.displacedPositions = [n1.displacedPosition, n2.displacedPosition]
     else
         u = [n1.node.displacement; n2.node.displacement]
-        # posStart = n1.displacedPosition
-        # posEnd = n2.displacedPosition
-        # x = posEnd .- posStart
-        # L = norm(x)
-        # psi = element.element.Ψ
-        # LCS = lcs(x, psi)
-        # r = R(x, psi)
 
         posStart = n1.displacedPosition
         L = element.element.length
         LCS = element.element.LCS
         r = element.element.R
 
-        # element.displacedPositions = disp(posStart, u, L, r, LCS, element.nsegments, factor)
         element.displacedPositions = disp(n1.position, n2.displacedPosition, u, L, r, LCS, element.nsegments, factor)
     end
 
@@ -169,19 +161,8 @@ mutable struct Geometry
 
         return new(nodes, elems, loads, factor, factor)
     end
-    
-    # function Geometry(model::AbstractModel, dispfactor::Union{Int64, Float64}, loadfactor::Union{Int64, Float64}, n::Int64)
-    #     nodes = [GeometricNode(node) for node in model.nodes]
-    #     elems = [GeometricElement(nodes, element; nsegments = n) for element in model.elements]
-    #     loads = [GeometricLoad(load; scalefactor = loadfactor, n = n) for load in model.loads]
 
-    #     displace!.(nodes, dispfactor)
-    #     displace!.(elems, dispfactor)
-
-    #     return new(nodes, elems, loads, dispfactor, loadfactor)
-    # end
-
-    function Geometry(model::AbstractModel, dispfactor::Union{Int64, Float64}, loadfactor::Union{Int64, Float64}, n::Int64)
+    function Geometry(model::AbstractModel, dispfactor::Union{Int64, Float64}, loadfactor::Union{Int64, Float64}; n::Int64 = 20)
         nodes = [GeometricNode(node) for node in model.nodes]
         elems = [GeometricElement(nodes, element; nsegments = n) for element in model.elements]
         loads = [GeometricLoad(load; scalefactor = loadfactor, n = n) for load in model.loads]
@@ -281,7 +262,7 @@ function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matr
     ulocal = R * u
 
     Lnew = L - (ulocal[1] - ulocal[7])
-    # Lnew = L
+    
     #x increment
     xrange = collect(range(0, Lnew, length = n))
 
@@ -298,30 +279,6 @@ function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matr
     yrange = shapeFunction * ulocaly * factor
     zrange = shapeFunction * ulocalz * factor
 
-    ####TEST
-    # shapeFunctionAxial = [Naxial(i, L) for i in xrange]
-    
-    # #axial displacements w/r/t xy displacements
-    # ulocalx1 = ulocal[iLocalx1]
-
-    # #axial displacements w/r/t xz displacements
-    # ulocalx2 = ulocal[iLocalx2]
-
-    # #shift factors
-    # xyresult = vcat([sf * ulocalx1 * factor for sf in shapeFunctionAxial]...)
-    # xzresult = vcat([sf * ulocalx2 * factor for sf in shapeFunctionAxial]...)
-
-    # xy_x = xyresult[1:2:end] .* L
-    # xy_y = xyresult[2:2:end]
-
-    # xz_x = xzresult[1:2:end]
-    # xz_z = xzresult[2:2:end]
-
-
-    # yrange .+= xy_y
-    # zrange .+= xz_z
-    ###TEST
-
     #shift postiions
     xshift = [x * LCS[1] for x in xrange]
     yshift = [y * LCS[2] for y in yrange]
@@ -334,8 +291,7 @@ end
 
 function disp(posStart::Vector{Float64}, posEnd::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matrix{Float64}, LCS::Vector{Vector{Float64}}, n::Int64, factor::Union{Int64,Float64})
     
-   
-    
+ 
     #displacement vector in LCS
     ulocal = R * u
     #x increment
@@ -355,9 +311,6 @@ function disp(posStart::Vector{Float64}, posEnd::Vector{Float64}, u::Vector{Floa
     yrange = shapeFunction * ulocaly * factor
     zrange = shapeFunction * ulocalz * factor
 
-    ####TEST
-    # 
-
     #shift postiions
     # xshift = [x * LCS[1] for x in xrange]
     xshift = [x * LCS[1] for x in xrange]
@@ -366,30 +319,19 @@ function disp(posStart::Vector{Float64}, posEnd::Vector{Float64}, u::Vector{Floa
 
     fullshift = xshift .+ yshift .+ zshift
 
-    # adjustmentfactors = Vector{Float64}()
 
-    # slope = posEnd .- posStart
-
-    # for (i, shift) in enumerate(fullshift[end])
-    #     if abs(shift) < 1
-    #         push!(adjustmentfactors, slope[i])
-    #     else
-    #         push!(adjustmentfactors, slope[i] / shift)
-    #     end
-    # end
-
-    # slack = posEnd .- (posStart .+ fullshift[end])
-    # slacksingle = slack ./ length(fullshift)
-
-    straightline = posEnd .- posStart
-    # adjustmentfactors = (posEnd - posStart) ./  fullshift[end]
-    
+    slack = posEnd .- (posStart .+ fullshift[end])
+    slacksingle = slack ./ (length(fullshift) - 1)
 
 
-    scaler = makeR(straightline, fullshift[end])
+    # return [posStart .+ shift for shift in fullshift]
+    d = [posStart .+ shift .+ slacksingle for shift in fullshift[2:end-1]]
+    p = [posStart .+ fullshift[1]]
 
-    return [posStart .+ shift for shift in fullshift]
-    # return [posStart .+ shift .+ slacksingle for shift in fullshift]
+    push!(p, d...)
+    push!(p, posEnd)
+
+    return p
 end
 
 function makeR(straightline::Vector{Float64}, shift::Vector{Float64})
