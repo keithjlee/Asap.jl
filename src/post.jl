@@ -228,6 +228,9 @@ Assumed analyzed
 """
 iLocaly = [2, 6, 8, 12]
 iLocalz = [3, 5, 9, 11]
+
+iLocalx1 = [1, 2, 7, 8]
+iLocalx2 = [1, 3, 7, 9]
 function disp(model::Model, element::Element, n::Int64, factor::Union{Int64,Float64})
     
     #x increment
@@ -242,10 +245,18 @@ function disp(model::Model, element::Element, n::Int64, factor::Union{Int64,Floa
     #end displacements w/r/t z displacements
     ulocalz = ulocal[iLocalz]
 
+    #axial displacements w/r/t xy displacements
+    ulocalx1 = ulocal[iLocalx1]
+
+    #axial displacements w/r/t xz displacements
+    ulocalx2 = ulocal[iLocalx2]
+
     #shape function
     shapeFunction = vcat([N(i, element.length) for i in xrange]...)
+    shapeFunctionAxial = vcat([Naxial(i, element.length) for i in xrange]...)
 
     #shift factors
+    xrange = shapeFunctionAxial * (ulocalx1 + ulocalx2) * factor
     yrange = shapeFunction * ulocaly * factor
     zrange = shapeFunction * ulocalz * factor
 

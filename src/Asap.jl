@@ -21,6 +21,7 @@ export TrussElement
 export release!
 
 include("loads.jl")
+export Load
 export NodeForce
 export NodeMoment
 export LineLoad

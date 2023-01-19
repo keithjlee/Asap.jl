@@ -281,6 +281,14 @@ function N(x::Float64, L::Float64)
     return [n1 n2 n3 n4]
 end
 
+function Naxial(x::Float64, L::Float64)
+    n1 = n2 = 1 - x/L
+    n3 = n4 = x/L
+    
+    return [n1 0 n3 0;
+        0 n2 0 n4]
+end
+
 """
 stress function
 """
