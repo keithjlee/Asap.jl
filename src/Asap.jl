@@ -1,6 +1,6 @@
 module Asap
 
-using LinearAlgebra, SparseArrays, Statistics
+using LinearAlgebra, SparseArrays, Statistics, Rotations
 
 include("meta.jl")
 export Material

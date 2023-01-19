@@ -85,12 +85,13 @@ function displace!(element::GeometricElement, factor::Union{Float64, Int64})
         # LCS = lcs(x, psi)
         # r = R(x, psi)
 
-        posStart = n1.position
+        posStart = n1.displacedPosition
         L = element.element.length
         LCS = element.element.LCS
         r = element.element.R
 
-        element.displacedPositions = disp(posStart, u, L, r, LCS, element.nsegments, factor)
+        # element.displacedPositions = disp(posStart, u, L, r, LCS, element.nsegments, factor)
+        element.displacedPositions = disp(n1.position, n2.displacedPosition, u, L, r, LCS, element.nsegments, factor)
     end
 
 end
@@ -256,7 +257,9 @@ function disp(model::Model, element::Element, n::Int64, factor::Union{Int64,Floa
     shapeFunctionAxial = vcat([Naxial(i, element.length) for i in xrange]...)
 
     #shift factors
-    xrange = shapeFunctionAxial * (ulocalx1 + ulocalx2) * factor
+    xrange1 = shapeFunctionAxial * ulocalx1 * factor
+    xrange2 = shapeFunctionAxial * ulocalx2 * factor
+    xrange = xrange1 .+ xrange2
     yrange = shapeFunction * ulocaly * factor
     zrange = shapeFunction * ulocalz * factor
 
@@ -272,11 +275,15 @@ end
 
 function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matrix{Float64}, LCS::Vector{Vector{Float64}}, n::Int64, factor::Union{Int64,Float64})
     
-    #x increment
-    xrange = collect(range(0, L, length = n))
+    
     
     #displacement vector in LCS
     ulocal = R * u
+
+    Lnew = L - (ulocal[1] - ulocal[7])
+    # Lnew = L
+    #x increment
+    xrange = collect(range(0, Lnew, length = n))
 
     #end displacements w/r/t y displacement
     ulocaly = ulocal[iLocaly]
@@ -287,26 +294,33 @@ function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matr
     #shape function
     shapeFunction = vcat([N(i, L) for i in xrange]...)
 
-    ####TEST
-
-    #axial displacements w/r/t xy displacements
-    ulocalx1 = ulocal[iLocalx1]
-
-    #axial displacements w/r/t xz displacements
-    ulocalx2 = ulocal[iLocalx2]
-    shapeFunctionAxial = vcat([Naxial(i, L) for i in xrange]...)
-
-    #shift factors
-    xrange1 = shapeFunctionAxial * ulocalx1 * factor
-    xrange2 = shapeFunctionAxial * ulocalx2 * factor
-
-    crange = xrange1 .+ xrange2
-
-    ###TEST
-
     #shift factors
     yrange = shapeFunction * ulocaly * factor
     zrange = shapeFunction * ulocalz * factor
+
+    ####TEST
+    # shapeFunctionAxial = [Naxial(i, L) for i in xrange]
+    
+    # #axial displacements w/r/t xy displacements
+    # ulocalx1 = ulocal[iLocalx1]
+
+    # #axial displacements w/r/t xz displacements
+    # ulocalx2 = ulocal[iLocalx2]
+
+    # #shift factors
+    # xyresult = vcat([sf * ulocalx1 * factor for sf in shapeFunctionAxial]...)
+    # xzresult = vcat([sf * ulocalx2 * factor for sf in shapeFunctionAxial]...)
+
+    # xy_x = xyresult[1:2:end] .* L
+    # xy_y = xyresult[2:2:end]
+
+    # xz_x = xzresult[1:2:end]
+    # xz_z = xzresult[2:2:end]
+
+
+    # yrange .+= xy_y
+    # zrange .+= xz_z
+    ###TEST
 
     #shift postiions
     xshift = [x * LCS[1] for x in xrange]
@@ -316,4 +330,74 @@ function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matr
     fullshift = xshift .+ yshift .+ zshift
 
     return [posStart .+ shift for shift in fullshift]
+end
+
+function disp(posStart::Vector{Float64}, posEnd::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matrix{Float64}, LCS::Vector{Vector{Float64}}, n::Int64, factor::Union{Int64,Float64})
+    
+   
+    
+    #displacement vector in LCS
+    ulocal = R * u
+    #x increment
+    Lnew = L - (ulocal[1] - ulocal[7])
+
+    xrange = collect(range(0, Lnew, length = n))
+    #end displacements w/r/t y displacement
+    ulocaly = ulocal[iLocaly]
+
+    #end displacements w/r/t z displacements
+    ulocalz = ulocal[iLocalz]
+
+    #shape function
+    shapeFunction = vcat([N(i, L) for i in xrange]...)
+
+    #shift factors
+    yrange = shapeFunction * ulocaly * factor
+    zrange = shapeFunction * ulocalz * factor
+
+    ####TEST
+    # 
+
+    #shift postiions
+    # xshift = [x * LCS[1] for x in xrange]
+    xshift = [x * LCS[1] for x in xrange]
+    yshift = [y * LCS[2] for y in yrange]
+    zshift = [z * LCS[3] for z in zrange]
+
+    fullshift = xshift .+ yshift .+ zshift
+
+    # adjustmentfactors = Vector{Float64}()
+
+    # slope = posEnd .- posStart
+
+    # for (i, shift) in enumerate(fullshift[end])
+    #     if abs(shift) < 1
+    #         push!(adjustmentfactors, slope[i])
+    #     else
+    #         push!(adjustmentfactors, slope[i] / shift)
+    #     end
+    # end
+
+    # slack = posEnd .- (posStart .+ fullshift[end])
+    # slacksingle = slack ./ length(fullshift)
+
+    straightline = posEnd .- posStart
+    # adjustmentfactors = (posEnd - posStart) ./  fullshift[end]
+    
+
+
+    scaler = makeR(straightline, fullshift[end])
+
+    return [posStart .+ shift for shift in fullshift]
+    # return [posStart .+ shift .+ slacksingle for shift in fullshift]
+end
+
+function makeR(straightline::Vector{Float64}, shift::Vector{Float64})
+    ang = round(dot(shift, straightline) / norm(shift) / norm(straightline))
+    t = acos(ang) #angle 
+    s = normalize(cross(shift, straightline)) #axis
+
+    scale = norm(straightline) / norm(shift)
+
+    R = AngleAxis(t, s...) .* scale
 end
