@@ -192,8 +192,6 @@ function globalS!(model::Union{Model, TrussModel})
         idx = element.globalID
         S[idx, idx] .+= element.K
     end
-
-    model.S = Symmetric(S)
 end
 
 """
