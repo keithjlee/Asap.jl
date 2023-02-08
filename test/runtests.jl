@@ -14,7 +14,6 @@ using LinearAlgebra
     n4 = TrussNode([6., 8., 0.], :free)
 
     nodes = [n1, n2, n3, n4]
-    planarize!(nodes)
 
     E = 70. #kN/m^2
     A = 4e3 / 1e6 #m^2
@@ -35,6 +34,7 @@ using LinearAlgebra
     loads = [l1, l2]
 
     model = TrussModel(nodes, elements, loads)
+    planarize!(model)
     solve!(model)
 
     reactions = model.reactions[model.fixedDOFs]
@@ -58,7 +58,6 @@ using LinearAlgebra
     n2 = Node([10., 20., 0.] .* 12, :free)
     n3 = Node([30., 20., 0.] .* 12, :fixed)
     nodes = [n1, n2, n3]
-    planarize!(nodes)
 
     E = 29e3
     A = 11.8
@@ -80,6 +79,7 @@ using LinearAlgebra
     loads = [l1, l2, l3]
 
     model = Model(nodes, elements, loads)
+    planarize!(model)
     solve!(model)
 
     reactions = model.reactions[model.fixedDOFs]

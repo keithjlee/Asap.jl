@@ -77,7 +77,7 @@ end
 A truss element
 """
 mutable struct TrussElement <: AbstractElement
-    section::TrussSection #cross section
+    section::AbstractSection #cross section
     nodeIDs::Vector{Int64} #indices of start/end nodes 
     posStart::Vector{Float64} #start position
     posEnd::Vector{Float64} #end position
@@ -96,7 +96,7 @@ mutable struct TrussElement <: AbstractElement
     -nodeIndex: [startIndex, endIndex] of element w/r/t nodes\\
     -section: element Section
     """
-    function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::TrussSection)
+    function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection)
         element = new(section, nodeIndex)
 
         element.posStart = nodes[nodeIndex[1]].position
