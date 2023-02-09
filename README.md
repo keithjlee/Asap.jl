@@ -8,7 +8,7 @@ Below is a truss model of moderate scale (~684 elements), parsed and analyzed in
 Below is a much more complex frame model (~23040 elements), parsed and analyzed in under 5s.
 ![](READMEassets/biosphere.png)
 
-Note that these times are extreme upper bounds, where the structure of the sparse stiffness matrix is yet unknown. Subsequent solves to new external forces are ~.1ms and ~.2s respectively.
+Note that these times are extreme upper bounds for direct CPU solves, where the structure of the sparse stiffness matrix is yet unknown. Subsequent solves to new external forces are ~.1ms and ~.2s respectively.
 
 A small 3D frame example:
 
