@@ -180,18 +180,60 @@ function createF(model::TrussModel, loads::Vector{NodeForce})
     return P
 end
 
+"""
+Create global stiffness matrix
+"""
+function globalS!(model::Model)
+    I = Vector{Int64}()
+    J = Vector{Int64}()
+    V = Vector{Float64}()
 
+    for element in model.elements
+
+        idx = element.globalID
+
+        @inbounds for i = 1:12
+            @inbounds for j = 1:12
+                k = element.K[i,j]
+                # if abs(k) > tol
+                push!(I, idx[i])
+                push!(J, idx[j])
+                push!(V, k)
+                
+            end
+        end
+
+    end
+
+    model.S = sparse(I, J, V)
+end
 
 """
 Create global stiffness matrix
 """
-function globalS!(model::Union{Model, TrussModel})
-    S = spzeros(model.nDOFs, model.nDOFs)
+function globalS!(model::TrussModel)
+    I = Vector{Int64}()
+    J = Vector{Int64}()
+    V = Vector{Float64}()
 
     for element in model.elements
+
         idx = element.globalID
-        S[idx, idx] .+= element.K
+
+        @inbounds for i = 1:6
+            @inbounds for j = 1:6
+                k = element.K[i,j]
+                # if abs(k) > tol
+                push!(I, idx[i])
+                push!(J, idx[j])
+                push!(V, k)
+                
+            end
+        end
+
     end
+
+    model.S = sparse(I, J, V)
 end
 
 """
