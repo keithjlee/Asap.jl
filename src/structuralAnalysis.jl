@@ -195,7 +195,6 @@ function globalS!(model::Model)
         @inbounds for i = 1:12
             @inbounds for j = 1:12
                 k = element.K[i,j]
-                # if abs(k) > tol
                 push!(I, idx[i])
                 push!(J, idx[j])
                 push!(V, k)
@@ -223,7 +222,6 @@ function globalS!(model::TrussModel)
         @inbounds for i = 1:6
             @inbounds for j = 1:6
                 k = element.K[i,j]
-                # if abs(k) > tol
                 push!(I, idx[i])
                 push!(J, idx[j])
                 push!(V, k)

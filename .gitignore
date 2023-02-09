@@ -6,3 +6,4 @@ scratch.jl
 test/scratch.jl
 scaletes.jl
 exampleStructures/biosphere.json
+parseTestStructures.jl
