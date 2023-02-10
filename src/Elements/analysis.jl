@@ -152,7 +152,8 @@ end
 Transformation matrix of an element
 """
 function R(element::Element; tol = 1e-4)
-    xvec = normalize(element.posEnd .- element.posStart) # local x vector
+    
+    xvec = localx(element)
     CXx, CYx, CZx = xvec # local x cosines
 
     cΨ = cos(element.Ψ)
@@ -217,10 +218,19 @@ function R(xvec::Vector{Float64}, Ψ; tol = 1e-4)
 end
 
 """
+Get the local x vector of an element
+Defaults to normalized unit vector
+"""
+function localx(element::AbstractElement; unit = true)
+    x = element.nodeEnd.position .- element.nodeStart.position
+    unit ? normalize(x) : x
+end
+
+"""
 Truss transformation matrix
 """
 function R(element::TrussElement)
-    Cx, Cy, Cz = (element.posEnd .- element.posStart) ./ element.length
+    Cx, Cy, Cz = localx(element)
     return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
 end
 
@@ -231,7 +241,7 @@ Local coordinate system of element
 function lcs(element::Union{Element, TrussElement}, Ψ::Float64; tol = 0.001)
 
     # local x vector
-    xvec = normalize(element.posEnd .- element.posStart)
+    xvec = localx(element)
     
     if norm(cross(xvec, globalY)) < tol
         CYx = xvec[2] #cosine to global Y axis

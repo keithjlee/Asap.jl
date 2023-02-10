@@ -6,8 +6,8 @@ An element
 mutable struct Element <: AbstractElement
     section::Section #cross section
     nodeIDs::Vector{Int64} #indices of start/end nodes 
-    posStart::Vector{Float64} #start position
-    posEnd::Vector{Float64} #end position
+    nodeStart::Node #start node
+    nodeEnd::Node #end position
     globalID::Vector{Int64} #element global DOFs
     length::Float64 #length of element
     release::Symbol #
@@ -28,11 +28,9 @@ mutable struct Element <: AbstractElement
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
         element = new(section, nodeIndex)
 
-        element.posStart = nodes[nodeIndex[1]].position
-        element.posEnd = nodes[nodeIndex[2]].position
-        element.length = norm(element.posEnd .- element.posStart)
+        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
+        element.length = dist(element.nodeStart, element.nodeEnd)
         element.Ψ = pi/2
-        # element.LCS = lcs(element, element.Ψ)
         element.id = nothing
         element.Q = zeros(12)
 
@@ -57,9 +55,8 @@ mutable struct Element <: AbstractElement
 
         element = new(section, nodeIndex)
 
-        element.posStart = nodes[nodeIndex[1]].position
-        element.posEnd = nodes[nodeIndex[2]].position
-        element.length = norm(element.posEnd .- element.posStart)
+        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
+        element.length = dist(element.nodeStart, element.nodeEnd)
         element.Ψ = pi/2
         # element.LCS = lcs(element, element.Ψ)
         element.id = nothing
@@ -79,8 +76,8 @@ A truss element
 mutable struct TrussElement <: AbstractElement
     section::AbstractSection #cross section
     nodeIDs::Vector{Int64} #indices of start/end nodes 
-    posStart::Vector{Float64} #start position
-    posEnd::Vector{Float64} #end position
+    nodeStart::TrussNode #start position
+    nodeEnd::TrussNode #end position
     globalID::Vector{Int64} #element global DOFs
     length::Float64 #length of element
     K::Matrix{Float64} # stiffness matrix in GCS
@@ -99,9 +96,8 @@ mutable struct TrussElement <: AbstractElement
     function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection)
         element = new(section, nodeIndex)
 
-        element.posStart = nodes[nodeIndex[1]].position
-        element.posEnd = nodes[nodeIndex[2]].position
-        element.length = norm(element.posEnd .- element.posStart)
+        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
+        element.length = dist(element.nodeStart, element.nodeEnd)
         element.id = nothing
 
         element.Ψ = pi/2
