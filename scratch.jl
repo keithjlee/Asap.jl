@@ -126,14 +126,13 @@ function obj(x)
 
     Rs = Asap.R.(E)
 
-    # KeGlobal = vec.(transpose.(Rs) .* Kstore .* Rs)
-
-    KeGlobal = [vec(r' * k * r) for (r,k) in zip(Rs, Kstore)]
+    #OPTION 1: FASTER BUT UNSTABLE
+    KeGlobal = vec.(transpose.(Rs) .* Kstore .* Rs)
     V = vcat(KeGlobal...)
-
     K = sparse(I, J, V)
-    # ks = [sparse(i, j, vec(k), n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
 
+    #OPTION 2: MEMORY INTENSIVE BUT WORKS
+    # ks = [sparse(i, j, k, n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
     # K = sum(ks)
 
     U = K[freedof, freedof] \ P[freedof]
