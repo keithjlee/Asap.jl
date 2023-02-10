@@ -74,3 +74,14 @@ function R(element::TrussElement)
     Cx, Cy, Cz = localx(element)
     return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
 end
+
+function R(vec::Vector{Float64})
+    Cx, Cy, Cz = normalize(vec)
+    return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
+end
+
+function R(vec::SubArray)
+    Cx, Cy, Cz = normalize(vec)
+    return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
+end
+

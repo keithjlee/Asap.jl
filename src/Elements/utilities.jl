@@ -46,7 +46,7 @@ end
 """
 Local coordinate system of element
 """
-function lcs(element::Union{Element, TrussElement}, Ψ::Float64; tol = 0.001)
+function lcs(element::AbstractElement, Ψ::Float64; tol = 0.001)
 
     # local x vector
     xvec = localx(element)

@@ -1,4 +1,4 @@
-using Asap, JSON, SparseArrays, LinearAlgebra, Statistics, GLMakie, kjlMakie
+using Asap, JSON, SparseArrays, LinearAlgebra, Statistics, GLMakie, kjlMakie, Zygote
 
 
 E = 200e6 #kN/m^2
@@ -42,5 +42,122 @@ loads = Vector{NodeForce}()
 for node in nodes[:free]
     push!(loads, NodeForce(node, Pvec))
 end
-structure = TrussModel(nodes, elements, loads)
+structure = TrussModel(nodes, elements, loads);
 @time solve!(structure; reprocess = true)
+
+################
+# NAIVE SHAPE OPTIMIZATION
+################
+###CONSTANTS
+#elemental stiffness matrices in LCS
+Kstore = Asap.localK.(structure.elements)
+#free degrees of freedom
+freedof = structure.freeDOFs
+#load vector
+P = structure.P
+#Connectivity Matrix
+C = Asap.connectivity(structure)
+#Initial positions
+X = Asap.nodePositions(structure)
+#Row/Column vectors for global K assembly
+I = Vector{Int64}()
+J = Vector{Int64}()
+
+for element in structure.elements
+    idx = element.globalID
+    @inbounds for j = 1:6
+        @inbounds for i = 1:6
+            push!(I, idx[i])
+            push!(J, idx[j])
+        end
+    end
+end
+
+@time begin
+    x0 = X[:, 3]
+
+    Xvec = [X[:, 1:2] x0]
+
+    E = normalize.(eachrow(C * Xvec))
+
+    Rs = Asap.R.(E)
+
+    KeGlobal = transpose.(Rs) .* Kstore .* Rs;
+    V = vcat(vec.(KeGlobal)...)
+
+    # V = vcat([vec(r' * k * r) for (r,k) in zip(Rs, Kstore)]...)
+
+    K = sparse(I, J, V)
+
+    U = K[freedof, freedof] \ P[freedof]
+
+    O = U' * P[freedof]
+end
+
+Cd = Matrix(C)
+
+Is = Vector{Vector{Int64}}()
+Js = Vector{Vector{Int64}}()
+
+for element in structure.elements
+    idx = element.globalID
+    ii = Vector{Int64}()
+    jj = Vector{Int64}()
+
+    for j = 1:6
+        for i = 1:6
+            push!(ii, idx[i])
+            push!(jj, idx[j])
+        end
+    end
+
+    push!(Is, ii)
+    push!(Js, jj)
+end
+
+n = structure.nDOFs
+
+ks = [sparse(i, j, vec(k), n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
+
+function obj(x::Vector{Float64}, p)
+    Xvec = [X[:, 1:2] x]
+
+    E = normalize.(eachrow(C * Xvec))
+
+    Rs = Asap.R.(E)
+
+    # KeGlobal = vec.(transpose.(Rs) .* Kstore .* Rs)
+
+    KeGlobal = [vec(r' * k * r) for (r,k) in zip(Rs, Kstore)]
+    V = vcat(KeGlobal...)
+
+    K = sparse(I, J, V)
+    # ks = [sparse(i, j, vec(k), n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
+
+    # K = sum(ks)
+
+    U = K[freedof, freedof] \ P[freedof]
+
+    O = U' * P[freedof]
+
+    return O
+end
+
+
+x0 = X[:, 3] .+ rand(structure.nNodes)
+
+@time obj(x0, 0)
+
+@time g = gradient(x-> obj(x, 0), x0)[1];
+
+using Optimization, OptimizationNLopt
+
+opf = Optimization.OptimizationFunction(obj, Optimization.AutoZygote())
+opp = Optimization.OptimizationProblem(opf, x0, 
+    lb = x0 .- 1, ub = x0 .+ 1)
+
+sol = Optimization.solve(opp, NLopt.LD_LBFGS(),
+    abstol = 1e-3,
+    maxiters = 30
+    )
+
