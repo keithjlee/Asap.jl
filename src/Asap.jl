@@ -1,46 +1,48 @@
 module Asap
 
-using LinearAlgebra, SparseArrays, Statistics, Rotations
+using LinearAlgebra, SparseArrays, Statistics
 
-include("meta.jl")
+include("Materials_Sections/material.jl")
+include("Materials_Sections/section.jl")
 export Material
 export Section
 export TrussSection
 export Steel_Nmm
 export Steel_kNm
 
-include("nodes.jl")
+include("Nodes/nodes.jl")
+include("Nodes/utilities.jl")
 export Node
 export TrussNode
 export planarize!
+export fixnode!
 
-include("elements.jl")
-include("elementAnalysis.jl")
+include("Elements/elements.jl")
+include("Elements/analysis.jl")
+include("Elements/utilities.jl")
 export Element
 export TrussElement
 export release!
 
-include("loads.jl")
-export Load
+include("Loads/loads.jl")
+include("Loads/utilities.jl")
 export NodeForce
 export NodeMoment
 export LineLoad
 export GravityLoad
 export PointLoad
 
-include("model.jl")
+include("Structure/model.jl")
+include("Structure/utilities.jl")
 export Model
 export TrussModel
 
-include("structuralAnalysis.jl")
+include("Structure/analysis.jl")
 export process!
 export solve!
 export solve
 
-include("utilities.jl")
-export fixnode!
-
-include("post.jl")
+include("PostProcess/post.jl")
 export Geometry
 export GeometricElement
 export GeometricNode

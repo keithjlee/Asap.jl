@@ -6,9 +6,6 @@ A node in a system
 mutable struct Node <: AbstractNode
     position::Vector{Float64}
     dof::Vector{Bool}
-    x::Float64
-    y::Float64
-    z::Float64
     globalID::Vector{Int64}
     reaction::Vector{Float64}
     displacement::Vector{Float64}
@@ -25,8 +22,6 @@ mutable struct Node <: AbstractNode
         end
 
         node = new(position, dofs)
-
-        node.x, node.y, node.z = node.position
 
         node.id = nothing
         return node
@@ -46,7 +41,7 @@ mutable struct Node <: AbstractNode
         dofs = copy(fixDict[fixity])
 
         node = new(position, dofs)
-        node.x, node.y, node.z = node.position
+
         node.id = nothing
         return node
     end
@@ -55,9 +50,6 @@ end
 mutable struct TrussNode <: AbstractNode
     position::Vector{Float64}
     dof::Vector{Bool}
-    x::Float64
-    y::Float64
-    z::Float64
     globalID::Vector{Int64}
     reaction::Vector{Float64}
     displacement::Vector{Float64}
@@ -75,7 +67,6 @@ mutable struct TrussNode <: AbstractNode
 
         node = new(position, dofs)
 
-        node.x, node.y, node.z = node.position
         node.displacement = zeros(6)
         node.reaction = zeros(6)
 
@@ -97,7 +88,7 @@ mutable struct TrussNode <: AbstractNode
         dofs = copy(fixDict[fixity][1:3])
 
         node = new(position, dofs)
-        node.x, node.y, node.z = node.position
+
         node.displacement = zeros(3)
         node.reaction = zeros(3)
 
@@ -119,14 +110,10 @@ const fixDict = Dict(:fixed => [false, false, false, false, false, false],
     :zfree => [false, false, true, false, false, false],
     :pinned => [false, false, false, true, true, true])
 
-
+"""
+Inactive DOF w/r/t plane
+"""
 const planeDict = Dict(:XY => [3, 4, 5],
     :YZ => [1, 5, 6],
     :ZX => [2, 4, 6])
 
-"""
-Set the DOF of a node to a common type
-"""
-function fixnode!(node::Node, fixity::Symbol)
-    node.dof = copy(fixDict[fixity])
-end
