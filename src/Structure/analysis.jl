@@ -253,7 +253,7 @@ end
 """
 Populate node reactions and displacements
 """
-function postprocessnodes!(model::Union{Model, TrussModel})
+function postprocessnodes!(model::AbstractModel)
     for node in model.nodes
         node.reaction = model.reactions[node.globalID]
         node.displacement = model.u[node.globalID]
@@ -281,7 +281,7 @@ end
 """
 process a network
 """
-function process!(model::Union{Model, TrussModel})
+function process!(model::AbstractModel)
 
     #global DOF 
     populateDOF!(model)
@@ -302,7 +302,7 @@ end
 """
 post-process a network
 """
-function postprocess!(model::Union{Model, TrussModel})
+function postprocess!(model::AbstractModel)
     reactions!(model)
     postprocessnodes!(model)
     postprocesselements!(model)
@@ -393,9 +393,8 @@ end
 Solve a network with a new load vector
 """
 function solve(model::Model, F::Vector{Float64})
-    if length(F) != model.nDOFs
-        error("Length of F must equal total number of DOFs")
-    end
+
+    @assert length(F) == model.nDOFs "Length of F must equal total number of DOFs"
 
     idx = model.freeDOFs
 
@@ -412,9 +411,7 @@ Solve a network with a new load vector
 """
 function solve(model::TrussModel, F::Vector{Float64})
 
-    if length(F) != model.nDOFs
-        error("Length of F must equal total number of DOFs")
-    end
+    @assert length(F) == model.nDOFs "Length of F must equal total number of DOFs"
 
     idx = model.freeDOFs
 
