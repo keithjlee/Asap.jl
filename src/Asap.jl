@@ -2,6 +2,11 @@ module Asap
 
 using LinearAlgebra, SparseArrays, Statistics
 
+# global axes
+const globalX::Vector{Float64} = [1., 0., 0.]
+const globalY::Vector{Float64} = [0., 1., 0.]
+const globalZ::Vector{Float64} = [0., 0., 1.]
+
 include("Materials_Sections/material.jl")
 include("Materials_Sections/section.jl")
 export Material
@@ -18,14 +23,17 @@ export planarize!
 export fixnode!
 
 include("Elements/elements.jl")
-include("Elements/analysis.jl")
+include("Elements/K.jl")
+include("Elements/R.jl")
 include("Elements/utilities.jl")
 export Element
 export TrussElement
 export release!
+export endPositions
 
 include("Loads/loads.jl")
 include("Loads/utilities.jl")
+include("Loads/fixedEndForces.jl")
 export NodeForce
 export NodeMoment
 export LineLoad

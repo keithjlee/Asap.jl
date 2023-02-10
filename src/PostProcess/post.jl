@@ -334,12 +334,12 @@ function disp(posStart::Vector{Float64}, posStartDisplaced::Vector{Float64}, pos
     return p
 end
 
-function makeR(straightline::Vector{Float64}, shift::Vector{Float64})
-    ang = round(dot(shift, straightline) / norm(shift) / norm(straightline))
-    t = acos(ang) #angle 
-    s = normalize(cross(shift, straightline)) #axis
+# function makeR(straightline::Vector{Float64}, shift::Vector{Float64})
+#     ang = round(dot(shift, straightline) / norm(shift) / norm(straightline))
+#     t = acos(ang) #angle 
+#     s = normalize(cross(shift, straightline)) #axis
 
-    scale = norm(straightline) / norm(shift)
+#     scale = norm(straightline) / norm(shift)
 
-    R = AngleAxis(t, s...) .* scale
-end
+#     R = AngleAxis(t, s...) .* scale
+# end
