@@ -119,7 +119,7 @@ n = structure.nDOFs
 
 ks = [sparse(i, j, vec(k), n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
 
-function obj(x::Vector{Float64}, p)
+function obj(x)
     Xvec = [X[:, 1:2] x]
 
     E = normalize.(eachrow(C * Xvec))
@@ -146,18 +146,6 @@ end
 
 x0 = X[:, 3] .+ rand(structure.nNodes)
 
-@time obj(x0, 0)
+@time obj(x0)
 
-@time g = gradient(x-> obj(x, 0), x0)[1];
-
-using Optimization, OptimizationNLopt
-
-opf = Optimization.OptimizationFunction(obj, Optimization.AutoZygote())
-opp = Optimization.OptimizationProblem(opf, x0, 
-    lb = x0 .- 1, ub = x0 .+ 1)
-
-sol = Optimization.solve(opp, NLopt.LD_LBFGS(),
-    abstol = 1e-3,
-    maxiters = 30
-    )
-
+@time g = gradient(x-> obj(x), x0)[1];
