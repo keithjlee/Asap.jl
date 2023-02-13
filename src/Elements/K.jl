@@ -121,10 +121,19 @@ function makeK(element::Element)
     return Symmetric(element.R' * kfunction(element) * element.R)
 end
 
+function localK(element::Element)
+    kfunction = kDict[element.release]
+    return kfunction(element)
+end
+
 """
 make elemental stiffness matrix in GCS
 """
 function makeK!(element::TrussElement)
     k = element.section.E * element.section.A / element.length .* [1 -1; -1 1]
     element.K = Symmetric(element.R' * k * element.R)
+end
+
+function localK(element::TrussElement)
+    return element.section.E * element.section.A / element.length .* [1 -1; -1 1]
 end
