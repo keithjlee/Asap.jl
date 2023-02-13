@@ -119,7 +119,21 @@ n = structure.nDOFs
 
 ks = [sparse(i, j, vec(k), n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
 
-function obj(x)
+function Vbuff(vals::Vector{Float64}, stiffnesses::Vector{Vector{Float64}})
+    V = Zygote.Buffer(vals)
+   
+    @inbounds for i = 1:length(stiffnesses)
+        istart = 36 * (i - 1) + 1
+        iend = istart + 35
+        V[istart:iend] = stiffnesses[i]
+    end
+
+
+    return copy(V)
+end
+
+nvals = sum(length.(KeGlobal))
+function obj(x, p)
     Xvec = [X[:, 1:2] x]
 
     E = normalize.(eachrow(C * Xvec))
@@ -128,7 +142,7 @@ function obj(x)
 
     #OPTION 1: FASTER BUT UNSTABLE
     KeGlobal = vec.(transpose.(Rs) .* Kstore .* Rs)
-    V = vcat(KeGlobal...)
+    V = Vbuff(zeros(nvals), KeGlobal)
     K = sparse(I, J, V)
 
     #OPTION 2: MEMORY INTENSIVE BUT WORKS
@@ -143,8 +157,42 @@ function obj(x)
 end
 
 
+
 x0 = X[:, 3] .+ rand(structure.nNodes)
 
-@time obj(x0)
+@time obj(x0, 0)
 
-@time g = gradient(x-> obj(x), x0)[1];
+@time g = gradient(x-> obj(x, 0), x0)[1];
+
+
+using Optimization, OptimizationNLopt
+
+opf = Optimization.OptimizationFunction(obj, Optimization.AutoZygote())
+opp = Optimization.OptimizationProblem(opf, x0,
+    p = SciMLBase.NullParameters(),
+    lb = X[:, 3] .- 1.,
+    ub = X[:, 3] .+ 1.)
+
+sol = Optimization.solve(opp,
+    NLopt.LD_LBFGS(),
+    abstol = 1e-3,
+    maxiters = 300)
+
+set_theme!(kjl_light)
+
+e1 = vcat([Point3.([e.nodeStart.position, e.nodeEnd.position]) for e in structure.elements]...)
+
+Xsol = Point3.(eachrow([X[:, 1:2] sol.u]))
+e2 = vcat([Xsol[e.nodeIDs] for e in structure.elements]...)
+
+begin
+    fig = Figure(backgroundcolor = :white)
+    ax = Axis3(fig[1,1],
+        aspect = :data)
+
+    l1 = linesegments!(e1, color = :black)
+
+    l2 = linesegments!(e2, color = blue)
+
+    fig
+end
