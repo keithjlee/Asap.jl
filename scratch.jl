@@ -128,12 +128,12 @@ function obj(x)
 
     #OPTION 1: FASTER BUT UNSTABLE
     KeGlobal = vec.(transpose.(Rs) .* Kstore .* Rs)
-    V = vcat(KeGlobal...)
-    K = sparse(I, J, V)
+    # V = vcat(KeGlobal...)
+    # K = sparse(I, J, V)
 
     #OPTION 2: MEMORY INTENSIVE BUT WORKS
-    # ks = [sparse(i, j, k, n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
-    # K = sum(ks)
+    ks = [sparse(i, j, k, n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
+    K = sum(ks)
 
     U = K[freedof, freedof] \ P[freedof]
 
@@ -148,3 +148,4 @@ x0 = X[:, 3] .+ rand(structure.nNodes)
 @time obj(x0)
 
 @time g = gradient(x-> obj(x), x0)[1];
+
