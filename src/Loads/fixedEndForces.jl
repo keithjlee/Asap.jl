@@ -20,12 +20,16 @@ function Qlocal(load::PointLoad)
     py = - dot(plocal[2], LCS[2])
 
     # moments in local Z
-    mz1 = py * b^2 * a / l^2
+    mz1 = py * b^2 * a / l^2 
+    # mz2 = -py * a^2 * b / l^2
     mz2 = -py * a^2 * b / l^2
 
     # shear in local Y
-    vy2 = (py * a - mz1 - mz2) / l
-    vy1 = py - vy2
+    # vy2 = (py * a - mz1 - mz2) / l
+    # vy2 = (py * a - mz1 - mz2) / l
+    # vy1 = py - vy2
+    vy1 = py * b^2 / l^3 * (3a + b)
+    vy2 = py * a^2 / l^3 * (a + 3b)
 
     # perpendicular load in local Z
     pz = - dot(plocal[3], LCS[3])
@@ -35,8 +39,11 @@ function Qlocal(load::PointLoad)
     my2 = pz * a^2 * b / l^2
 
     # shear in local Z
-    vz2 = (pz * a - my1 - my2) / l
-    vz1 = pz - vz2
+    # vz2 = (pz * a - my1 - my2) / l
+    # vz2 = (pz * a - my1 + my2) / l
+    # vz1 = pz - vz2
+    vz1 = pz * b^2 / l^3 * (3a + b)
+    vz2 = pz * a^2 / l^3 * (a + 3b)
 
     return [ax1, vy1, vz1, 0., my1, mz1, ax2, vy2, vz2, 0., my2, mz2]
 end
@@ -115,18 +122,18 @@ function Q_freefixed(load::Load)
     FAb, FSby, FSbz, FTb, FMby, FMbz, FAe, FSey, FSez, FTe, FMey, FMez = Qlocal(load)
 
     #modified fixed end forces
-    return [FAb, 
-        FSby - factor*FMbz,
-        FSbz + factor*FMby,
-        0,
-        0,
-        0,
-        FAe,
-        FSey + factor*FMbz,
-        FSez - factor*FMby,
-        FTb + FTe,
-        FMey - 1/2*FMby,
-        FMez - 1/2*FMbz]
+    return [FAb, #axial beginning
+        FSby - factor*FMbz, #shear local Y
+        FSbz + factor*FMby, #shear local Z
+        0, #torsion beginning
+        0, #moment local Y
+        0, #moment local Z
+        FAe, # axial end
+        FSey + factor*FMbz, #shear local Y
+        FSez - factor*FMby, #shear local Z
+        FTb + FTe, #torsion end
+        FMey - 1/2*FMby, #moment local Y
+        FMez - 1/2*FMbz] #moment local Z
 end
 
 """

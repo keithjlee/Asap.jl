@@ -208,11 +208,11 @@ end
 """
 Assumed analyzed
 """
-iLocaly = [2, 6, 8, 12]
-iLocalz = [3, 5, 9, 11]
+iLocaly = [2, 6, 8, 12] # Local Y1, MZ1, Y2, MZ2
+iLocalz = [3, 5, 9, 11] # Local Z1, MY1, Z2, MY2
 
-iLocalx1 = [1, 2, 7, 8]
-iLocalx2 = [1, 3, 7, 9]
+iLocalx = [1, 7] # Local X1, Y1, X2, Y2
+
 function disp(model::Model, element::Element, n::Int64, factor::Union{Int64,Float64})
     
     #x increment
@@ -227,20 +227,15 @@ function disp(model::Model, element::Element, n::Int64, factor::Union{Int64,Floa
     #end displacements w/r/t z displacements
     ulocalz = ulocal[iLocalz]
 
-    #axial displacements w/r/t xy displacements
-    ulocalx1 = ulocal[iLocalx1]
-
-    #axial displacements w/r/t xz displacements
-    ulocalx2 = ulocal[iLocalx2]
+    #axial displacements w/r/t
+    ulocalx = ulocal[iLocalx]
 
     #shape function
     shapeFunction = vcat([N(i, element.length) for i in xrange]...)
     shapeFunctionAxial = vcat([Naxial(i, element.length) for i in xrange]...)
 
     #shift factors
-    xrange1 = shapeFunctionAxial * ulocalx1 * factor
-    xrange2 = shapeFunctionAxial * ulocalx2 * factor
-    xrange = xrange1 .+ xrange2
+    xrange = shapeFunctionAxial * ulocalx * factor
     yrange = shapeFunction * ulocaly * factor
     zrange = shapeFunction * ulocalz * factor
 
@@ -249,9 +244,12 @@ function disp(model::Model, element::Element, n::Int64, factor::Union{Int64,Floa
     yshift = [y * element.LCS[2] for y in yrange]
     zshift = [z * element.LCS[3] for z in zrange]
 
-    fullshift = xshift .+ yshift .+ zshift
+    
+    inc = [element.LCS[1] * v for v in range(0., element.length, n)]
+    fullshift = xshift .+ yshift .+ zshift .+ inc
 
-    return [element.posStart .+ shift for shift in fullshift]
+
+    return [element.nodeStart.position .+ shift for shift in fullshift]
 end
 
 function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matrix{Float64}, LCS::Vector{Vector{Float64}}, n::Int64, factor::Union{Int64,Float64})
@@ -285,6 +283,8 @@ function disp(posStart::Vector{Float64}, u::Vector{Float64}, L::Float64, R::Matr
     zshift = [z * LCS[3] for z in zrange]
 
     fullshift = xshift .+ yshift .+ zshift
+
+
 
     return [posStart .+ shift for shift in fullshift]
 end

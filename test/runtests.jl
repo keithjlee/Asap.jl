@@ -205,4 +205,48 @@ using LinearAlgebra
     err = norm(reactions_textbook .- reactions)
 
     @test err <= tol
+
+
+    # from https://www.12000.org/my_notes/stiffness_matrix/stiffness_matrix_report.htm
+
+    #Ex1
+    P=400.; 
+    L=144.; 
+    E=30e6; 
+    Is=57.1; 
+
+    n1 = Node([0., 0., 0.], :fixed)
+    n2 = Node([L, 0., 0.], :free)
+
+    nodes = [n1, n2]
+
+    sec = Section(1., E, 1., Is, Is, 1.)
+
+    e = Element(nodes, [1,2], sec)
+    elements = [e]
+
+    p = NodeForce(n2, [0., -P, 0.])
+    loads = [p]
+
+    model = Model(nodes, elements, loads)
+    planarize!(model)
+    solve!(model)
+
+    d_textbook = [-.2324, -.0024]
+    d = n2.displacement[[2,6]]
+
+    @test norm(d_textbook .- d) <= tol
+
+    #Ex2
+    p = PointLoad(e, 0.5, [0., -P, 0.])
+    loads = [p]
+    
+    model = Model(nodes, elements, loads)
+    planarize!(model)
+    solve!(model; reprocess = true)
+    
+    d_textbook = [-0.072630472854641, -0.000605253940455]
+    d = n2.displacement[[2,6]]
+    
+    @test norm(d_textbook .- d) <= tol
 end
