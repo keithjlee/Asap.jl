@@ -103,15 +103,15 @@ end
 displacement function
 """
 function N(x::Float64, L::Float64)
-    # n1 = 1 - 3(x/L)^2 + 2(x/L)^3
-    # n2 = x*(1 - x/L)^2
-    # n3 = 3(x/L)^2 - 2(x/L)^3
-    # n4 = x^2/L * (-1 + x/L)
+    n1 = 1 - 3(x/L)^2 + 2(x/L)^3
+    n2 = x*(1 - x/L)^2
+    n3 = 3(x/L)^2 - 2(x/L)^3
+    n4 = x^2/L * (-1 + x/L)
 
-    n1 = 1 + 1 / L^3 * (-3L * x + 2x^3)
-    n2 = x + 1 / L^2 * (-2L * x^2 + x^3)
-    n3 = 1 / L^3 * (3L * x^2 - 2x^3)
-    n4 = 1 / L^2 * (-L * x^2 + x^3)
+    # n1 = 1 + 1 / L^3 * (-3L * x + 2x^3)
+    # n2 = x + 1 / L^2 * (-2L * x^2 + x^3)
+    # n3 = 1 / L^3 * (3L * x^2 - 2x^3)
+    # n4 = 1 / L^2 * (-L * x^2 + x^3)
 
     return [n1 n2 n3 n4]
 end
