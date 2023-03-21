@@ -101,7 +101,6 @@ function Qlocal(load::GravityLoad)
     mz1 = py * l^2 / 12 #moment 1 in Z
     mz2 = -mz1 #moment 2 in Z
 
-
     # perpendicular load in local z
     pz = -dot(plocal[3], LCS[3])
 

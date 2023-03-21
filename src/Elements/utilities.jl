@@ -24,9 +24,7 @@ end
 change the release of an element
 """
 function release!(element::Element, release::Symbol)
-    if !in(release, releases)
-        error("Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree")
-    end
+    @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree"
 
     element.release = release
     element.Q = zeros(12)
@@ -44,7 +42,7 @@ function localx(element::AbstractElement; unit = true)
 end
 
 """
-Local coordinate system of element
+Local coordinate system of element with roll angle
 """
 function lcs(element::AbstractElement, Ψ::Float64; tol = 0.001)
 
@@ -100,7 +98,22 @@ end
 
 
 """
-displacement function
+displacement function for the transverse translation and in-plane rotation for a GIVEN PLANE IN THE LCS OF AN ELEMENT:
+
+u_xy= [ v₁
+        θ₁
+        v₂
+        θ₂ ]
+
+IE for the local XY plane:
+
+v₁, v₂ are the start and end displacements in the local Y direction
+θ₁, θ₂ are the start and end rotations in the **local Z** direction (ie rotation in plane of local XY)
+
+Gives:
+
+v_y(x) = N × u_xy (translational displacement in local Y at point x)
+
 """
 function N(x::Float64, L::Float64)
     n1 = 1 - 3(x/L)^2 + 2(x/L)^3
@@ -116,6 +129,15 @@ function N(x::Float64, L::Float64)
     return [n1 n2 n3 n4]
 end
 
+"""
+Second derivative of (assumed cubic) shape function N, for use in calculating internal moments:
+
+M(x) = -EI d²v/dx² = -EI ⋅ (d²N/dx² × u_xy)
+
+Note that this is essentially useless as it reduces a cubic function into a linear one and thus cannot accurately decribe the moment across an element unless highly discretized.
+
+As such the third derivative (d³N/dx³) to determine internal Shear is also effectively useless as it will give a constant value across the entire section
+"""
 function dN2(x::Float64, L::Float64)
     # n1 = 1 - 3(x/L)^2 + 2(x/L)^3
     # n2 = x*(1 - x/L)^2
@@ -131,7 +153,7 @@ function dN2(x::Float64, L::Float64)
 end
 
 """
-Axial displacement function
+Axial displacement function: linear interpolation between start and end displacements
 """
 function Naxial(x::Float64, L::Float64)
     n1 = 1 - x/L
