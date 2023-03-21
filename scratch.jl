@@ -1,4 +1,4 @@
-using Asap, JSON, SparseArrays, LinearAlgebra, Statistics, GLMakie, kjlMakie, Zygote
+using Asap, JSON, SparseArrays, LinearAlgebra, Statistics, kjlMakie, GLMakie
 
 
 E = 200e6 #kN/m^2
@@ -45,107 +45,64 @@ end
 structure = TrussModel(nodes, elements, loads);
 @time solve!(structure; reprocess = true)
 
-################
-# NAIVE SHAPE OPTIMIZATION
-################
-###CONSTANTS
-#elemental stiffness matrices in LCS
-Kstore = Asap.localK.(structure.elements)
-#free degrees of freedom
-freedof = structure.freeDOFs
-#load vector
-P = structure.P
-#Connectivity Matrix
-C = Asap.connectivity(structure)
-#Initial positions
-X = Asap.nodePositions(structure)
-#Row/Column vectors for global K assembly
-I = Vector{Int64}()
-J = Vector{Int64}()
+#### Simply Supported Beam
 
-for element in structure.elements
-    idx = element.globalID
-    @inbounds for j = 1:6
-        @inbounds for i = 1:6
-            push!(I, idx[i])
-            push!(J, idx[j])
-        end
-    end
+
+#cantilever
+
+
+dpos = Asap.disp(model, e, 40, 100)
+
+lines(Point3.(dpos), axis = (aspect = DataAspect(),))
+
+#cantilever middle load
+P=1000.; 
+m = 200.;
+L=144.; 
+E=30e6; 
+Is=57.; 
+
+a = .625;
+
+n1 = Node([0., 0., 0.], :fixed)
+n2 = Node([L, 0., 0.], :yfixed)
+
+nodes = [n1, n2]
+
+sec = Section(1., E, 1., Is, Is, 1.)
+
+e = Element(nodes, [1,2], sec)
+elements = [e]
+
+p1 = LineLoad(e, [0., -m, 0.])
+p2 = PointLoad(e, a, [0., -P, 0.])
+
+loads = [p1, p2]
+
+model = Model(nodes, elements, loads)
+planarize!(model)
+solve!(model; reprocess = true)
+
+dpos = Asap.disp(model, e, 40, 100)
+
+p1 = Point3.(dpos)
+
+dan(x) = 3.7229e-7 * x^3 - 5.361e-5 * x^2
+
+xr = range(0, e.length, 40)
+
+p2 = Point3.([[x, dan(x) * 100, 0.] for x in xr])
+
+begin
+    fig = Figure()
+    ax = Axis(fig[1,1])
+
+    lines!(p1, color = blue)
+
+    lines!(p2, color = :black)
+    fig
 end
 
-@time begin
-    x0 = X[:, 3]
+b = 1 - a
 
-    Xvec = [X[:, 1:2] x0]
-
-    E = normalize.(eachrow(C * Xvec))
-
-    Rs = Asap.R.(E)
-
-    KeGlobal = transpose.(Rs) .* Kstore .* Rs;
-    V = vcat(vec.(KeGlobal)...)
-
-    # V = vcat([vec(r' * k * r) for (r,k) in zip(Rs, Kstore)]...)
-
-    K = sparse(I, J, V)
-
-    U = K[freedof, freedof] \ P[freedof]
-
-    O = U' * P[freedof]
-end
-
-Cd = Matrix(C)
-
-Is = Vector{Vector{Int64}}()
-Js = Vector{Vector{Int64}}()
-
-for element in structure.elements
-    idx = element.globalID
-    ii = Vector{Int64}()
-    jj = Vector{Int64}()
-
-    for j = 1:6
-        for i = 1:6
-            push!(ii, idx[i])
-            push!(jj, idx[j])
-        end
-    end
-
-    push!(Is, ii)
-    push!(Js, jj)
-end
-
-n = structure.nDOFs
-
-ks = [sparse(i, j, vec(k), n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
-
-function obj(x)
-    Xvec = [X[:, 1:2] x]
-
-    E = normalize.(eachrow(C * Xvec))
-
-    Rs = Asap.R.(E)
-
-    #OPTION 1: FASTER BUT UNSTABLE
-    KeGlobal = vec.(transpose.(Rs) .* Kstore .* Rs)
-    # V = vcat(KeGlobal...)
-    # K = sparse(I, J, V)
-
-    #OPTION 2: MEMORY INTENSIVE BUT WORKS
-    ks = [sparse(i, j, k, n, n) for (i, j, k) in zip(Is, Js, KeGlobal)]
-    K = sum(ks)
-
-    U = K[freedof, freedof] \ P[freedof]
-
-    O = U' * P[freedof]
-
-    return O
-end
-
-
-x0 = X[:, 3] .+ rand(structure.nNodes)
-
-@time obj(x0)
-
-@time g = gradient(x-> obj(x), x0)[1];
-
+P * a^2 * b / L^2 + m * L^2 / 12

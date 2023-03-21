@@ -103,21 +103,41 @@ end
 displacement function
 """
 function N(x::Float64, L::Float64)
-    n1 = 1 - 3(x/L)^2 + 2(x/L)^3
-    n2 = x*(1 - x/L)^2
-    n3 = 3(x/L)^2 - 2(x/L)^3
-    n4 = x^2/L * (-1 + x/L)
+    # n1 = 1 - 3(x/L)^2 + 2(x/L)^3
+    # n2 = x*(1 - x/L)^2
+    # n3 = 3(x/L)^2 - 2(x/L)^3
+    # n4 = x^2/L * (-1 + x/L)
+
+    n1 = 1 + 1 / L^3 * (-3L * x + 2x^3)
+    n2 = x + 1 / L^2 * (-2L * x^2 + x^3)
+    n3 = 1 / L^3 * (3L * x^2 - 2x^3)
+    n4 = 1 / L^2 * (-L * x^2 + x^3)
 
     return [n1 n2 n3 n4]
 end
 
+function dN2(x::Float64, L::Float64)
+    # n1 = 1 - 3(x/L)^2 + 2(x/L)^3
+    # n2 = x*(1 - x/L)^2
+    # n3 = 3(x/L)^2 - 2(x/L)^3
+    # n4 = x^2/L * (-1 + x/L)
 
+    n1 = 1 / L^3 * (12x - 6L)
+    n2 = 1 / L^2 * (6x - 4L)
+    n3 = 1 / L^3 * (6L - 12x)
+    n4 = 1 / L^2 * (-2L + 6x)
+
+    return [n1 n2 n3 n4]
+end
+
+"""
+Axial displacement function
+"""
 function Naxial(x::Float64, L::Float64)
-    n1 = n2 = 1 - x/L
-    n3 = n4 = x/L
-    
-    return [n1 0 n3 0;
-        0 n2 0 n4]
+    n1 = 1 - x/L
+    n2 = x / L
+
+    return [n1 n2]
 end
 
 """
