@@ -235,14 +235,14 @@ function disp(model::Model, element::Element, n::Int64, factor::Union{Int64,Floa
     shapeFunctionAxial = vcat([Naxial(i, element.length) for i in xrange]...)
 
     #shift factors
-    xrange = shapeFunctionAxial * ulocalx * factor
-    yrange = shapeFunction * ulocaly * factor
-    zrange = shapeFunction * ulocalz * factor
+    xr = shapeFunctionAxial * ulocalx * factor
+    yr = shapeFunction * ulocaly * factor
+    zr = shapeFunction * ulocalz * factor
 
     #shift postiions
-    xshift = [x * element.LCS[1] for x in xrange]
-    yshift = [y * element.LCS[2] for y in yrange]
-    zshift = [z * element.LCS[3] for z in zrange]
+    xshift = [x * element.LCS[1] for x in xr]
+    yshift = [y * element.LCS[2] for y in yr]
+    zshift = [z * element.LCS[3] for z in zr]
 
     
     inc = [element.LCS[1] * v for v in range(0., element.length, n)]
