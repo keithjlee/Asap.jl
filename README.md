@@ -55,8 +55,8 @@ model = Model(nodes, elements, loads)
 solve!(model)
 
 #extract information
-println(model.displacements)
-println(e1.forces)
-println(n2.reaction)
+@show model.u
+@show e1.forces
+@show n2.reaction
 
 ```
