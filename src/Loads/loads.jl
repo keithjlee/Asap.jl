@@ -73,6 +73,10 @@ mutable struct LineLoad <: ElementLoad
     end
 end
 
+M_Line(value::Float64, x::Float64, L::Float64) = value * x / 2 * (L - x)
+V_Line(value::Float64, x::Float64, L::Float64) = value * (0.5L - x)
+Δ_Line(value::Float64, x::Float64, L::Float64, E::Float64, In::Float64) = value * x / 24 / E / In * (L^3 - 2L * x^2 + x^3)
+
 """
     GravityLoad(element::Element, factor::Float64)
 
