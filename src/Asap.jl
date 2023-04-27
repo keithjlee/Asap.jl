@@ -29,7 +29,9 @@ include("Elements/utilities.jl")
 export Element
 export TrussElement
 export release!
-export endPositions
+export endpoints
+export midpoint
+export displacedshape
 
 include("Loads/loads.jl")
 include("Loads/utilities.jl")
