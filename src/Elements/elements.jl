@@ -32,9 +32,10 @@ Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 
 """
 mutable struct Element <: AbstractElement
     section::Section #cross section
-    nodeIDs::Vector{Int64} #indices of start/end nodes 
     nodeStart::Node #start node
     nodeEnd::Node #end position
+    nodeIDs::Vector{Int64} #indices of start/end nodes 
+    elementID::Int64
     globalID::Vector{Int64} #element global DOFs
     length::Float64 #length of element
     release::Symbol #
@@ -47,7 +48,7 @@ mutable struct Element <: AbstractElement
     id::Union{Symbol, Nothing} #optional identifier
 
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
-        element = new(section, nodeIndex)
+        element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
         element.length = dist(element.nodeStart, element.nodeEnd)
@@ -60,18 +61,48 @@ mutable struct Element <: AbstractElement
         return element
     end
 
+    function Element(nodeStart::Node, nodeEnd::Node, section::Section)
+        element = new(section)
+        element.nodeStart = nodeStart
+        element.nodeEnd = nodeEnd
+
+        element.length = dist(nodeStart, nodeEnd)
+        element.Ψ = pi/2
+        element.id = nothing
+        element.Q = zeros(12)
+
+        element.release = :fixedfixed
+
+        return element
+    end
+
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol)
 
-        if !in(release, releases)
-            error("Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :truss")
-        end
+        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :truss"
 
-        element = new(section, nodeIndex)
+        element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
         element.length = dist(element.nodeStart, element.nodeEnd)
         element.Ψ = pi/2
-        # element.LCS = lcs(element, element.Ψ)
+        element.id = nothing
+        element.Q = zeros(12)
+
+        element.release = release
+
+        return element
+    end
+
+    function Element(nodeStart::Node, nodeEnd::Node, section::Section, release::Symbol)
+
+        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :truss"
+
+        element = new(section)
+        element.nodeStart = nodeStart
+        element.nodeEnd = nodeEnd
+
+        element.length = dist(nodeStart, nodeEnd)
+        element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
 
@@ -97,9 +128,10 @@ TrussElement(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0),
 """
 mutable struct TrussElement <: AbstractElement
     section::AbstractSection #cross section
-    nodeIDs::Vector{Int64} #indices of start/end nodes 
     nodeStart::TrussNode #start position
     nodeEnd::TrussNode #end position
+    nodeIDs::Vector{Int64} #indices of start/end nodes 
+    elementID::Int64
     globalID::Vector{Int64} #element global DOFs
     length::Float64 #length of element
     K::Matrix{Float64} # stiffness matrix in GCS
@@ -110,12 +142,23 @@ mutable struct TrussElement <: AbstractElement
     id::Union{Symbol, Nothing} #optional identifier
 
     function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection)
-        element = new(section, nodeIndex)
+        element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
         element.length = dist(element.nodeStart, element.nodeEnd)
         element.id = nothing
 
+        element.Ψ = pi/2
+
+        return element
+    end
+
+    function TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection)
+        element = new(section)
+        element.nodeStart = nodeStart
+        element.nodeEnd = nodeEnd
+        element.length = dist(nodeStart, nodeEnd)
+        element.id = nothing
         element.Ψ = pi/2
 
         return element

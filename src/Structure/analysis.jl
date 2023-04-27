@@ -12,12 +12,16 @@ function populateDOF!(model::Model)
 
     n_dof = 6
     for (i, node) in enumerate(model.nodes)
+        node.nodeID = i
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
     end
 
-    for element in model.elements
-        idStart = model.nodes[element.nodeIDs[1]].globalID
-        idEnd = model.nodes[element.nodeIDs[2]].globalID
+    for (i, element) in enumerate(model.elements)
+        element.elementID = i
+        element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
+
+        idStart = element.nodeStart.globalID
+        idEnd = element.nodeEnd.globalID
 
         element.globalID = [idStart; idEnd]
     end
@@ -37,12 +41,17 @@ function populateDOF!(model::TrussModel)
 
     n_dof = 3
     for (i, node) in enumerate(model.nodes)
+        node.nodeID = i
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof - 1)
     end
 
-    for element in model.elements
-        idStart = model.nodes[element.nodeIDs[1]].globalID
-        idEnd = model.nodes[element.nodeIDs[2]].globalID
+    for (i, element) in enumerate(model.elements)
+
+        element.elementID = i
+        element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
+
+        idStart = element.nodeStart.globalID
+        idEnd = element.nodeEnd.globalID
 
         element.globalID = [idStart; idEnd]
     end

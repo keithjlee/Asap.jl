@@ -31,6 +31,7 @@ Node([4.3, 2.2, 10.4], Bool[1, 1, 0, 1, 1, 1], #undef, #undef, #undef, nothing)
 mutable struct Node <: AbstractNode
     position::Vector{Float64}
     dof::Vector{Bool}
+    nodeID::Int64
     globalID::Vector{Int64}
     reaction::Vector{Float64}
     displacement::Vector{Float64}
@@ -88,6 +89,7 @@ TrussNode([1.0, 1.0, 56.0], Bool[0, 0, 0], #undef, [0.0, 0.0, 0.0], [0.0, 0.0, 0
 mutable struct TrussNode <: AbstractNode
     position::Vector{Float64}
     dof::Vector{Bool}
+    nodeID::Int64
     globalID::Vector{Int64}
     reaction::Vector{Float64}
     displacement::Vector{Float64}
