@@ -92,10 +92,16 @@ end
 """
 Extract start and end positions of element
 """
-function endPositions(element::AbstractElement)
+function endpoints(element::AbstractElement)
     return [element.nodeStart.position, element.nodeEnd.position]
 end
 
+"""
+midpoint of element
+"""
+function midpoint(element::AbstractElement)
+    return (element.nodeStart.position .+ element.nodeEnd.position) ./ 2
+end
 
 """
 displacement function for the transverse translation and in-plane rotation for a GIVEN PLANE IN THE LCS OF AN ELEMENT:
@@ -172,4 +178,37 @@ function B(y::Float64, x::Float64, L::Float64)
     b4 = 2L * (-1 + 3 * x / L)
 
     return -y/L^2 .* [b1 b2 b3 b4]
+end
+
+"""
+local x,y,z displacements at even increments along a beam element
+"""
+function displacements(element::Element; n::Integer = 20)
+    ulocal = element.R * [element.nodeStart.displacement; element.nodeEnd.displacement]
+    L = element.length
+
+    uX = ulocal[[1, 7]]
+    uY = ulocal[[2, 6, 8, 12]]
+    uZ = ulocal[[3, 5, 9, 11]]
+
+    xrange = range(0, L, n)
+
+    [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
+        @inbounds hcat([N(x, L) * uY for x in xrange]...);
+        @inbounds hcat([-N(x, L) * uZ for x in xrange]...)]
+end
+
+
+"""
+Get a 3 × n matrix of the displaced nodal positions that make up an element
+"""
+function displacedshape(element::Element, factor::Real = 1; n::Integer = 20)
+    Δ = displacements(element; n = n)
+
+    xlocal = first(element.LCS)
+    init = element.nodeStart.position
+
+    inc = range(0, element.length, n)
+
+    hcat([init .+ xlocal .* i .+ factor .* disp for (i, disp) in zip(inc, eachcol(Δ))]...)
 end
