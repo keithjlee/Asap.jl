@@ -16,9 +16,9 @@ function Base.findall(nodes::Vector{TrussNode}, i::Symbol)
 end
 
 """
-Fix nodes to a plane. All DOF (including rotations) that would cause a non-planar deformation are set to false.\\
--nodes: a vector of nodes to planarize
--plane: choose from :XY, :YZ, :ZX
+    planarize!(nodes::Vector{AbstractNode}; plane = :XY)
+
+Restrict the dofs of a set of nodes to remain on a plane. Choose from: :XY, :YZ, :ZX
 """
 function planarize!(nodes::Vector{Node}; plane = :XY)
     idx = planeDict[plane]
@@ -37,9 +37,17 @@ function planarize!(nodes::Vector{TrussNode}; plane = :XY)
 end
 
 """
-Set the DOF of a node to a common type
+    fixnode!(node::AbstractNode, fixity::Symbol)
+
+Change the DOFs of a node to a common boundary condition.
+Available boundary conditions:
+- :free
+- :fixed
+- :pinned
+- :(x/y/z)free
+- :(x/y/z)fixed
 """
-function fixnode!(node::Node, fixity::Symbol)
+function fixnode!(node::AbstractNode, fixity::Symbol)
     node.dof = copy(fixDict[fixity])
 end
 

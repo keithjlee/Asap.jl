@@ -21,7 +21,14 @@ end
 
 
 """
-change the release of an element
+    release!(element::Element, release::Symbol)
+
+Change the release condition of an element.
+Available releases:
+- :fixedfixed (default)
+- :fixedfree
+- :freefixed
+- :freefree
 """
 function release!(element::Element, release::Symbol)
     @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree"
@@ -90,14 +97,18 @@ function lcs(xin::Vector{Float64}, Ψ::Float64; tol = 0.001)
 end
 
 """
-Extract start and end positions of element
+    endpoints(element::AbstractElement)
+
+Extract the start and end points as two vectors.
 """
 function endpoints(element::AbstractElement)
     return [element.nodeStart.position, element.nodeEnd.position]
 end
 
 """
-midpoint of element
+    midpoint(element::AbstractElement)
+
+Extract the centerpoint of an element as a vector.
 """
 function midpoint(element::AbstractElement)
     return (element.nodeStart.position .+ element.nodeEnd.position) ./ 2
@@ -200,9 +211,11 @@ end
 
 
 """
-Get a 3 × n matrix of the displaced nodal positions that make up an element
+    displacedshape(element::Element; factor::Real = 1, n::Integer = 20)
+
+Generate a [3 × n] matrix whose columns describe the displaced shape of an element with a displacement scale factor of `factor`
 """
-function displacedshape(element::Element, factor::Real = 1; n::Integer = 20)
+function displacedshape(element::Element; factor::Real = 1, n::Integer = 20)
     Δ = displacements(element; n = n)
 
     xlocal = first(element.LCS)

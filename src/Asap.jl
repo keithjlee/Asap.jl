@@ -52,11 +52,11 @@ export process!
 export solve!
 export solve
 
-include("PostProcess/post.jl")
-export Geometry
-export GeometricElement
-export GeometricNode
-export GeometricLoad
-export updateFactor!
+# include("PostProcess/post.jl")
+# export Geometry
+# export GeometricElement
+# export GeometricNode
+# export GeometricLoad
+# export updateFactor!
 
 end 

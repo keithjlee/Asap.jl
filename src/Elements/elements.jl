@@ -1,7 +1,34 @@
 abstract type AbstractElement end
 
 """
-An element
+    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
+
+Instantiate a frame element with a given section that connects two nodes.
+
+# Example
+```julia-repl
+julia> Element(nodes, [1,2], sec)
+Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 2], Node([0.0, 0.0, 0.0], Bool[0, 0, 0, 0, 0, 0], #undef, #undef, #undef, nothing), Node([5000.0, 500.0, 5200.0], Bool[0, 0, 0, 1, 1, 1], #undef, #undef, #undef, nothing), #undef, 7231.18247591637, :fixedfixed, #undef, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], #undef, 1.5707963267948966, #undef, #undef, nothing)
+```
+
+-----------------------------
+
+    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol)
+
+Instantiate a frame element with a given section that connects two nodes with a given end release.
+Available releases:
+- :fixedfixed (default)
+- :fixedfree
+- :freefixed
+- :freefree
+
+# Example
+
+```julia-repl
+julia> Element(nodes, [1,2], sec, :fixedfree)
+Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 2], Node([0.0, 0.0, 0.0], Bool[0, 0, 0, 0, 0, 0], #undef, #undef, #undef, nothing), Node([5000.0, 500.0, 5200.0], Bool[0, 0, 0, 1, 1, 1], #undef, #undef, #undef, nothing), #undef, 7231.18247591637, :fixedfree, #undef, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], #undef, 1.5707963267948966, #undef, #undef, nothing)
+```
+
 """
 mutable struct Element <: AbstractElement
     section::Section #cross section
@@ -19,12 +46,6 @@ mutable struct Element <: AbstractElement
     forces::Vector{Float64} #elemental forces in LCS
     id::Union{Symbol, Nothing} #optional identifier
 
-    """
-    Base constructor of a frame element:\\
-    -nodes: vector of nodes used in model\\
-    -nodeIndex: [startIndex, endIndex] of element w/r/t nodes\\
-    -section: element Section
-    """
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
         element = new(section, nodeIndex)
 
@@ -39,14 +60,6 @@ mutable struct Element <: AbstractElement
         return element
     end
 
-    """
-    Element constructor with prescribed end releases:\\
-    -nodes: vector of nodes used in model\\
-    -nodeIndex: [startIndex, endIndex] of element w/r/t nodes\\
-    -section: element Section
-    -release: choose from :fixedfixed, :freefixed, :fixedfree, :freefree
-
-    """
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol)
 
         if !in(release, releases)
@@ -71,7 +84,16 @@ end
 
 
 """
-A truss element
+    TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection)
+
+Instantiate a truss element with a given section that connects two truss nodes.
+
+# Example
+```julia-repl
+julia> TrussElement(nt, [1,2], sec)
+TrussElement(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 2], TrussNode([0.8879630592102802, 0.6713937498337156, 0.617463764682365], Bool[0, 0, 0], #undef, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], nothing), TrussNode([0.16046742214916832, 0.15869760269854827, 0.6247762072043447], Bool[1, 1, 1], #undef, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], nothing), #undef, 0.8900341077991537, #undef, #undef, #undef, 1.5707963267948966, #undef, nothing)
+```
+
 """
 mutable struct TrussElement <: AbstractElement
     section::AbstractSection #cross section
@@ -87,12 +109,6 @@ mutable struct TrussElement <: AbstractElement
     LCS::Vector{Vector{Float64}}
     id::Union{Symbol, Nothing} #optional identifier
 
-    """
-    Base constructor of a frame element:\\
-    -nodes: vector of nodes used in model\\
-    -nodeIndex: [startIndex, endIndex] of element w/r/t nodes\\
-    -section: element Section
-    """
     function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection)
         element = new(section, nodeIndex)
 
