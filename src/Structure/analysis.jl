@@ -309,7 +309,9 @@ function postprocess!(model::AbstractModel)
 end
 
 """
-Solve a network
+    solve!(model::AbstractModel; reprocess = false)
+
+Perform a structural analysis. `reprocess = true` re-generates the stiffness matrix and resets all saved solutions.
 """
 function solve!(model::Model; reprocess = false)
 
@@ -333,9 +335,7 @@ function solve!(model::Model; reprocess = false)
     postprocess!(model)
 end
 
-"""
-Solve a network
-"""
+
 function solve!(model::TrussModel; reprocess = false)
 
     if !model.processed || reprocess
@@ -358,7 +358,9 @@ function solve!(model::TrussModel; reprocess = false)
 end
 
 """
-Solve a network and return displacement vector
+    solve(model::AbstractModel)
+
+Solve a model and directly return the global displacement vector.
 """
 function solve(model::Model)
     idx = model.freeDOFs
@@ -373,9 +375,6 @@ function solve(model::Model)
     return u
 end
 
-"""
-Solve a network and return displacement vector
-"""
 function solve(model::TrussModel)
     idx = model.freeDOFs
 
@@ -390,7 +389,9 @@ function solve(model::TrussModel)
 end
 
 """
-Solve a network with a new load vector
+    solve(model::AbstractModel, F::Vector{Float64})
+
+Find the displacement of the structural model w/r/t a new external force vector. 
 """
 function solve(model::Model, F::Vector{Float64})
 

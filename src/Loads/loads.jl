@@ -6,14 +6,16 @@ abstract type NodeLoad <: Load end
 abstract type ElementLoad <: Load end
 
 """
-A force applied to a node in global XYZ axes
+    NodeForce(node::AbstractNode, value::Vector{Float64})
+
+A force vector [Fx, Fy, Fz] in the global coordinate system applied to a node.
 """
 mutable struct NodeForce <: NodeLoad
     node::Union{Node, TrussNode}
     value::Vector{Float64}
     id::Union{Symbol, Nothing}
     
-    function NodeForce(node::Union{Node, TrussNode}, value::Vector{Float64})
+    function NodeForce(node::AbstractNode, value::Vector{Float64})
 
         if length(value) != 3
             error("Load value must be a vector in R³")
@@ -27,7 +29,9 @@ mutable struct NodeForce <: NodeLoad
 end
 
 """
-A moment applied to a node in global XYZ axes
+    NodeMoment(node::Node, value::Vector{Float64})
+
+A moment vector [Mx, My, Mz] in the global coordinate system applied to a node with rotational DOFs.
 """
 mutable struct NodeMoment <: NodeLoad
     node::Node
@@ -48,8 +52,9 @@ mutable struct NodeMoment <: NodeLoad
 end
 
 """
-A distributed line load along an element with respect to global XYZ axes.\\
-Generates w = norm(value) [force/distance] in the direction of value.
+    LineLoad(element::Element, value::Vector{Float64})
+
+A distributed line load [wx, wy, wz] in (force/length) applied along an element in the global coordinate system.
 """
 mutable struct LineLoad <: ElementLoad
     element::Element
@@ -69,9 +74,11 @@ mutable struct LineLoad <: ElementLoad
 end
 
 """
-A gravity load (negative global Z) applied along a member.\\
-Generates distributed load w = element.section.A * element.section.ρ * factor\\
-Where factor should be the appropriate acceleration due to gravity
+    GravityLoad(element::Element, factor::Float64)
+
+A gravity load (negative global Z) applied along a member. 
+
+Generates distributed load w = element.section.A * element.section.ρ * factor, where factor should be the appropriate acceleration due to gravity.
 """
 mutable struct GravityLoad <: ElementLoad
     element::Element
@@ -87,8 +94,9 @@ end
 
 
 """
-A point load applied at a fractional point along element.\\
-Generates a load vector P = [Px, Py, Pz] at a distance L = element.length × position from the starting node
+    PointLoad(element::Element, position::Float64, value::Vector{Float64})
+
+A point load [Px, Py, Pz] applied in the global coordinate system at a distance `position` × `element.length` from the starting node.
 """
 mutable struct PointLoad <: ElementLoad
     element::Element

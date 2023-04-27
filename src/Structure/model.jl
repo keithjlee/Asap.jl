@@ -1,7 +1,15 @@
 abstract type AbstractModel end
 
 """
-Model
+    Model(nodes::Vector{Node}, elements::Vector{Element}, loads::Vector{Load})
+
+Create a complete structural model ready for analysis.
+
+-----------------------------------
+
+    Model(nodes::Vector{Node}, elements::Vector{Element})
+
+Create a model with geometric values and no loads.
 """
 mutable struct Model <: AbstractModel
     nodes::Vector{Node}
@@ -38,7 +46,15 @@ mutable struct Model <: AbstractModel
 end
 
 """
-Truss model
+    TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement}, loads::Vector{NodeForce})
+
+Create a complete structural model ready for analysis.
+
+-----------------------------------
+
+    Model(nodes::Vector{TrussNode}, elements::Vector{TrussElement})
+
+Create a model with geometric values and no loads.
 """
 mutable struct TrussModel <: AbstractModel
     nodes::Vector{TrussNode}

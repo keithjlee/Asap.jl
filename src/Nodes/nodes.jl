@@ -1,7 +1,32 @@
 abstract type AbstractNode end
 
 """
-A node in a system
+    Node(position::Vector{Float64}, dofs::Vector{Bool})
+
+Instantiate a 6 DOF node with given position and fixities.
+
+# Example
+```julia-repl
+julia> Node([4.3, 2.2, 10.4], [true, true, false, true, false, false])
+Node([4.3, 2.2, 10.4], Bool[1, 1, 0, 1, 0, 0], #undef, #undef, #undef, nothing)
+```
+---------------------------------------------
+
+    Node(position::Vector{Float64}, fixity::Symbol)
+
+Instantiate a 6 DOF node with given position and common boundary type.
+Available boundary conditions:
+- :free
+- :fixed
+- :pinned
+- :(x/y/z)free
+- :(x/y/z)fixed
+# Example
+```julia-repl
+julia> Node([4.3, 2.2, 10.4], :zfixed)
+Node([4.3, 2.2, 10.4], Bool[1, 1, 0, 1, 1, 1], #undef, #undef, #undef, nothing)
+
+```
 """
 mutable struct Node <: AbstractNode
     position::Vector{Float64}
@@ -11,15 +36,8 @@ mutable struct Node <: AbstractNode
     displacement::Vector{Float64}
     id::Union{Symbol, Nothing}
 
-    """
-    Generate a node:\\
-    -position: [x,y,z] as a vector of floats\\
-    -dofs: [bool, bool, bool, bool, bool, bool] as a vector of booleans where true = free DOF
-    """
     function Node(position::Vector{Float64}, dofs::Vector{Bool})
-        if length(position) != 3 || length(dofs) != 6
-            error("Position vector must be in R³, DOFs must be length 6")
-        end
+        @assert length(position) == 3 && length(dofs) == 6 "Position vector must be in R³, DOFs must be length 6"
 
         node = new(position, dofs)
 
@@ -27,16 +45,9 @@ mutable struct Node <: AbstractNode
         return node
     end
 
-    """
-    Generate a node with a common boundary condition:\\
-    -position: [x,y,z] as a vector of floats\\
-    -fixity: choose from :fixed, :pinned, :free, :(x/y/z)fixed, :(x/y/z)free
-
-    """
     function Node(position::Vector{Float64}, fixity::Symbol)
-        if length(position) != 3
-            error("Position vector must be in R³")
-        end
+
+        @assert length(position) == 3 "Position vector must be in R³"
 
         dofs = copy(fixDict[fixity])
 
@@ -47,6 +58,33 @@ mutable struct Node <: AbstractNode
     end
 end
 
+"""
+    TrussNode(position::Vector{Float64}, dofs::Vector{Bool})
+
+Instantiate a 3 DOF node with given position and fixities.
+
+# Example
+```julia-repl
+julia> TrussNode([1., 1., 56.], [false, true, true])
+TrussNode([1.0, 1.0, 56.0], Bool[0, 1, 1], #undef, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0, 0.0], nothing)
+```
+---------------------------------------------
+
+    TrussNode(position::Vector{Float64}, fixity::Symbol)
+
+Instantiate a 3 DOF node with given position and common boundary type.
+Available boundary conditions:
+- :free
+- :pinned
+- :(x/y/z)free
+- :(x/y/z)fixed
+# Example
+```julia-repl
+julia> TrussNode([1., 1., 56.], :pinned)
+TrussNode([1.0, 1.0, 56.0], Bool[0, 0, 0], #undef, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], nothing)
+
+```
+"""
 mutable struct TrussNode <: AbstractNode
     position::Vector{Float64}
     dof::Vector{Bool}
@@ -55,15 +93,9 @@ mutable struct TrussNode <: AbstractNode
     displacement::Vector{Float64}
     id::Union{Symbol, Nothing}
 
-    """
-    Generate a node:\\
-    -position: [x,y,z] as a vector of floats\\
-    -dofs: [bool, bool, bool, bool, bool, bool] as a vector of booleans where true = free DOF
-    """
     function TrussNode(position::Vector{Float64}, dofs::Vector{Bool})
-        if length(position) != 3 || length(dofs) != 3
-            error("Position vector and DOF vector must be in R³")
-        end
+        
+        @assert length(position) == length(dofs) == 3  "Position and dof vector must be in R³"
 
         node = new(position, dofs)
 
@@ -74,16 +106,9 @@ mutable struct TrussNode <: AbstractNode
         return node
     end
 
-    """
-    Generate a node with a common boundary condition:\\
-    -position: [x,y,z] as a vector of floats\\
-    -fixity: choose from :fixed, :pinned, :free, :(x/y/z)fixed, :(x/y/z)free
-
-    """
     function TrussNode(position::Vector{Float64}, fixity::Symbol)
-        if length(position) != 3
-            error("Position vector must be in R³")
-        end
+        
+        @assert length(position) == 3 "Position vector must be in R³"
 
         dofs = copy(fixDict[fixity][1:3])
 
