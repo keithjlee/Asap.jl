@@ -1,4 +1,5 @@
 abstract type AbstractElement end
+abstract type FrameElement <: AbstractElement end
 
 """
     Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
@@ -30,7 +31,7 @@ Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 
 ```
 
 """
-mutable struct Element <: AbstractElement
+mutable struct Element <: FrameElement
     section::Section #cross section
     nodeStart::Node #start node
     nodeEnd::Node #end position
@@ -122,8 +123,7 @@ mutable struct BridgeElement
     elementStart::Element
     posStart::Float64
     elementEnd::Element
-    newElements::Vector{Element}
-
+    posEnd::Float64
 end
 
 

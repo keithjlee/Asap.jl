@@ -18,9 +18,7 @@ mutable struct NodeForce <: NodeLoad
     
     function NodeForce(node::AbstractNode, value::Vector{Float64})
 
-        if length(value) != 3
-            error("Load value must be a vector in R³")
-        end
+        @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
         force = new(node, value)
         force.id = nothing
@@ -42,9 +40,7 @@ mutable struct NodeMoment <: NodeLoad
     
     function NodeMoment(node::Node, value::Vector{Float64})
 
-        if length(value) != 3
-            error("Load value must be a vector in R³")
-        end
+        @assert length(value) == 3 "Moment vector must be in R³ (GCS)"
 
         force = new(node, value)
         force.id = nothing
@@ -54,7 +50,7 @@ mutable struct NodeMoment <: NodeLoad
 end
 
 
-function assign!(load::NodeForce)
+function assign!(load::NodeLoad)
     push!(load.node.loadIDs, load.loadID)
 end
 
@@ -71,9 +67,7 @@ mutable struct LineLoad <: ElementLoad
 
     function LineLoad(element::Element, value::Vector{Float64})
 
-        if length(value) != 3
-            error("Load value must be a vector in R³")
-        end
+        @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
         force = new(element, value)
         force.id = nothing
@@ -119,13 +113,8 @@ mutable struct PointLoad <: ElementLoad
     id::Union{Symbol, Nothing}
 
     function PointLoad(element::Element, position::Float64, value::Vector{Float64})
-        if !(0.0 < position < 1.0)
-            error("position must be > 0 and < 1")
-        end
-
-        if length(value) != 3
-            error("Load value must be a vector in R³")
-        end
+        @assert 0 < position < 1 "position must be ∈ ]0, 1["
+        @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
         force = new(element, position, value)
         force.id = nothing
