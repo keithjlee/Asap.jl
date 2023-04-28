@@ -29,14 +29,14 @@ mutable struct Model <: AbstractModel
     compliance::Float64 #structural compliance
     processed::Bool
     
-    function Model(nodes::Vector{Node}, elements::Vector{E}, loads::Vector{T}) where {T <: Load, E <: FrameElement}
+    function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:Load})
         structure = new(nodes, elements, loads)
         structure.processed = false
 
         return structure
     end
 
-    function Model(nodes::Vector{Node}, elements::Vector{E}) where E <: FrameElement
+    function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement})
         structure = new(nodes, elements)
         structure.loads = Vector{Load}()
         structure.processed = false

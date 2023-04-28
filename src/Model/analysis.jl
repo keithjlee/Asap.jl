@@ -80,7 +80,7 @@ function solve!(model::Model, L::Vector{<:Load})
     model.loads = L
 
     # clear existing load associations
-    for element in model.elements
+    for (node, element) in zip(model.nodes, model.elements)
         empty!(element.loadIDs)
     end
 

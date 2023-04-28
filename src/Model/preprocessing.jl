@@ -11,11 +11,12 @@ function populateDOF!(model::Model)
     model.fixedDOFs = findall(.!model.DOFs)
 
     n_dof = 6
+    dofset = collect(0:n_dof-  1)
 
     # assign an id to node, extract global DOF index
     for (i, node) in enumerate(model.nodes)
         node.nodeID = i
-        node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
+        node.globalID = i * n_dof - (n_dof - 1) .+ dofset
     end
 
     #assign an id to load, store load id into relevant node/element
@@ -268,11 +269,11 @@ process a network
 """
 function process!(model::AbstractModel)
 
-    #global DOF 
-    populateDOF!(model)
-
     #elements 
     processElements!(model)
+
+    #global DOF 
+    populateDOF!(model)
 
     #loads
     populateLoads!(model)
