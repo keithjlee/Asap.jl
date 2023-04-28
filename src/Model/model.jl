@@ -13,7 +13,7 @@ Create a model with geometric values and no loads.
 """
 mutable struct Model <: AbstractModel
     nodes::Vector{Node}
-    elements::Vector{Element}
+    elements::Vector{FrameElement}
     loads::Vector{Load}
     nNodes::Int64
     nElements::Int64
@@ -29,14 +29,14 @@ mutable struct Model <: AbstractModel
     compliance::Float64 #structural compliance
     processed::Bool
     
-    function Model(nodes::Vector{Node}, elements::Vector{Element}, loads::Vector{T}) where T <: Load
+    function Model(nodes::Vector{Node}, elements::Vector{E}, loads::Vector{T}) where {T <: Load, E <: FrameElement}
         structure = new(nodes, elements, loads)
         structure.processed = false
 
         return structure
     end
 
-    function Model(nodes::Vector{Node}, elements::Vector{Element})
+    function Model(nodes::Vector{Node}, elements::Vector{E}) where E <: FrameElement
         structure = new(nodes, elements)
         structure.loads = Vector{Load}()
         structure.processed = false

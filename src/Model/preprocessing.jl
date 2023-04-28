@@ -11,11 +11,21 @@ function populateDOF!(model::Model)
     model.fixedDOFs = findall(.!model.DOFs)
 
     n_dof = 6
+
+    # assign an id to node, extract global DOF index
     for (i, node) in enumerate(model.nodes)
         node.nodeID = i
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
     end
 
+    #assign an id to load, store load id into relevant node/element
+    for (i, load) in enumerate(model.loads)
+        load.loadID = i
+
+        assign!(load)
+    end
+
+    # assign an id to element, get associated node IDs, extract global DOF
     for (i, element) in enumerate(model.elements)
         element.elementID = i
         element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
@@ -25,6 +35,7 @@ function populateDOF!(model::Model)
 
         element.globalID = [idStart; idEnd]
     end
+
 end
 
 """
@@ -45,6 +56,12 @@ function populateDOF!(model::TrussModel)
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof - 1)
     end
 
+    for (i, load) in enumerate(model.loads)
+        load.loadID = i
+
+        assign!(load)
+    end
+
     for (i, element) in enumerate(model.elements)
 
         element.elementID = i
@@ -55,6 +72,7 @@ function populateDOF!(model::TrussModel)
 
         element.globalID = [idStart; idEnd]
     end
+
 end
 
 """
@@ -65,6 +83,7 @@ function processElements!(model::Model)
         element.Q = zeros(12) # reset Qf
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
+        element.length = dist(element.nodeStart, element.nodeEnd)
         makeK!(element)
     end
 end
@@ -76,6 +95,7 @@ function processElements!(model::TrussModel)
     for element in model.elements
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
+        element.length = dist(element.nodeStart, element.nodeEnd)
         makeK!(element)
     end
 end
@@ -244,50 +264,6 @@ function globalS!(model::TrussModel)
 end
 
 """
-Reaction forces
-"""
-function reactions!(model::Model)
-    model.reactions = zeros(model.nDOFs)
-    model.reactions[model.fixedDOFs] = model.S[model.fixedDOFs, :] * model.u + model.Pf[model.fixedDOFs]
-end
-
-"""
-Reaction forces
-"""
-function reactions!(model::TrussModel)
-    model.reactions = zeros(model.nDOFs)
-    model.reactions[model.fixedDOFs] = model.S[model.fixedDOFs, :] * model.u
-end
-
-"""
-Populate node reactions and displacements
-"""
-function postprocessnodes!(model::AbstractModel)
-    for node in model.nodes
-        node.reaction = model.reactions[node.globalID]
-        node.displacement = model.u[node.globalID]
-    end
-end
-
-"""
-Populate elemental forces
-"""
-function postprocesselements!(model::Model)
-    for element in model.elements
-        element.forces = element.R * (element.K * model.u[element.globalID] + element.Q)
-    end
-end
-
-"""
-Populate elemental forces
-"""
-function postprocesselements!(model::TrussModel)
-    for element in model.elements
-        element.forces = element.R * (element.K * model.u[element.globalID])
-    end
-end
-
-"""
 process a network
 """
 function process!(model::AbstractModel)
@@ -308,161 +284,3 @@ function process!(model::AbstractModel)
     model.processed = true
 end
 
-"""
-post-process a network
-"""
-function postprocess!(model::AbstractModel)
-    reactions!(model)
-    postprocessnodes!(model)
-    postprocesselements!(model)
-end
-
-"""
-    solve!(model::AbstractModel; reprocess = false)
-
-Perform a structural analysis. `reprocess = true` re-generates the stiffness matrix and resets all saved solutions.
-"""
-function solve!(model::Model; reprocess = false)
-
-    if !model.processed || reprocess
-        process!(model)
-    end
-
-    # reduce scope of problem and solve
-    idx = model.freeDOFs
-    F = model.P[idx] - model.Pf[idx]
-    U = model.S[idx, idx] \ F
-
-    #compliance
-    model.compliance = U' * F
-
-    #full DOF displacement vector
-    model.u = zeros(model.nDOFs)
-    model.u[idx] = U
-
-    # post process
-    postprocess!(model)
-end
-
-
-function solve!(model::TrussModel; reprocess = false)
-
-    if !model.processed || reprocess
-        process!(model)
-    end
-
-    # reduce scope of problem and solve
-    idx = model.freeDOFs
-    U = model.S[idx, idx] \ model.P[idx]
-
-    #compliance
-    model.compliance = U' * model.P[idx]
-
-    #full DOF displacement vector
-    model.u = zeros(model.nDOFs)
-    model.u[idx] = U
-
-    # post process
-    postprocess!(model)
-end
-
-"""
-    solve(model::AbstractModel)
-
-Solve a model and directly return the global displacement vector.
-"""
-function solve(model::Model)
-    idx = model.freeDOFs
-
-    F = model.P[idx] - model.Pf[idx]
-
-    U = model.S[idx, idx] \ F
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-function solve(model::TrussModel)
-    idx = model.freeDOFs
-
-    F = model.P[idx]
-
-    U = model.S[idx, idx] \ F
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-"""
-    solve(model::AbstractModel, F::Vector{Float64})
-
-Find the displacement of the structural model w/r/t a new external force vector. 
-"""
-function solve(model::Model, F::Vector{Float64})
-
-    @assert length(F) == model.nDOFs "Length of F must equal total number of DOFs"
-
-    idx = model.freeDOFs
-
-    U = model.S[idx, idx] \ F[idx]
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-"""
-Solve a network with a new load vector
-"""
-function solve(model::TrussModel, F::Vector{Float64})
-
-    @assert length(F) == model.nDOFs "Length of F must equal total number of DOFs"
-
-    idx = model.freeDOFs
-
-    U = model.S[idx, idx] \ F[idx]
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-"""
-Solve a network with a new set of loads
-"""
-function solve(model::Model, L::Vector{Load})
-    
-    F = createF(model, L)
-    
-    idx = model.freeDOFs
-
-    U = model.S[idx, idx] \ F[idx]
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-"""
-Solve a network with a new set of loads
-"""
-function solve(model::TrussModel, L::Vector{NodeForce})
-    
-    F = createF(model, L)
-    
-    idx = model.freeDOFs
-
-    U = model.S[idx, idx] \ F[idx]
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end

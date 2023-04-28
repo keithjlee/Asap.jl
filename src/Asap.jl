@@ -42,12 +42,14 @@ export LineLoad
 export GravityLoad
 export PointLoad
 
-include("Structure/model.jl")
-include("Structure/utilities.jl")
+include("Model/model.jl")
+include("Model/utilities.jl")
 export Model
 export TrussModel
 
-include("Structure/analysis.jl")
+include("Model/preprocessing.jl")
+include("Model/postprocessing.jl")
+include("Model/analysis.jl")
 export process!
 export solve!
 export solve
