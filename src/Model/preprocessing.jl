@@ -18,6 +18,13 @@ function populateDOF!(model::Model)
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
     end
 
+    #assign an id to load, store load id into relevant node/element
+    for (i, load) in enumerate(model.loads)
+        load.loadID = i
+
+        assign!(load)
+    end
+
     # assign an id to element, get associated node IDs, extract global DOF
     for (i, element) in enumerate(model.elements)
         element.elementID = i
@@ -29,12 +36,6 @@ function populateDOF!(model::Model)
         element.globalID = [idStart; idEnd]
     end
 
-    #assign an id to load, store load id into relevant node/element
-    for (i, load) in enumerate(model.loads)
-        load.loadID = i
-
-        assign!(load)
-    end
 end
 
 """
@@ -55,6 +56,12 @@ function populateDOF!(model::TrussModel)
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof - 1)
     end
 
+    for (i, load) in enumerate(model.loads)
+        load.loadID = i
+
+        assign!(load)
+    end
+
     for (i, element) in enumerate(model.elements)
 
         element.elementID = i
@@ -66,11 +73,6 @@ function populateDOF!(model::TrussModel)
         element.globalID = [idStart; idEnd]
     end
 
-    for (i, load) in enumerate(model.loads)
-        load.loadID = i
-
-        assign!(load)
-    end
 end
 
 """
@@ -81,6 +83,7 @@ function processElements!(model::Model)
         element.Q = zeros(12) # reset Qf
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
+        element.length = dist(element.nodeStart, element.nodeEnd)
         makeK!(element)
     end
 end
@@ -92,6 +95,7 @@ function processElements!(model::TrussModel)
     for element in model.elements
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
+        element.length = dist(element.nodeStart, element.nodeEnd)
         makeK!(element)
     end
 end

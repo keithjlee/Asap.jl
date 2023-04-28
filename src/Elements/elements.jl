@@ -49,11 +49,23 @@ mutable struct Element <: FrameElement
     forces::Vector{Float64} #elemental forces in LCS
     id::Union{Symbol, Nothing} #optional identifier
 
+    function Element(section::Section, release::Symbol)
+        element = new(section)
+        
+        @assert in(release, releases)
+
+        element.Ψ = pi/2
+        element.id = nothing
+        element.Q = zeros(12)
+        element.loadIDs = Vector{Int64}()
+    end
+
+    Element(section::Section) = Element(section, :fixedfixed)
+
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.length = dist(element.nodeStart, element.nodeEnd)
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
@@ -69,7 +81,6 @@ mutable struct Element <: FrameElement
         element.nodeStart = nodeStart
         element.nodeEnd = nodeEnd
 
-        element.length = dist(nodeStart, nodeEnd)
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
@@ -87,7 +98,6 @@ mutable struct Element <: FrameElement
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.length = dist(element.nodeStart, element.nodeEnd)
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
@@ -106,7 +116,6 @@ mutable struct Element <: FrameElement
         element.nodeStart = nodeStart
         element.nodeEnd = nodeEnd
 
-        element.length = dist(nodeStart, nodeEnd)
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
@@ -119,12 +128,39 @@ mutable struct Element <: FrameElement
 
 end
 
-mutable struct BridgeElement
+"""
+special element that is generated between two existing elements
+"""
+mutable struct BridgeElement <: FrameElement
     elementStart::Element
     posStart::Float64
     elementEnd::Element
     posEnd::Float64
+    section::Section
+    release::Symbol
+    Ψ::Float64
+    id::Union{Symbol, Nothing}
+    loadIDs::Vector{Int64}
+
+    function BridgeElement(elementStart::Element, 
+            posStart::Float64, 
+            elementEnd::Element, 
+            posEnd::Element, 
+            section::Section,
+            release::Symbol = :fixedfixed)
+
+        @assert 0 < posStart < 1 && 0 < posEnd < 1 "posStart/End must be ∈ ]0,1["
+        @assert in(release, releases)
+
+        be = new(elementStart, posStart, elementEnd, posEnd, section, release)
+        be.Ψ = pi/2
+        be.id = nothing
+        be.loadIDs = Vector{Int64}()
+
+        return be
+    end
 end
+
 
 
 """
@@ -158,7 +194,6 @@ mutable struct TrussElement <: AbstractElement
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.length = dist(element.nodeStart, element.nodeEnd)
         element.id = nothing
 
         element.Ψ = pi/2
@@ -170,7 +205,6 @@ mutable struct TrussElement <: AbstractElement
         element = new(section)
         element.nodeStart = nodeStart
         element.nodeEnd = nodeEnd
-        element.length = dist(nodeStart, nodeEnd)
         element.id = nothing
         element.Ψ = pi/2
 

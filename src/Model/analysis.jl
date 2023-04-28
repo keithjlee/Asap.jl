@@ -48,76 +48,13 @@ function solve!(model::TrussModel; reprocess = false)
 end
 
 """
-    solve(model::AbstractModel)
+    solve(model::Model, L::Vector{Load})
 
-Solve a model and directly return the global displacement vector.
+Return the displacement vector to a new set of loads
 """
-function solve(model::Model)
-    idx = model.freeDOFs
+function solve(model::Model, L::Vector{<:Load})
 
-    F = model.P[idx] - model.Pf[idx]
-
-    U = model.S[idx, idx] \ F
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-function solve(model::TrussModel)
-    idx = model.freeDOFs
-
-    F = model.P[idx]
-
-    U = model.S[idx, idx] \ F
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-"""
-    solve(model::AbstractModel, F::Vector{Float64})
-
-Find the displacement of the structural model w/r/t a new external force vector. 
-"""
-function solve(model::Model, F::Vector{Float64})
-
-    @assert length(F) == model.nDOFs "Length of F must equal total number of DOFs"
-
-    idx = model.freeDOFs
-
-    U = model.S[idx, idx] \ F[idx]
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-"""
-Solve a network with a new load vector
-"""
-function solve(model::TrussModel, F::Vector{Float64})
-
-    @assert length(F) == model.nDOFs "Length of F must equal total number of DOFs"
-
-    idx = model.freeDOFs
-
-    U = model.S[idx, idx] \ F[idx]
-
-    u = zeros(model.nDOFs)
-    u[idx] = U
-
-    return u
-end
-
-"""
-Solve a network with a new set of loads
-"""
-function solve(model::Model, L::Vector{Load})
+    @assert model.processed "Model must be already processed"
     
     F = createF(model, L)
     
@@ -132,9 +69,54 @@ function solve(model::Model, L::Vector{Load})
 end
 
 """
-Solve a network with a new set of loads
+    solve!(model::Model, L::Vector{Load})
+
+Replace the assigned model loads with a new load vector and solve.
+"""
+function solve!(model::Model, L::Vector{<:Load})
+
+    @assert model.processed "Model must be already processed"
+
+    model.loads = L
+
+    # clear existing load associations
+    for element in model.elements
+        empty!(element.loadIDs)
+    end
+
+    # assign new load associations
+    for (i, load) in enumerate(model.loads)
+        load.loadID = i
+        assign!(load)
+    end
+
+    # create P, Pf matrix
+    populateLoads!(model)
+    
+    # reduce scope of problem and solve
+    idx = model.freeDOFs
+    F = model.P[idx] - model.Pf[idx]
+    U = model.S[idx, idx] \ F
+
+    #compliance
+    model.compliance = U' * F
+
+    #full DOF displacement vector
+    model.u = zeros(model.nDOFs)
+    model.u[idx] = U
+
+    # post process
+    postprocess!(model)
+end
+
+"""
+    solve(model::TrussModel, L::Vector{NodeForce})
+
+Return the displacement vector to a new set of loads
 """
 function solve(model::TrussModel, L::Vector{NodeForce})
+
+    !model.processed && process!(model)
     
     F = createF(model, L)
     
@@ -146,4 +128,44 @@ function solve(model::TrussModel, L::Vector{NodeForce})
     u[idx] = U
 
     return u
+end
+
+"""
+    solve!(model::TrussModel, L::Vector{NodeForce})
+
+Replace the assigned model loads with a new load vector and solve.
+"""
+function solve!(model::TrussModel, L::Vector{NodeForce})
+
+    @assert model.processed "Model must be already processed"
+
+    model.loads = L
+
+    # clear existing load associations
+    for element in model.elements
+        empty!(element.loadIDs)
+    end
+
+    # assign new load associations
+    for (i, load) in enumerate(model.loads)
+        load.loadID = i
+        assign!(load)
+    end
+
+    # create P, Pf matrix
+    populateLoads!(model)
+    
+    # reduce scope of problem and solve
+    idx = model.freeDOFs
+    U = model.S[idx, idx] \ model.P[idx]
+
+    #compliance
+    model.compliance = U' * model.P[idx]
+
+    #full DOF displacement vector
+    model.u = zeros(model.nDOFs)
+    model.u[idx] = U
+
+    # post process
+    postprocess!(model)
 end

@@ -65,7 +65,7 @@ mutable struct LineLoad <: ElementLoad
     loadID::Int64
     id::Union{Symbol, Nothing}
 
-    function LineLoad(element::Element, value::Vector{Float64})
+    function LineLoad(element::FrameElement, value::Vector{Float64})
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
@@ -74,10 +74,6 @@ mutable struct LineLoad <: ElementLoad
         return force
     end
 end
-
-M_Line(value::Float64, x::Float64, L::Float64) = value * x / 2 * (L - x)
-V_Line(value::Float64, x::Float64, L::Float64) = value * (0.5L - x)
-Δ_Line(value::Float64, x::Float64, L::Float64, E::Float64, In::Float64) = value * x / 24 / E / In * (L^3 - 2L * x^2 + x^3)
 
 """
     GravityLoad(element::Element, factor::Float64)
@@ -92,7 +88,7 @@ mutable struct GravityLoad <: ElementLoad
     loadID::Int64
     id::Union{Symbol, Nothing}
 
-    function GravityLoad(element::Element, factor::Float64)
+    function GravityLoad(element::FrameElement, factor::Float64)
         force = new(element, factor)
         force.id = nothing
         return force
@@ -112,7 +108,7 @@ mutable struct PointLoad <: ElementLoad
     loadID::Int64
     id::Union{Symbol, Nothing}
 
-    function PointLoad(element::Element, position::Float64, value::Vector{Float64})
+    function PointLoad(element::FrameElement, position::Float64, value::Vector{Float64})
         @assert 0 < position < 1 "position must be ∈ ]0, 1["
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
