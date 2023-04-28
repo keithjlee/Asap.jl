@@ -37,6 +37,7 @@ mutable struct Element <: AbstractElement
     nodeIDs::Vector{Int64} #indices of start/end nodes 
     elementID::Int64
     globalID::Vector{Int64} #element global DOFs
+    loadIDs::Vector{Int64}
     length::Float64 #length of element
     release::Symbol #
     K::Matrix{Float64} # stiffness matrix in GCS
@@ -55,6 +56,7 @@ mutable struct Element <: AbstractElement
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
+        element.loadIDs = Vector{Int64}()
 
         element.release = :fixedfixed
 
@@ -70,6 +72,7 @@ mutable struct Element <: AbstractElement
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
+        element.loadIDs = Vector{Int64}()
 
         element.release = :fixedfixed
 
@@ -87,6 +90,7 @@ mutable struct Element <: AbstractElement
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
+        element.loadIDs = Vector{Int64}()
 
         element.release = release
 
@@ -105,11 +109,20 @@ mutable struct Element <: AbstractElement
         element.Ψ = pi/2
         element.id = nothing
         element.Q = zeros(12)
+        element.loadIDs = Vector{Int64}()
 
         element.release = release
 
         return element
     end
+
+end
+
+mutable struct BridgeElement
+    elementStart::Element
+    posStart::Float64
+    elementEnd::Element
+    newElements::Vector{Element}
 
 end
 

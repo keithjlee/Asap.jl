@@ -55,6 +55,12 @@ function populateDOF!(model::TrussModel)
 
         element.globalID = [idStart; idEnd]
     end
+
+    for (i, load) in enumerate(model.loads)
+        load.loadID = i
+
+        assign!(load)
+    end
 end
 
 """
