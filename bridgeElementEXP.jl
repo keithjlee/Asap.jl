@@ -18,6 +18,7 @@ begin
 
     e1 = Element(n1, n2, sec)
     e2 = Element(n3, n4, sec)
+    e3 = Element(n1, n4, sec)
 
     b1 = Asap.BridgeElement(e1, 0.5, e2, 0.5, sec)
     b2 = Asap.BridgeElement(e1, 0.2, e2, 0.2, sec)
@@ -25,42 +26,42 @@ begin
 
     bes = [Asap.BridgeElement(e1, rand(), e2, rand(), sec) for _ = 1:20]
 
-    elements = [[e1, e2] ; bes]
+    elements = [[e1, e2, e3] ; bes]
 
     l1 = LineLoad(e2, [0., 0., -3])
     l2 = PointLoad(rand(bes), 0.5, [0., 0., -10e3])
     l3 = PointLoad(e1, 0.3, [0., 0., 3.])
+    l4 = LineLoad(e3, [0., 0., -1.])
 
-    loads = [l1, l2, l3]
+    loads = [l1, l2, l3, l4]
 end
 
 #block 1: identifiers
+Asap.makeids!(nodes)
+Asap.makeids!(elements)
+Asap.makeids!(loads)
 
 # nodes
 begin
     n_dof = 6
     dofset = collect(0:n_dof-  1)
     for (i, node) in enumerate(nodes)
-        node.nodeID = i
         node.globalID = i * n_dof - (n_dof - 1) .+ dofset
     end
 end
 
 # loads
 begin
-    for (i, load) in enumerate(loads)
-        load.loadID = i
+    for load in loads
         Asap.assign!(load)
     end
 
 end
 
 # elements
-i = 1
 newPos = Vector{Vector{Float64}}()
 
 for element in elements
-    element.elementID = i
     if typeof(element) == Element
         element.Q = zeros(12) # reset Qf
         element.R = Asap.R(element)
@@ -83,17 +84,18 @@ for element in elements
 
         push!(newPos, npos, npos2)
     end
-
-    i += 1
 end
 
+iElements = findall(typeof.(elements) .== Element)
+iBridges = findall(typeof.(elements) .== Asap.BridgeElement)
 
-n = length(findall(typeof.(elements) .== Element))
-m = length(findall(typeof.(elements) .== Asap.BridgeElement))
+n = length(iElements)
+m = length(iBridges)
 
 BMmat = zeros(Int64, n, m)
-Nodemat = [getproperty.(elements[typeof.(elements) .== Element], :nodeStart) Matrix{Node}(undef, n, m) getproperty.(elements[typeof.(elements) .== Element], :nodeEnd)]
+Nodemat = [getproperty.(elements[iElements], :nodeStart) Matrix{Node}(undef, n, m) getproperty.(elements[iElements], :nodeEnd)]
 ordermat = [zeros(n, m+1) ones(n)]
+idvec = getproperty.(elements[iElements], :elementID)
 
 i = 1
 
@@ -128,6 +130,9 @@ for e in elements
     end
 end
 
+iActive = findall(sum.(eachrow(BMmat)) .!= 0)
+BMmat = BMmat[iActive,:]
+Nodemat = Nodemat[iActive]
 
 newEls = Vector{Element}()
 #generate shattered elements
