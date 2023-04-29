@@ -1,15 +1,27 @@
 abstract type AbstractModel end
 
+function makeids!(nodes::Vector{<:AbstractNode})
+    @inbounds for (i, node) in enumerate(nodes)
+        node.nodeID = i
+    end
+end
+
+function makeids!(elements::Vector{<:AbstractElement})
+    @inbounds for (i, element) in enumerate(elements)
+        element.elementID = i
+    end
+end
+
+function makeids!(loads::Vector{<:Load})
+    @inbounds for (i, load) in enumerate(loads)
+        load.loadID = i
+    end
+end
+
 """
     Model(nodes::Vector{Node}, elements::Vector{Element}, loads::Vector{Load})
 
 Create a complete structural model ready for analysis.
-
------------------------------------
-
-    Model(nodes::Vector{Node}, elements::Vector{Element})
-
-Create a model with geometric values and no loads.
 """
 mutable struct Model <: AbstractModel
     nodes::Vector{Node}
@@ -31,18 +43,27 @@ mutable struct Model <: AbstractModel
     
     function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:Load})
         structure = new(nodes, elements, loads)
+
+        makeids!(structure.nodes)
+        makeids!(structure.elements)
+        makeids!(structure.loads)
+
         structure.processed = false
 
         return structure
     end
 
-    function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement})
-        structure = new(nodes, elements)
-        structure.loads = Vector{Load}()
-        structure.processed = false
+    # function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement})
+    #     structure = new(nodes, elements)
+    #     structure.loads = Vector{Load}()
 
-        return structure
-    end
+    #     makeids!(structure.nodes)
+    #     makeids!(structure.elements)
+
+    #     structure.processed = false
+
+    #     return structure
+    # end
 end
 
 """
@@ -50,11 +71,6 @@ end
 
 Create a complete structural model ready for analysis.
 
------------------------------------
-
-    Model(nodes::Vector{TrussNode}, elements::Vector{TrussElement})
-
-Create a model with geometric values and no loads.
 """
 mutable struct TrussModel <: AbstractModel
     nodes::Vector{TrussNode}
@@ -75,16 +91,25 @@ mutable struct TrussModel <: AbstractModel
     
     function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement}, loads::Vector{NodeForce})
         structure = new(nodes, elements, loads)
+
+        makeids!(structure.nodes)
+        makeids!(structure.elements)
+        makeids!(structure.loads)
+
         structure.processed = false
 
         return structure
     end
 
-    function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement})
-        structure = new(nodes, elements)
-        structure.loads = Vector{NodeForce}()
-        structure.processed = false
+    # function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement})
+    #     structure = new(nodes, elements)
+    #     structure.loads = Vector{NodeForce}()
 
-        return structure
-    end
+    #     makeids!(structure.nodes)
+    #     makeids!(structure.elements)
+
+    #     structure.processed = false
+
+    #     return structure
+    # end
 end
