@@ -104,39 +104,39 @@ i = 1
 
 g2lID = Dict(getproperty.(elements[typeof.(elements) .== Element], :elementID) .=> collect(1:n))
 
-for e in elements
-    if typeof(e) == Asap.BridgeElement
-        # push!(startposStore, e.posStart)
-        # push!(endposStore, e.posEnd)
+for e in elements[iBridges]
+    # push!(startposStore, e.posStart)
+    # push!(endposStore, e.posEnd)
 
-        rowstart = g2lID[e.elementStart.elementID]
-        rowend = g2lID[e.elementEnd.elementID]
+    rowstart = g2lID[e.elementStart.elementID]
+    rowend = g2lID[e.elementEnd.elementID]
 
-        BMmat[rowstart, i] = -1
-        BMmat[rowend, i] = 1
+    BMmat[rowstart, i] = -1
+    BMmat[rowend, i] = 1
 
-        ordermat[rowstart, i + 1] = e.posStart
-        ordermat[rowend, i + 1] = e.posEnd
+    ordermat[rowstart, i + 1] = e.posStart
+    ordermat[rowend, i + 1] = e.posEnd
 
-        pos1 = e.elementStart.nodeStart.position .+ e.elementStart.LCS[1] * e.posStart * e.elementStart.length
+    pos1 = e.elementStart.nodeStart.position .+ e.elementStart.LCS[1] * e.posStart * e.elementStart.length
 
-        Nodemat[rowstart, i + 1] = Node(pos1, :free)
+    Nodemat[rowstart, i + 1] = Node(pos1, :free)
 
-        pos2 = e.elementEnd.nodeStart.position .+ e.elementEnd.LCS[1] * e.posEnd * e.elementEnd.length
+    pos2 = e.elementEnd.nodeStart.position .+ e.elementEnd.LCS[1] * e.posEnd * e.elementEnd.length
 
-        Nodemat[rowend, i + 1] = Node(pos2, :free)
+    Nodemat[rowend, i + 1] = Node(pos2, :free)
 
-        i += 1
-    end
+    i += 1
 end
 
 iActive = findall(sum.(eachrow(BMmat)) .!= 0)
 BMmat = BMmat[iActive,:]
-Nodemat = Nodemat[iActive]
+Nodemat = Nodemat[iActive,:]
+ordermat = ordermat[iActive, :]
+idvec = idvec[iActive]
 
 newEls = Vector{Element}()
 #generate shattered elements
-for (j, row, order) in zip(1:size(Nodemat)[1], eachrow(Nodemat), eachrow(ordermat))
+for (j, row, order) in zip(idvec, eachrow(Nodemat), eachrow(ordermat))
     ordernodes = row[sortperm(order)]
     shattered =[Element(ordernodes[i], ordernodes[i+1], e1.section) for i = 1:length(row)-1]
 
@@ -151,7 +151,7 @@ for e in newEls
 end
 
 #generate bridge elements
-for (i, bm) in enumerate(elements[typeof.(elements) .== Asap.BridgeElement])
+for (i, bm) in enumerate(elements[iBridges])
     order = sortperm(BMmat[:, i])
 
     el = Element(Nodemat[order, i+1]..., bm.section)
@@ -162,37 +162,40 @@ for (i, bm) in enumerate(elements[typeof.(elements) .== Asap.BridgeElement])
     push!(newEls, el)
 end
 
+deleteat!(elements, [idvec; iBridges])
+push!(elements, newEls...)
 
 #transfer loads
 newLoads = Vector{Asap.Load}()
 
+
 #for distributed loads
 eid1 = l1.element.elementID
-itransfer = findall(getproperty.(newEls, :elementID) .== eid1)
+
+itransfer = findall(getproperty.(elements, :elementID) .== eid1)
 for i in itransfer
-    push!(newLoads, LineLoad(newEls[i], l1.value))
+    push!(newLoads, LineLoad(elements[i], l1.value))
 end
 
 # for point load on bridge element
 eid2 = l2.element.elementID
-itransfer = findfirst(getproperty.(newEls, :elementID) .== eid2)
-push!(newLoads, PointLoad(newEls[itransfer], l2.position, l2.value))
+itransfer = findfirst(getproperty.(elements, :elementID) .== eid2)
+push!(newLoads, PointLoad(elements[itransfer], l2.position, l2.value))
 
 #for point load on an initial beam
 eid3 = l3.element.elementID
 loadpos = l3.element.length * l3.position
-itransfer = findall(getproperty.(newEls, :elementID) .== eid3)
-endpositions = cumsum(getproperty.(newEls[itransfer], :length))
+itransfer = findall(getproperty.(elements, :elementID) .== eid3)
+endpositions = cumsum(getproperty.(elements[itransfer], :length))
 ielement = findfirst(endpositions .> loadpos)
 newfrac = (loadpos - endpositions[ielement - 1]) / (endpositions[ielement] - endpositions[ielement - 1])
 
-push!(newLoads, PointLoad(newEls[itransfer[ielement]], newfrac, l3.value))
+push!(newLoads, PointLoad(elements[itransfer[ielement]], newfrac, l3.value))
 
+newNodes = vec(Nodemat[:, 2:end-1])
+push!(nodes, newNodes...)
 
-
-newNodes = vec(Nodemat)
-
-newModel = Model(newNodes, newEls, newLoads)
+newModel = Model(nodes, elements, newLoads)
 solve!(newModel; reprocess = true)
 
 pos = Point3.([n.position for n in newModel.nodes])
