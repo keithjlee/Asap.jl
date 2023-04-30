@@ -27,6 +27,7 @@ include("Elements/K.jl")
 include("Elements/R.jl")
 include("Elements/utilities.jl")
 export Element
+export BridgeElement
 export TrussElement
 export release!
 export endpoints

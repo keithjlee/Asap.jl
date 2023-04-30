@@ -61,6 +61,7 @@ end
 # elements
 newPos = Vector{Vector{Float64}}()
 
+#initialize elements
 for element in elements
     if typeof(element) == Element
         element.Q = zeros(12) # reset Qf
@@ -107,6 +108,7 @@ g2lID = Dict(getproperty.(elements[typeof.(elements) .== Element], :elementID) .
 for e in elements[iBridges]
     # push!(startposStore, e.posStart)
     # push!(endposStore, e.posEnd)
+    
 
     rowstart = g2lID[e.elementStart.elementID]
     rowend = g2lID[e.elementEnd.elementID]
