@@ -81,6 +81,16 @@ function processElements!(model::Model)
     end
 end
 
+function processElements!(elements::Vector{<:FrameElement})
+    for element in elements
+        element.Q = zeros(12) # reset Qf
+        element.R = R(element)
+        element.LCS = lcs(element, element.Ψ)
+        element.length = dist(element.nodeStart, element.nodeEnd)
+        makeK!(element)
+    end
+end
+
 """
 Process elements: get transformation matrix and global elemental stiffness matrix
 """

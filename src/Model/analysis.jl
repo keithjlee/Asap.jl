@@ -173,34 +173,26 @@ end
 """
 Test function for solving models with bridge elements
 """
-function solve_explicit!(model::Model)
+function process_bridge!(model::Model)
 
     elements = model.elements
 
-    # find which elements are bridge elements
     iElement = findall(typeof.(elements) .== Element)
-    iBridge = findall(typeof.(elements) == BridgeElement)
+    iBridge = findall(typeof.(elements) .== BridgeElement)
 
-    # size of info arrays
+    processElements!(Vector{Element}(elements[iElement]))
+
     n = length(iElement)
     m = length(iBridge)
 
-    # initialize arrays
-    # C is the connectivity matrix, each column is a bridge element, -1: start element, 1: end element
-    C = zeros(Int64, n, m)
-
-    # fraction shatter point values for all bridge elements
     ordermat = [zeros(n, m+1) ones(n)]
 
-    # get IDs of existing elements
     idvec = getproperty.(elements[iElement], :elementID)
 
-    # convert element IDs to actual index in data matrices
     id2ind = Dict(idvec .=> collect(1:n))
 
-    # populate data matrices for all bridge elements
     activeelements = Vector{Int64}()
-    for (i, e) in enumerate(elements[BridgeElement])
+    for (i, e) in enumerate(elements[iBridge])
         e1 = e.elementStart
         e2 = e.elementEnd
 
@@ -208,11 +200,7 @@ function solve_explicit!(model::Model)
         rowstart = id2ind[e1.elementID]
         rowend = id2ind[e2.elementID]
 
-        push!(iactive, rowstart, rowend)
-
-        # populate connectivity matrix
-        C[rowstart, i] = -1
-        C[rowend, i] = 1
+        push!(activeelements, rowstart, rowend)
 
         # populate positional information
         ordermat[rowstart, i+1] = e.posStart
@@ -223,7 +211,6 @@ function solve_explicit!(model::Model)
     unique!(activeelements)
     iactive = sortperm(activeelements)
 
-    #generate all unique nodes and develop indices for shatter and bridge elements
     nodemat = zeros(Int64, n, m)
     newnodes = Vector{Node}()
     newelements = Vector{Element}()
@@ -248,8 +235,10 @@ function solve_explicit!(model::Model)
 
         for (j, frac) in enumerate(fractions)
 
-            # if g is empty, frac value is unique
-            if length(g) == 0 frac != 0
+            frac == 0 && continue
+
+            # if fracstore is empty, frac value is unique
+            if length(fracstore) == 0
                 pos = startpos .+ vec * frac * L
                 node = Node(pos, :free)
                 node.nodeID = nodeIDstart + i
@@ -328,16 +317,114 @@ function solve_explicit!(model::Model)
     end
 
     # modify input model with new elements and nodes
-    deleteat!(model.elements, [idvec; iBridge]) # delete unshattered elements and all bridge elements
+    deleteat!(model.elements, sort!([iactive; iBridge])) # delete unshattered elements and all bridge elements
     model.elements = [model.elements; newelements]
     model.nodes = [model.nodes; newnodes]
 
+    processElements!(model)
+
     # process loads
-    for load in model.loads
+    newloads = Vector{Asap.Load}()
+
+    rmid = Vector{Int64}()
+
+    elementids = getproperty.(model.elements, :elementID)
+    for (index, load) in enumerate(model.loads)
+        id = load.element.elementID
         if typeof(load) == LineLoad
-            
+            # IF APPLIED TO A SHATTERED ELEMENT
+            if in(id, iactive)
+                push!(rmid, index)
+                itransfer = findall(elementids .== id)
+
+                for i in itransfer
+                    newload = LineLoad(model.elements[i], load.value)
+                    newload.loadID = load.loadID
+                    newload.id = load.id
+                    push!(newloads, newload)
+                end
+
+            elseif typeof(load.element) == BridgeElement #IF APPLIED TO A BRIDGE ELEMENT
+                push!(rmid, index)
+
+                itransfer = findfirst(elementids .== id)
+                newload = LineLoad(model.elements[itransfer], load.value)
+                newload.loadID = load.loadID
+                newload.id = load.id
+                push!(newloads, newload)
+            end
+        elseif typeof(load) == PointLoad
+
+            if typeof(load.element) == Element
+
+                if in(id, iactive)
+                    push!(rmid, index)
+
+                    position = load.element.length * load.position
+
+                    itransfer = findall(elementids .== id)
+
+                    endpositions = cumsum(getproperty.(model.elements[itransfer], :length))
+                    ielement = findfirst(endpositions .> position)
+                    newfrac = (position - endpositions[ielement-1]) / (endpositions[ielement] - endpositions[ielement - 1])
+
+                    newload = PointLoad(model.elements[itransfer[ielement]], newfrac, load.value)
+                    newload.loadID = load.loadID
+                    newload.id = load.id
+                    push!(newloads, newload)
+                end
+
+            else
+                push!(rmid, index)
+                itransfer = findfirst(elementids .== id)
+                newload = PointLoad(model.elements[itransfer], load.position, load.value)
+                newload.loadID = load.loadID
+                newload.id = load.id
+                push!(newloads, newload)
+            end
+
         end
 
     end
 
+    deleteat!(model.loads, sort!(unique!(rmid)))
+    model.loads = [model.loads; newloads]
+
+
+    # populating DOFs
+    model.DOFs = vcat([node.dof for node in model.nodes]...)
+    model.nDOFs = length(model.DOFs)
+    model.nNodes = length(model.nodes)
+    model.nElements = length(model.elements)
+    model.freeDOFs = findall(model.DOFs)
+    model.fixedDOFs = findall(.!model.DOFs)
+
+    n_dof = 6
+    dofset = collect(0:n_dof-  1)
+
+    # assign an id to node, extract global DOF index
+    @inbounds for (i, node) in enumerate(model.nodes)
+        node.globalID = i * n_dof - (n_dof - 1) .+ dofset
+    end
+
+    #assign an id to load, store load id into relevant node/element
+    @inbounds for load in model.loads
+        Asap.assign!(load)
+    end
+
+    # assign an id to element, get associated node IDs, extract global DOF
+    @inbounds for element in model.elements
+        element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
+
+        idStart = element.nodeStart.globalID
+        idEnd = element.nodeEnd.globalID
+
+        element.globalID = [idStart; idEnd]
+    end
+
+    populateLoads!(model)
+
+    Asap.globalS!(model)
+
+    model.processed = true
 end
