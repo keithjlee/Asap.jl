@@ -19,6 +19,7 @@ function Base.findall(elements::Vector{TrussElement}, i::Symbol)
     return findall([element.id == i for element in elements])
 end
 
+Base.length(element::AbstractElement) = norm(element.nodeEnd.position .- element.nodeStart.position)
 
 """
     release!(element::Element, release::Symbol)

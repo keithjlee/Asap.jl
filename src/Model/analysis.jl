@@ -185,11 +185,12 @@ function process_bridge!(model::Model)
     n = length(iElement)
     m = length(iBridge)
 
-    ordermat = [zeros(n, m+1) ones(n)]
+    ordermat = [spzeros(n, m+1) ones(n)]
 
     idvec = getproperty.(elements[iElement], :elementID)
 
     id2ind = Dict(idvec .=> collect(1:n))
+    ind2id = Dict(collect(1:n) .=> idvec)
 
     activeelements = Vector{Int64}()
     for (i, e) in enumerate(elements[iBridge])
@@ -209,23 +210,24 @@ function process_bridge!(model::Model)
 
     #relevant element indices
     unique!(activeelements)
-    iactive = sortperm(activeelements)
+    iactive = sort!(activeelements)
+    itrueactive = [ind2id[i] for i in iactive]
 
-    nodemat = zeros(Int64, n, m)
+    nodemat = spzeros(Int64, n, m)
     newnodes = Vector{Node}()
     newelements = Vector{Element}()
 
     nodeIDstart = model.nodes[end].nodeID
 
     i = 1
-    tol = 1e-2
+    tol = 1e-5
     for index in iactive
         fracstore = Vector{Float64}()
         nodestore = Vector{Node}()
         elementstore = Vector{Element}()
 
         #element to shatter
-        element = elements[index]
+        element = elements[ind2id[index]]
         startpos = element.nodeStart.position
         L = element.length
         vec = first(element.LCS)
@@ -317,13 +319,14 @@ function process_bridge!(model::Model)
     end
 
     # modify input model with new elements and nodes
-    deleteat!(model.elements, sort!([iactive; iBridge])) # delete unshattered elements and all bridge elements
+    deleteat!(model.elements, sort!([itrueactive; iBridge])) # delete unshattered elements and all bridge elements
     model.elements = [model.elements; newelements]
     model.nodes = [model.nodes; newnodes]
 
     processElements!(model)
 
     # process loads
+    # convertloads!(model, itrueactive)
     newloads = Vector{Asap.Load}()
 
     rmid = Vector{Int64}()
@@ -331,10 +334,11 @@ function process_bridge!(model::Model)
     elementids = getproperty.(model.elements, :elementID)
     for (index, load) in enumerate(model.loads)
         id = load.element.elementID
+        in(id, itrueactive) && push!(rmid, index)
+
         if typeof(load) == LineLoad
             # IF APPLIED TO A SHATTERED ELEMENT
-            if in(id, iactive)
-                push!(rmid, index)
+            if in(id, itrueactive)
                 itransfer = findall(elementids .== id)
 
                 for i in itransfer
@@ -357,8 +361,7 @@ function process_bridge!(model::Model)
 
             if typeof(load.element) == Element
 
-                if in(id, iactive)
-                    push!(rmid, index)
+                if in(id, itrueactive)
 
                     position = load.element.length * load.position
 
@@ -392,35 +395,7 @@ function process_bridge!(model::Model)
 
 
     # populating DOFs
-    model.DOFs = vcat([node.dof for node in model.nodes]...)
-    model.nDOFs = length(model.DOFs)
-    model.nNodes = length(model.nodes)
-    model.nElements = length(model.elements)
-    model.freeDOFs = findall(model.DOFs)
-    model.fixedDOFs = findall(.!model.DOFs)
-
-    n_dof = 6
-    dofset = collect(0:n_dof-  1)
-
-    # assign an id to node, extract global DOF index
-    @inbounds for (i, node) in enumerate(model.nodes)
-        node.globalID = i * n_dof - (n_dof - 1) .+ dofset
-    end
-
-    #assign an id to load, store load id into relevant node/element
-    @inbounds for load in model.loads
-        Asap.assign!(load)
-    end
-
-    # assign an id to element, get associated node IDs, extract global DOF
-    @inbounds for element in model.elements
-        element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
-
-        idStart = element.nodeStart.globalID
-        idEnd = element.nodeEnd.globalID
-
-        element.globalID = [idStart; idEnd]
-    end
+    populateDOF!(model)
 
     populateLoads!(model)
 
