@@ -1,4 +1,28 @@
 """
+process a network
+"""
+function process!(model::AbstractModel)
+
+    if any(typeof.(model.elements) .== BridgeElement)
+        processBridge!(model)
+    else
+        processElements!(model)
+    end
+
+    #global DOF 
+    populateDOF!(model)
+
+    #loads
+    populateLoads!(model)
+
+    #stiffness matrix
+    globalS!(model)
+
+    #processing finished
+    model.processed = true
+end
+
+"""
     solve!(model::AbstractModel; reprocess = false)
 
 Perform a structural analysis. `reprocess = true` re-generates the stiffness matrix and resets all saved solutions.
@@ -80,7 +104,11 @@ function solve!(model::Model, L::Vector{<:Load})
     model.loads = L
 
     # clear existing load associations
-    for (node, element) in zip(model.nodes, model.elements)
+    for node in model.nodes
+        empty!(node.loadIDs)
+    end
+
+    for element in model.elements
         empty!(element.loadIDs)
     end
 
@@ -142,8 +170,8 @@ function solve!(model::TrussModel, L::Vector{NodeForce})
     model.loads = L
 
     # clear existing load associations
-    for element in model.elements
-        empty!(element.loadIDs)
+    for node in model.nodes
+        empty!(node.loadIDs)
     end
 
     # assign new load associations
@@ -168,238 +196,4 @@ function solve!(model::TrussModel, L::Vector{NodeForce})
 
     # post process
     postprocess!(model)
-end
-
-"""
-Test function for solving models with bridge elements
-"""
-function process_bridge!(model::Model)
-
-    elements = model.elements
-
-    iElement = findall(typeof.(elements) .== Element)
-    iBridge = findall(typeof.(elements) .== BridgeElement)
-
-    processElements!(Vector{Element}(elements[iElement]))
-
-    n = length(iElement)
-    m = length(iBridge)
-
-    ordermat = [spzeros(n, m+1) ones(n)]
-
-    idvec = getproperty.(elements[iElement], :elementID)
-
-    id2ind = Dict(idvec .=> collect(1:n))
-    ind2id = Dict(collect(1:n) .=> idvec)
-
-    activeelements = Vector{Int64}()
-    for (i, e) in enumerate(elements[iBridge])
-        e1 = e.elementStart
-        e2 = e.elementEnd
-
-        # which elements (rows) does each bridge element connect to?
-        rowstart = id2ind[e1.elementID]
-        rowend = id2ind[e2.elementID]
-
-        push!(activeelements, rowstart, rowend)
-
-        # populate positional information
-        ordermat[rowstart, i+1] = e.posStart
-        ordermat[rowend, i+1] = e.posEnd
-    end
-
-    #relevant element indices
-    unique!(activeelements)
-    iactive = sort!(activeelements)
-    itrueactive = [ind2id[i] for i in iactive]
-
-    nodemat = spzeros(Int64, n, m)
-    newnodes = Vector{Node}()
-    newelements = Vector{Element}()
-
-    nodeIDstart = model.nodes[end].nodeID
-
-    i = 1
-    tol = 1e-5
-    for index in iactive
-        fracstore = Vector{Float64}()
-        nodestore = Vector{Node}()
-        elementstore = Vector{Element}()
-
-        #element to shatter
-        element = elements[ind2id[index]]
-        startpos = element.nodeStart.position
-        L = element.length
-        vec = first(element.LCS)
-
-        fractions = ordermat[index, 2:end-1]
-        istore = zeros(Int64, length(fractions))
-
-        for (j, frac) in enumerate(fractions)
-
-            frac == 0 && continue
-
-            # if fracstore is empty, frac value is unique
-            if length(fracstore) == 0
-                pos = startpos .+ vec * frac * L
-                node = Node(pos, :free)
-                node.nodeID = nodeIDstart + i
-                node.id = :bridge
-
-                push!(nodestore, node)
-                push!(fracstore, frac)
-
-                nodemat[index, j] = i
-                istore[j] = i
-                
-                i += 1
-                continue
-            end
-
-            # find the difference between this fracture value and previous values
-            diffs = abs.(fracstore .- frac)
-
-            # find minimum difference
-            val, ind = findmin(diffs)
-
-            # if min distance is less than tolerance, it already exists as a node
-            if val < tol
-                nodemat[index, j] = istore[ind]
-            else # create a new node
-                pos = startpos .+ vec * frac * L
-                node = Node(pos, :free)
-                node.nodeID = nodeIDstart + i
-                node.id = :bridge
-
-                push!(nodestore, node)
-                push!(fracstore, frac)
-
-                nodemat[index, j] = i
-                istore[j] = i
-                
-                i += 1
-            end
-
-        end
-
-        # make shattered elements
-        isorted = sortperm(fracstore)
-        nodeset = [element.nodeStart; nodestore[isorted]; element.nodeEnd]
-
-        for i = 1:length(nodeset) - 1
-            el = Element(nodeset[i], nodeset[i+1], element.section)
-            el.elementID = element.elementID
-            el.Ψ = element.Ψ
-            el.id = element.id
-
-            push!(elementstore, el)
-        end
-
-        # collect all new elements and nodes
-        newnodes = [newnodes; nodestore]
-        newelements = [newelements; elementstore]
-
-    end
-
-    # create bridge elements
-    for (i, be) in enumerate(elements[iBridge])
-        rowstart = id2ind[be.elementStart.elementID]
-        rowend = id2ind[be.elementEnd.elementID]
-
-        nstart = newnodes[nodemat[rowstart, i]]
-        nend = newnodes[nodemat[rowend, i]]
-
-        el = Element(nstart, nend, be.section)
-        el.elementID = be.elementID
-        el.Ψ = be.Ψ
-        el.id = be.id
-        el.release = be.release
-
-        push!(newelements, el)
-    end
-
-    # modify input model with new elements and nodes
-    deleteat!(model.elements, sort!([itrueactive; iBridge])) # delete unshattered elements and all bridge elements
-    model.elements = [model.elements; newelements]
-    model.nodes = [model.nodes; newnodes]
-
-    processElements!(model)
-
-    # process loads
-    # convertloads!(model, itrueactive)
-    newloads = Vector{Asap.Load}()
-
-    rmid = Vector{Int64}()
-
-    elementids = getproperty.(model.elements, :elementID)
-    for (index, load) in enumerate(model.loads)
-        id = load.element.elementID
-        in(id, itrueactive) && push!(rmid, index)
-
-        if typeof(load) == LineLoad
-            # IF APPLIED TO A SHATTERED ELEMENT
-            if in(id, itrueactive)
-                itransfer = findall(elementids .== id)
-
-                for i in itransfer
-                    newload = LineLoad(model.elements[i], load.value)
-                    newload.loadID = load.loadID
-                    newload.id = load.id
-                    push!(newloads, newload)
-                end
-
-            elseif typeof(load.element) == BridgeElement #IF APPLIED TO A BRIDGE ELEMENT
-                push!(rmid, index)
-
-                itransfer = findfirst(elementids .== id)
-                newload = LineLoad(model.elements[itransfer], load.value)
-                newload.loadID = load.loadID
-                newload.id = load.id
-                push!(newloads, newload)
-            end
-        elseif typeof(load) == PointLoad
-
-            if typeof(load.element) == Element
-
-                if in(id, itrueactive)
-
-                    position = load.element.length * load.position
-
-                    itransfer = findall(elementids .== id)
-
-                    endpositions = cumsum(getproperty.(model.elements[itransfer], :length))
-                    ielement = findfirst(endpositions .> position)
-                    newfrac = (position - endpositions[ielement-1]) / (endpositions[ielement] - endpositions[ielement - 1])
-
-                    newload = PointLoad(model.elements[itransfer[ielement]], newfrac, load.value)
-                    newload.loadID = load.loadID
-                    newload.id = load.id
-                    push!(newloads, newload)
-                end
-
-            else
-                push!(rmid, index)
-                itransfer = findfirst(elementids .== id)
-                newload = PointLoad(model.elements[itransfer], load.position, load.value)
-                newload.loadID = load.loadID
-                newload.id = load.id
-                push!(newloads, newload)
-            end
-
-        end
-
-    end
-
-    deleteat!(model.loads, sort!(unique!(rmid)))
-    model.loads = [model.loads; newloads]
-
-
-    # populating DOFs
-    populateDOF!(model)
-
-    populateLoads!(model)
-
-    Asap.globalS!(model)
-
-    model.processed = true
 end

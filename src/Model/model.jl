@@ -39,6 +39,7 @@ mutable struct Model <: AbstractModel
     u::Vector{Float64} # nodal displacements
     reactions::Vector{Float64} # reaction forces
     compliance::Float64 #structural compliance
+    tol::Float64
     processed::Bool
     
     function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:Load})
@@ -49,6 +50,7 @@ mutable struct Model <: AbstractModel
         makeids!(structure.loads)
 
         structure.processed = false
+        structure.tol = 1e-3
 
         return structure
     end
@@ -87,6 +89,7 @@ mutable struct TrussModel <: AbstractModel
     u::Vector{Float64} # nodal displacements
     reactions::Vector{Float64} # reaction forces
     compliance::Float64 #structural compliance
+    tol::Float64
     processed::Bool
     
     function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement}, loads::Vector{NodeForce})
@@ -97,6 +100,7 @@ mutable struct TrussModel <: AbstractModel
         makeids!(structure.loads)
 
         structure.processed = false
+        structure.tol = 1e-3
 
         return structure
     end

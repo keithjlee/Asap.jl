@@ -65,7 +65,7 @@ mutable struct LineLoad <: ElementLoad
     loadID::Int64
     id::Union{Symbol, Nothing}
 
-    function LineLoad(element::FrameElement, value::Vector{Float64})
+    function LineLoad(element::T, value::Vector{Float64}) where T <: FrameElement
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 

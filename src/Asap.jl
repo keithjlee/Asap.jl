@@ -49,17 +49,12 @@ export Model
 export TrussModel
 
 include("Model/preprocessing.jl")
+include("Model/bridgeprocessing.jl")
 include("Model/postprocessing.jl")
 include("Model/analysis.jl")
 export process!
 export solve!
 export solve
 
-# include("PostProcess/post.jl")
-# export Geometry
-# export GeometricElement
-# export GeometricNode
-# export GeometricLoad
-# export updateFactor!
 
 end 
