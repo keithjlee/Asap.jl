@@ -19,6 +19,11 @@ function Base.findall(elements::Vector{TrussElement}, i::Symbol)
     return findall([element.id == i for element in elements])
 end
 
+Base.length(element::AbstractElement) = norm(element.nodeEnd.position .- element.nodeStart.position)
+
+function length!(element::AbstractElement)
+    element.length = length(element)
+end
 
 """
     release!(element::Element, release::Symbol)
@@ -70,6 +75,30 @@ function lcs(element::AbstractElement, Ψ::Float64; tol = 0.001)
     end
 
     return [xvec, yvec, zvec]
+end
+
+"""
+Local coordinate system of element with roll angle
+"""
+function lcs!(element::AbstractElement, Ψ::Float64; tol = 0.001)
+
+    # local x vector
+    xvec = localx(element)
+    
+    if norm(cross(xvec, globalY)) < tol
+        CYx = xvec[2] #cosine to global Y axis
+        xvec = CYx * globalY
+        yvec = -CYx * globalX * cos(Ψ) + sin(Ψ) * globalZ
+        zvec = CYx * globalX * sin(Ψ) + cos(Ψ) * globalZ 
+    else
+        zbar = normalize(cross(xvec, [0, 1, 0]))
+        ybar = normalize(cross(zbar, xvec))
+
+        yvec = cos(Ψ) * ybar + sin(Ψ) * zbar
+        zvec = -sin(Ψ) * ybar + cos(Ψ) * zbar
+    end
+
+    element.LCS = [xvec, yvec, zvec]
 end
 
 

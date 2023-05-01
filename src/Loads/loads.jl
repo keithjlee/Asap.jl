@@ -60,12 +60,12 @@ end
 A distributed line load [wx, wy, wz] in (force/length) applied along an element in the global coordinate system.
 """
 mutable struct LineLoad <: ElementLoad
-    element::Element
+    element::FrameElement
     value::Vector{Float64}
     loadID::Int64
     id::Union{Symbol, Nothing}
 
-    function LineLoad(element::FrameElement, value::Vector{Float64})
+    function LineLoad(element::T, value::Vector{Float64}) where T <: FrameElement
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
@@ -83,7 +83,7 @@ A gravity load (negative global Z) applied along a member.
 Generates distributed load w = element.section.A * element.section.ρ * factor, where factor should be the appropriate acceleration due to gravity.
 """
 mutable struct GravityLoad <: ElementLoad
-    element::Element
+    element::FrameElement
     factor::Float64
     loadID::Int64
     id::Union{Symbol, Nothing}
@@ -102,7 +102,7 @@ end
 A point load [Px, Py, Pz] applied in the global coordinate system at a distance `position` × `element.length` from the starting node.
 """
 mutable struct PointLoad <: ElementLoad
-    element::Element
+    element::FrameElement
     position::Float64
     value::Vector{Float64}
     loadID::Int64

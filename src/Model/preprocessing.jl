@@ -11,23 +11,20 @@ function populateDOF!(model::Model)
     model.fixedDOFs = findall(.!model.DOFs)
 
     n_dof = 6
+    dofset = collect(0:n_dof-  1)
 
     # assign an id to node, extract global DOF index
-    for (i, node) in enumerate(model.nodes)
-        node.nodeID = i
-        node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof-  1)
+    @inbounds for (i, node) in enumerate(model.nodes)
+        node.globalID = i * n_dof - (n_dof - 1) .+ dofset
     end
 
     #assign an id to load, store load id into relevant node/element
-    for (i, load) in enumerate(model.loads)
-        load.loadID = i
-
+    @inbounds for load in model.loads
         assign!(load)
     end
 
     # assign an id to element, get associated node IDs, extract global DOF
-    for (i, element) in enumerate(model.elements)
-        element.elementID = i
+    @inbounds for element in model.elements
         element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
 
         idStart = element.nodeStart.globalID
@@ -51,20 +48,16 @@ function populateDOF!(model::TrussModel)
     model.fixedDOFs = findall(.!model.DOFs)
 
     n_dof = 3
-    for (i, node) in enumerate(model.nodes)
-        node.nodeID = i
+    @inbounds for (i, node) in enumerate(model.nodes)
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof - 1)
     end
 
-    for (i, load) in enumerate(model.loads)
-        load.loadID = i
-
+    @inbounds for load in model.loads
         assign!(load)
     end
 
-    for (i, element) in enumerate(model.elements)
+    @inbounds for element in model.elements
 
-        element.elementID = i
         element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
 
         idStart = element.nodeStart.globalID
@@ -83,7 +76,17 @@ function processElements!(model::Model)
         element.Q = zeros(12) # reset Qf
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
-        element.length = dist(element.nodeStart, element.nodeEnd)
+        element.length = length(element)
+        makeK!(element)
+    end
+end
+
+function processElements!(elements::Vector{<:FrameElement})
+    for element in elements
+        element.Q = zeros(12) # reset Qf
+        element.R = R(element)
+        element.LCS = lcs(element, element.Ψ)
+        element.length = length(element)
         makeK!(element)
     end
 end
@@ -95,7 +98,7 @@ function processElements!(model::TrussModel)
     for element in model.elements
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
-        element.length = dist(element.nodeStart, element.nodeEnd)
+        element.length = length(element)
         makeK!(element)
     end
 end
@@ -262,25 +265,3 @@ function globalS!(model::TrussModel)
 
     model.S = sparse(I, J, V)
 end
-
-"""
-process a network
-"""
-function process!(model::AbstractModel)
-
-    #global DOF 
-    populateDOF!(model)
-
-    #elements 
-    processElements!(model)
-
-    #loads
-    populateLoads!(model)
-
-    #stiffness matrix
-    globalS!(model)
-
-    #processing finished
-    model.processed = true
-end
-

@@ -139,13 +139,14 @@ mutable struct BridgeElement <: FrameElement
     section::Section
     release::Symbol
     Ψ::Float64
+    elementID::Int64
     id::Union{Symbol, Nothing}
     loadIDs::Vector{Int64}
 
     function BridgeElement(elementStart::Element, 
             posStart::Float64, 
             elementEnd::Element, 
-            posEnd::Element, 
+            posEnd::Float64, 
             section::Section,
             release::Symbol = :fixedfixed)
 

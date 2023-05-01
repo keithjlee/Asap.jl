@@ -1,4 +1,28 @@
 """
+process a network
+"""
+function process!(model::AbstractModel)
+
+    if any(typeof.(model.elements) .== BridgeElement)
+        processBridge!(model)
+    else
+        processElements!(model)
+    end
+
+    #global DOF 
+    populateDOF!(model)
+
+    #loads
+    populateLoads!(model)
+
+    #stiffness matrix
+    globalS!(model)
+
+    #processing finished
+    model.processed = true
+end
+
+"""
     solve!(model::AbstractModel; reprocess = false)
 
 Perform a structural analysis. `reprocess = true` re-generates the stiffness matrix and resets all saved solutions.
@@ -80,6 +104,10 @@ function solve!(model::Model, L::Vector{<:Load})
     model.loads = L
 
     # clear existing load associations
+    for node in model.nodes
+        empty!(node.loadIDs)
+    end
+
     for element in model.elements
         empty!(element.loadIDs)
     end
@@ -142,8 +170,8 @@ function solve!(model::TrussModel, L::Vector{NodeForce})
     model.loads = L
 
     # clear existing load associations
-    for element in model.elements
-        empty!(element.loadIDs)
+    for node in model.nodes
+        empty!(node.loadIDs)
     end
 
     # assign new load associations
