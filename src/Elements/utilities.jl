@@ -220,6 +220,12 @@ function B(y::Float64, x::Float64, L::Float64)
     return -y/L^2 .* [b1 b2 b3 b4]
 end
 
+
+const releaseMask = Dict(:fixedfixed => [1. 1. 1. 1.],
+    :freefixed => [1. 0. 1. 1.],
+    :fixedfree => [1. 1. 1. 0.],
+    :freefree => [1. 0. 1. 0.])
+
 """
     displacements(element::Element; n::Integer = 20)
 
