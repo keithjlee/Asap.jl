@@ -21,7 +21,8 @@ end
 shatterReleaseDict = Dict(:fixedfixed => (:fixedfixed, :fixedfixed),
     :freefixed => (:freefixed, :fixedfixed),
     :fixedfree => (:fixedfixed, :fixedfree),
-    :freefree => (:freefixed, :fixedfree))
+    :freefree => (:freefixed, :fixedfree),
+    :joist => (:freefixed, :fixedfree))
 
 function shatter!(model::Model, 
         n::Int64,

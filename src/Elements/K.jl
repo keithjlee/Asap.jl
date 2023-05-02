@@ -100,13 +100,35 @@ function k_freefree(element::Element)
     return E * A / L .* k
 end
 
-const releases::Vector{Symbol} = [:fixedfixed, :freefixed, :fixedfree, :freefree]
+function k_joist(element::Element)
+    E = element.section.E
+    A = element.section.A
+    L = element.length
+    G = element.section.G
+    J = element.section.J
+
+    k = E / L^3 .* [A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 G*J*L^2/E 0 0 0 0 0 -G*J*L^2/E 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0 ;
+        -A*L^2 0 0 0 0 0 A*L^2 0 0 0 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 -G*J*L^2/E 0 0 0 0 0 G*J*L^2/E 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0;
+        0 0 0 0 0 0 0 0 0 0 0 0    
+    ]
+end
+
+const releases::Vector{Symbol} = [:fixedfixed, :freefixed, :fixedfree, :freefree, :joist]
 
 const kDict = Dict(:fixedfixed => k_fixedfixed,
     :freefixed => k_freefixed,
     :fixedfree => k_fixedfree,
     :freefree => k_freefree,
-    :truss => k_freefree)
+    :joist => k_joist)
 
 """
 make elemental stiffness matrix in GCS

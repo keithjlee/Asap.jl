@@ -163,7 +163,7 @@ v_y(x) = N × u_xy (translational displacement in local Y at point x)
 """
 function N(x::Float64, L::Float64)
     n1 = 1 - 3(x/L)^2 + 2(x/L)^3
-    n2 = x*(1 - x/L)^2
+    n2 = x * (1 - x/L)^2
     n3 = 3(x/L)^2 - 2(x/L)^3
     n4 = x^2/L * (-1 + x/L)
 
@@ -224,7 +224,8 @@ end
 const releaseMask = Dict(:fixedfixed => [1. 1. 1. 1.],
     :freefixed => [1. 0. 1. 1.],
     :fixedfree => [1. 1. 1. 0.],
-    :freefree => [1. 0. 1. 0.])
+    :freefree => [1. 0. 1. 0.],
+    :joist => [1. 0. 1. 0.])
 
 """
     displacements(element::Element; n::Integer = 20)
@@ -247,7 +248,7 @@ function displacements(element::Element; n::Integer = 20)
     # discretizing length of element
     xrange = range(0, L, n)
     mask = releaseMask[element.release]
-
+    mask = releaseMask[:freefree]
     [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
         @inbounds hcat([N(x, L) .* mask * uY for x in xrange]...);
         @inbounds hcat([N(x, L) .* mask * uZ for x in xrange]...)]

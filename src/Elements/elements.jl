@@ -93,7 +93,7 @@ mutable struct Element <: FrameElement
 
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol)
 
-        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :truss"
+        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
         element = new(section)
 
@@ -110,7 +110,7 @@ mutable struct Element <: FrameElement
 
     function Element(nodeStart::Node, nodeEnd::Node, section::Section, release::Symbol)
 
-        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :truss"
+        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
         element = new(section)
         element.nodeStart = nodeStart
