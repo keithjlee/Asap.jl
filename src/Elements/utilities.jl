@@ -3,11 +3,11 @@ Extract all elements with a given ID
 elements = Vector{Element}()
 elements[:outerEdges]
 """
-function Base.getindex(elements::Vector{Element}, i::Symbol)
+function Base.getindex(elements::Vector{<:AbstractElement}, i::Symbol)
     return [element for element in elements if element.id == i]
 end
 
-function Base.findall(elements::Vector{Element}, i::Symbol)
+function Base.findall(elements::Vector{<:AbstractElement}, i::Symbol)
     return findall([element.id == i for element in elements])
 end
 
@@ -249,8 +249,12 @@ function displacements(element::Element; n::Integer = 20)
     mask = releaseMask[element.release]
 
     [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
-        @inbounds hcat([N(x, L) .* releaseMask * uY for x in xrange]...);
-        @inbounds hcat([N(x, L) .* releaseMask * uZ for x in xrange]...)]
+        @inbounds hcat([N(x, L) .* mask * uY for x in xrange]...);
+        @inbounds hcat([N(x, L) .* mask * uZ for x in xrange]...)]
+
+    # [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
+    #     @inbounds hcat([N(x, L) * uY for x in xrange]...);
+    #     @inbounds hcat([N(x, L) * uZ for x in xrange]...)]
 end
 
 
