@@ -3,11 +3,11 @@ Extract all elements with a given ID
 elements = Vector{Element}()
 elements[:outerEdges]
 """
-function Base.getindex(elements::Vector{Element}, i::Symbol)
+function Base.getindex(elements::Vector{<:AbstractElement}, i::Symbol)
     return [element for element in elements if element.id == i]
 end
 
-function Base.findall(elements::Vector{Element}, i::Symbol)
+function Base.findall(elements::Vector{<:AbstractElement}, i::Symbol)
     return findall([element.id == i for element in elements])
 end
 
@@ -220,6 +220,12 @@ function B(y::Float64, x::Float64, L::Float64)
     return -y/L^2 .* [b1 b2 b3 b4]
 end
 
+
+const releaseMask = Dict(:fixedfixed => [1. 1. 1. 1.],
+    :freefixed => [1. 0. 1. 1.],
+    :fixedfree => [1. 1. 1. 0.],
+    :freefree => [1. 0. 1. 0.])
+
 """
     displacements(element::Element; n::Integer = 20)
 
@@ -240,10 +246,15 @@ function displacements(element::Element; n::Integer = 20)
 
     # discretizing length of element
     xrange = range(0, L, n)
+    mask = releaseMask[element.release]
 
     [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
-        @inbounds hcat([N(x, L) * uY for x in xrange]...);
-        @inbounds hcat([N(x, L) * uZ for x in xrange]...)]
+        @inbounds hcat([N(x, L) .* mask * uY for x in xrange]...);
+        @inbounds hcat([N(x, L) .* mask * uZ for x in xrange]...)]
+
+    # [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
+    #     @inbounds hcat([N(x, L) * uY for x in xrange]...);
+    #     @inbounds hcat([N(x, L) * uZ for x in xrange]...)]
 end
 
 
