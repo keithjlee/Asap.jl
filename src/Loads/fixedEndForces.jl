@@ -172,13 +172,13 @@ function Q_freefree(load::Load)
     return [FAb, 
         FSby - factor*(FMbz + FMez),
         FSbz + factor*(FMby + FMey),
-        0,
+        FTb,
         0,
         0,
         FAe,
         FSey + factor*(FMbz + FMez),
         FSez - factor*(FMby + FMey),
-        0,
+        FTe,
         0,
         0]
 end
@@ -196,7 +196,8 @@ Map of release to proper Q function
 qDict = Dict(:fixedfixed => Q_fixedfixed,
     :freefixed => Q_freefixed,
     :fixedfree => Q_fixedfree,
-    :freefree => Q_freefree)
+    :freefree => Q_freefree,
+    :joist => Q_freefree)
 
 """
 Generate the fixed-end forces for a given load type
