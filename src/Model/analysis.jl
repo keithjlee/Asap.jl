@@ -1,13 +1,30 @@
 """
 process a network
 """
-function process!(model::AbstractModel)
+function process!(model::Model)
 
     if any(typeof.(model.elements) .== BridgeElement)
         processBridge!(model)
     else
         processElements!(model)
     end
+
+    #global DOF 
+    populateDOF!(model)
+
+    #loads
+    populateLoads!(model)
+
+    #stiffness matrix
+    globalS!(model)
+
+    #processing finished
+    model.processed = true
+end
+
+function process!(model::TrussModel)
+
+    processElements!(model)
 
     #global DOF 
     populateDOF!(model)
