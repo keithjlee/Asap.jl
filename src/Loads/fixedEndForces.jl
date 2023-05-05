@@ -183,6 +183,27 @@ function Q_freefree(load::Load)
         0]
 end
 
+function Q_joist(load::Load)
+    #length of element
+    factor = 1 / load.element.length
+    #fixed end components
+    FAb, FSby, FSbz, FTb, FMby, FMbz, FAe, FSey, FSez, FTe, FMey, FMez = Qlocal(load)
+
+    #modified fixed end forces
+    return [FAb, 
+        FSby,
+        FSbz,
+        FTb,
+        0,
+        0,
+        FAe,
+        FSey,
+        FSez,
+        FTe,
+        0,
+        0]
+end
+
 """
 Fixed-fixed Qf
 """
