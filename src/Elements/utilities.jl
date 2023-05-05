@@ -221,40 +221,47 @@ function B(y::Float64, x::Float64, L::Float64)
 end
 
 
-const releaseMask = Dict(:fixedfixed => [1. 1. 1. 1.],
-    :freefixed => [1. 0. 1. 1.],
-    :fixedfree => [1. 1. 1. 0.],
-    :freefree => [1. 0. 1. 0.],
-    :joist => [1. 0. 1. 0.])
+const releaseMask = Dict(:fixedfixed => [1., 1., 1., 1.],
+    :freefixed => [1., 0., 1., 1.],
+    :fixedfree => [1., 1., 1., 0.],
+    :freefree => [1., 0., 1., 0.],
+    :joist => [1., 0., 1., 0.])
 
 """
     displacements(element::Element; n::Integer = 20)
 
 Get the [3 × n] matrix where each column represents the local [x,y,z] displacement of the element from end forces
 """
-function displacements(element::Element; n::Integer = 20)
+function localdisplacements(element::Element; n::Integer = 20)
 
     # base properties
     ulocal = element.R * [element.nodeStart.displacement; element.nodeEnd.displacement]
-    # d = [element.nodeStart.dof; element.nodeEnd.dof]
-    # ulocal[.!d] .= 0
     L = element.length
+
+    # masking
+    mask = releaseMask[element.release]
 
     # extracting relevant nodal DOFs
     uX = ulocal[[1, 7]]
-    uY = ulocal[[2, 6, 8, 12]]
-    uZ = ulocal[[3, 5, 9, 11]] .* [1, -1, 1, -1]
+    uY = ulocal[[2, 6, 8, 12]] .* mask
+    uZ = ulocal[[3, 5, 9, 11]] .* [1, -1, 1, -1] .* mask
 
     # discretizing length of element
     xrange = range(0, L, n)
     mask = releaseMask[element.release]
-    [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
-        @inbounds hcat([N(x, L) .* mask * uY for x in xrange]...);
-        @inbounds hcat([N(x, L) .* mask * uZ for x in xrange]...)]
+
+    nA = vcat(Naxial.(xrange, L)...)
+    nT = vcat(N.(xrange, L)...)
+
+    dx = nA * uX
+    dy = nT * uY
+    dz = nT * uZ
+
+    [dx' ; dy' ; dz']
 
     # [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
-    #     @inbounds hcat([N(x, L) * uY for x in xrange]...);
-    #     @inbounds hcat([N(x, L) * uZ for x in xrange]...)]
+    #     @inbounds hcat([N(x, L) .* mask * uY for x in xrange]...);
+    #     @inbounds hcat([N(x, L) .* mask * uZ for x in xrange]...)]
 end
 
 
@@ -264,13 +271,19 @@ end
 Generate a [3 × n] matrix whose columns describe the displaced shape of an element with a displacement scale factor of `factor`
 """
 function displacedshape(element::Element; factor::Real = 1, n::Integer = 20)
-    Δ = displacements(element; n = n)
+    ΔLCS = localdisplacements(element; n = n)
+    ΔGCS = hcat([sum(Δ .* element.LCS) for Δ in eachcol(ΔLCS)]...)
+
+    # xlocal = first(element.LCS)
+
+    # xinc = xlocal * range(0, element.length, n)'
+    # xinc .+ factor .* Δ
+
+    # init = element.nodeStart.position
 
     xlocal = first(element.LCS)
+    xinc = xlocal * range(0, element.length, n)'
 
-    init = element.nodeStart.position
-
-    inc = range(0, element.length, n)
-
-    hcat([init .+ xlocal .* i .+ factor .* sum(disp .* element.LCS) for (i, disp) in zip(inc, eachcol(Δ))]...)
+    element.nodeStart.position .+ xinc .+ factor .* ΔGCS
+    # hcat([init .+ xlocal .* i .+ factor .* sum(disp .* element.LCS) for (i, disp) in zip(inc, eachcol(Δ))]...)
 end
