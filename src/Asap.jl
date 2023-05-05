@@ -56,5 +56,8 @@ export process!
 export solve!
 export solve
 
+# FORCE DENSITY METHOD
+include("FDM/FDM.jl")
+
 
 end 
