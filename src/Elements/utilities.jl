@@ -243,7 +243,7 @@ function displacements(element::Element; n::Integer = 20)
     # extracting relevant nodal DOFs
     uX = ulocal[[1, 7]]
     uY = ulocal[[2, 6, 8, 12]]
-    uZ = ulocal[[3, 5, 9, 11]]
+    uZ = ulocal[[3, 5, 9, 11]] .* [1, -1, 1, -1]
 
     # discretizing length of element
     xrange = range(0, L, n)
