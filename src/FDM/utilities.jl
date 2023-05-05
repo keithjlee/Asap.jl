@@ -61,7 +61,7 @@ end
 """
 Repopulate network with new q values
 """
-function qUpdate!(network::Network, q::Union{Vector{Float64}, Vector{Int64}})
+function qUpdate!(network::Network, q::Vector{<:Real})
     if length(network.elements) != length(q)
         error("Number of elements and q must be equal.")
     end
@@ -74,7 +74,7 @@ function qUpdate!(network::Network, q::Union{Vector{Float64}, Vector{Int64}})
 end
 
 #single value
-function qUpdate!(network::Network, q::Union{Float64, Int64})
+function qUpdate!(network::Network, q::Real)
     for element in network.elements
         element.q = q
     end
@@ -83,7 +83,7 @@ function qUpdate!(network::Network, q::Union{Float64, Int64})
 end
 
 #by id
-function qUpdate!(network::Network, q::Union{Float64, Int64}, id::Symbol)
+function qUpdate!(network::Network, q::Real, id::Symbol)
     for element in network.elements[id]
         element.q = q
     end
@@ -95,7 +95,7 @@ end
 Get initial lengths for form finding;
 assumes units of E, A are consistent with L
 """
-function initialLengths(network::Network, E::Union{Float64, Int64}, A::Union{Float64, Int64})
+function initialLengths(network::Network, E::Real, A::Real)
     n = length(network.elements) #number of elements
     Id = I(n) #identity matrix n × n
     Em = E * Id #diagonal matrix of stiffness, E
@@ -108,7 +108,7 @@ end
 """
 Initial length method for varying section properties
 """
-function initialLengths(network::Network, E::Union{Vector{Float64}, Vector{Int64}}, A::Union{Vector{Float64}, Vector{Int64}})
+function initialLengths(network::Network, E::Vector{<:Real}, A::Vector{<:Real})
     n = length(network.elements)
 
     # make sure material property vectors are the same

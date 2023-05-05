@@ -182,7 +182,7 @@ end
 """
 update nodal positions
 """
-function vec2node!(vec::Union{Vector{Int64}, Vector{Float64}}, node::FDMnode)
+function vec2node!(vec::Vector{<:Real}, node::FDMnode)
     node.x, node.y, node.z = vec
 end
 
