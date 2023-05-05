@@ -248,7 +248,6 @@ function displacements(element::Element; n::Integer = 20)
     # discretizing length of element
     xrange = range(0, L, n)
     mask = releaseMask[element.release]
-    mask = releaseMask[:freefree]
     [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
         @inbounds hcat([N(x, L) .* mask * uY for x in xrange]...);
         @inbounds hcat([N(x, L) .* mask * uZ for x in xrange]...)]
