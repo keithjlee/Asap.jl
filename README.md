@@ -1,14 +1,10 @@
-# aSAP: (another) Structural Analysis Package
+# aSAP
+aSAP is...
+- the anti-SAP2000
+- results as soon as possible
+- a structural analysis package
 
-For when you want to know what's going on in your structure as soon as possible. Designed for ease of querying, performance, and information-rich data structures.
-
-Below is a truss model of moderate scale (~684 elements), parsed and analyzed in 7ms.
-![](READMEassets/truss.png)
-
-Below is a much more complex frame model (~23040 elements), parsed and analyzed in under 5s.
-![](READMEassets/biosphere.png)
-
-Note that these times are extreme upper bounds for direct CPU solves, where the structure of the sparse stiffness matrix is yet unknown. Subsequent solves to new external forces are ~.1ms and ~.2s respectively.
+Designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
 
 A small 3D frame example:
 
@@ -60,3 +56,4 @@ solve!(model)
 @show n2.reaction
 
 ```
+
