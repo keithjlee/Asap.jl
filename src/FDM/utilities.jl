@@ -62,9 +62,7 @@ end
 Repopulate network with new q values
 """
 function qUpdate!(network::Network, q::Vector{<:Real})
-    if length(network.elements) != length(q)
-        error("Number of elements and q must be equal.")
-    end
+    @assert length(network.elements) == length(q) "Number of elements and q must be equal"
 
     for (i, element) in enumerate(network.elements)
         element.q = q[i]
@@ -96,6 +94,7 @@ Get initial lengths for form finding;
 assumes units of E, A are consistent with L
 """
 function initialLengths(network::Network, E::Real, A::Real)
+    
     n = length(network.elements) #number of elements
     Id = I(n) #identity matrix n × n
     Em = E * Id #diagonal matrix of stiffness, E

@@ -7,6 +7,7 @@ mutable struct FDMnode
     z::Real
     dof::Bool # true = free; false = fixed
     id::Union{Symbol, Nothing}
+    nodeID::Integer
 
     #empty constructor
     function FDMnode()
@@ -20,11 +21,9 @@ mutable struct FDMnode
 
     # using a vector to represent position
     function FDMnode(pos::Vector{<:Real}, dof::Bool)
-        if length(pos) != 3
-            error("pos should be length 3.")
-        else
-            return new(pos..., dof, nothing)
-        end
+        @assert length(pos) == 3 "pos should be length 3"
+        
+        return new(pos..., dof, nothing)
     end
 
     #with an id
@@ -33,11 +32,9 @@ mutable struct FDMnode
     end
 
     function FDMnode(pos::Vector{<:Real}, dof::Bool, id::Symbol)
-        if length(pos) != 3
-            error("pos should be length 3.")
-        else
-            return new(pos..., dof, id)
-        end
+        @assert length(pos) == 3 "pos should be length 3"
+
+        return new(pos..., dof, id)
     end
 end
 
@@ -51,6 +48,7 @@ mutable struct FDMelement
     iEnd::Int64 #index of end point in vector of points
     q::Float64 #force density
     id::Union{Symbol, Nothing}
+    elementID::Integer
 
     function FDMelement(points::Vector{FDMnode}, iStart::Int64, iEnd::Int64, q::Real; id = nothing)
         element = new(points[iStart], iStart, points[iEnd], iEnd, Float64(q), id)
@@ -72,12 +70,10 @@ mutable struct FDMload
     force::Vector{<:Real} # force vector
 
     function Load(points::Vector{FDMnode}, i::Int64, force::Vector{<:Real})
-        if length(force) != 3
-            error("Force vector should be length 3.")
-        else
-            load = new(points[i], i, force)
-            return load
-        end
+        @assert length(force) == 3 "Force vector should be length 3"
+
+        load = new(points[i], i, force)
+        return load
     end
 end
 

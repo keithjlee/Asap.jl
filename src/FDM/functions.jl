@@ -120,10 +120,8 @@ end
 Solve w/r/t q ...
 """
 function solve(network::Network, q::Union{Vector{Int64}, Vector{Float64}})
-    
-    if length(q) != length(network.elements)
-        error("q and elements must have equal length")
-    end
+
+    @assert length(q) == length(network.elements) "q and elements must have equal length"
 
     Q = spdiagm(q)
 
