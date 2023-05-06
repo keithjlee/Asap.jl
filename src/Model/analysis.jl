@@ -127,6 +127,7 @@ function solve!(model::Model, L::Vector{<:Load})
 
     for element in model.elements
         empty!(element.loadIDs)
+        element.Q = similar(element.Q)
     end
 
     # assign new load associations
