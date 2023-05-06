@@ -183,6 +183,25 @@ function Q_freefree(load::Load)
         0]
 end
 
+function Q_joist(load::Load)
+    #fixed end components
+    FAb, FSby, FSbz, FTb, FMby, FMbz, FAe, FSey, FSez, FTe, FMey, FMez = Qlocal(load)
+
+    #modified fixed end forces
+    return [FAb, 
+        FSby,
+        FSbz,
+        FTb,
+        0,
+        0,
+        FAe,
+        FSey,
+        FSez,
+        FTe,
+        0,
+        0]
+end
+
 """
 Fixed-fixed Qf
 """
@@ -197,7 +216,7 @@ qDict = Dict(:fixedfixed => Q_fixedfixed,
     :freefixed => Q_freefixed,
     :fixedfree => Q_fixedfree,
     :freefree => Q_freefree,
-    :joist => Q_freefree)
+    :joist => Q_joist)
 
 """
 Generate the fixed-end forces for a given load type

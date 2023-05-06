@@ -47,8 +47,12 @@ Available boundary conditions:
 - :(x/y/z)free
 - :(x/y/z)fixed
 """
-function fixnode!(node::AbstractNode, fixity::Symbol)
+function fixnode!(node::Node, fixity::Symbol)
     node.dof = copy(fixDict[fixity])
+end
+
+function fixnode!(node::TrussNode, fixity::Symbol)
+    node.dof = copy((fixDict[fixity])[1:3])
 end
 
 """
