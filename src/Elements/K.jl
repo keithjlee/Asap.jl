@@ -122,12 +122,13 @@ function k_joist(element::Element)
     ]
 end
 
-const releases::Vector{Symbol} = [:fixedfixed, :freefixed, :fixedfree, :freefree, :joist]
+const releases::Vector{Symbol} = [:fixedfixed, :freefixed, :fixedfree, :freefree, :joist, :truss]
 
 const kDict = Dict(:fixedfixed => k_fixedfixed,
     :freefixed => k_freefixed,
     :fixedfree => k_fixedfree,
     :freefree => k_freefree,
+    :truss => k_freefree,
     :joist => k_joist)
 
 """
