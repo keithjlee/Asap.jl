@@ -8,6 +8,7 @@ mutable struct FDMnode
     dof::Bool # true = free; false = fixed
     id::Union{Symbol, Nothing}
     nodeID::Integer
+    reaction::Vector{Float64}
 
     #empty constructor
     function FDMnode()
@@ -69,7 +70,7 @@ mutable struct FDMload
     index::Int64 # position of point in vector of points
     force::Vector{<:Real} # force vector
 
-    function Load(points::Vector{FDMnode}, i::Int64, force::Vector{<:Real})
+    function FDMload(points::Vector{FDMnode}, i::Int64, force::Vector{<:Real})
         @assert length(force) == 3 "Force vector should be length 3"
 
         load = new(points[i], i, force)
@@ -83,7 +84,7 @@ An FDM network with all relevant information for analysis
 mutable struct Network
     nodes::Vector{FDMnode} #vector of nodes
     elements::Vector{FDMelement} #vector of elements
-    loads::Vector{Load} #vector of loads
+    loads::Vector{FDMload} #vector of loads
     q::Vector{<:Real} #vector of force densities
     Q::SparseMatrixCSC{Float64, Int64} #diagm(q)
     C::SparseMatrixCSC{Int64, Int64} #branch node matrix
@@ -96,7 +97,7 @@ mutable struct Network
     xyz::Union{Matrix{Int64}, Matrix{Float64}} #xyz matrix of initial positions
     processed::Bool
 
-    function Network(nodes::Vector{FDMnode}, elements::Vector{FDMelement}, loads::Vector{Load}; copy = false)
+    function Network(nodes::Vector{FDMnode}, elements::Vector{FDMelement}, loads::Vector{FDMload}; copy = false)
         if copy
             network = new(deepcopy(nodes), deepcopy(elements), deepcopy(loads))
         else

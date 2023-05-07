@@ -1,7 +1,7 @@
 include("types.jl")
 export FDMnode
 export FDMelement
-export Load
+export FDMload
 export Network
 
 include("functions.jl")

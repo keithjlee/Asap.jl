@@ -11,7 +11,7 @@ end
 """
 Extracts the indices of free (N) and fixed (F) nodes
 """
-function NF(d::Vector{Bool})
+function NF(d::Union{Vector{Bool}, BitVector})
     return findall(d), findall(.!d)
 end
 
@@ -113,7 +113,7 @@ function solve!(network::Network; reprocess = false)
     network.xyz[network.N, :] = (network.Cn' * network.Q * network.Cn) \ (network.Pn - network.Cn' * network.Q * network.Cf * network.xyz[network.F, :])
 
     # update nodal positions
-    xyzupdate(network)
+    xyzupdate!(network)
 end
 
 """
@@ -134,7 +134,7 @@ end
 """
 Extracts force density vector (q) from elements
 """
-function forcedensities(elements::Vector{Element})
+function forcedensities(elements::Vector{FDMelement})
     getproperty.(elements, :q)
 end
 
@@ -143,13 +143,13 @@ Extracts q from elements and populates network fields
 """
 function forcedensities!(network::Network)
     network.q = forcedensities(network.elements)
-    network.Q = spdiagm(q)
+    network.Q = spdiagm(network.q)
 end
 
 """
 Creates the branch-node connectivity matrix C
 """
-function branchmatrix(elements::Vector{Element}, points::Vector{FDMnode})
+function branchmatrix(elements::Vector{FDMelement}, points::Vector{FDMnode})
 
     #initialize
     c = spzeros(Int64, length(elements), length(points))
@@ -187,7 +187,7 @@ end
 """
 applied to network
 """
-function xyzupdate(network::Network)
+function xyzupdate!(network::Network)
     for index in network.N
         vec2node!(network.xyz[index, :], network.nodes[index])
     end

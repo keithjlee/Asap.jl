@@ -5,11 +5,19 @@ function dist(a::FDMnode, b::FDMnode)
     return sqrt((a.x - b.x)^2 + (a.y - b.y)^2 + (a.z - b.z)^2)
 end
 
+function position(node::FDMnode)
+    return [node.x, node.y, node.z]
+end
+
 """
 Extract member forces
 """
 function memberForces(network::Network)
     return norm.(eachrow(network.C * network.xyz)) .* network.q
+end
+
+function force(element::FDMelement)
+    return dist(element.pStart, element.pEnd) * element.q
 end
 
 """
@@ -120,4 +128,36 @@ function initialLengths(network::Network, E::Vector{<:Real}, A::Vector{<:Real})
     L = spdiagm(memberLengths(network))
 
     return diag((Id + (Em * Am) \ network.Q * L) \ Id)
+end
+
+function vector(element::FDMelement; unit = true)
+    vec = position(element.pEnd) - position(element.pStart)
+
+    unit ? normalize(vec) : vec
+end
+
+function reactions!(network::Network)
+    
+    for i in network.F
+
+        rxn = zeros(3)
+        
+        node = network.nodes[i]
+        
+        iels = findall(network.C[:, i] .!= 0)
+
+        for index in iels
+            e = network.elements[index]
+            eforce = vector(e) * force(e)
+
+            if network.C[index, i] < 0
+                rxn .+= eforce
+            else
+                rxn .-= eforce
+            end
+        end
+
+        node.reaction = rxn
+    end
+
 end
