@@ -55,6 +55,7 @@ include("Model/analysis.jl")
 export process!
 export solve!
 export solve
+export connectivity
 
 # FORCE DENSITY METHOD
 include("FDM/FDM.jl")

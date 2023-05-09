@@ -25,6 +25,16 @@ mutable struct NodeForce <: NodeLoad
 
         return force
     end
+
+    function NodeForce(nodes::Vector{<:AbstractNode}, index::Integer, value::Vector{Float64})
+
+        @assert length(value) == 3 "load vector must be in R³ (GCS)"
+
+        force = new(nodes[index], value)
+        force.id = nothing
+
+        return force
+    end
 end
 
 """
