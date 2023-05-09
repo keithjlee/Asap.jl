@@ -3,7 +3,7 @@ populate global DOF indices of nodes and elements
 """
 function populateDOF!(model::Model)
 
-    model.DOFs = vcat([node.dof for node in model.nodes]...)
+    model.DOFs = vcat(getproperty.(model.nodes, :dof)...)
     model.nDOFs = length(model.DOFs)
     model.nNodes = length(model.nodes)
     model.nElements = length(model.elements)
@@ -40,7 +40,7 @@ populate global DOF indices of nodes and elements
 """
 function populateDOF!(model::TrussModel)
 
-    model.DOFs = vcat([node.dof for node in model.nodes]...)
+    model.DOFs = vcat(getproperty.(model.nodes, :dof)...)
     model.nDOFs = length(model.DOFs)
     model.nNodes = length(model.nodes)
     model.nElements = length(model.elements)

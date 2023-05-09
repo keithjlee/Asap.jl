@@ -47,6 +47,7 @@ include("Model/model.jl")
 include("Model/utilities.jl")
 export Model
 export TrussModel
+export updateDOF!
 
 include("Model/preprocessing.jl")
 include("Model/bridgeprocessing.jl")

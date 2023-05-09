@@ -27,3 +27,14 @@ Generate the (nₙ × 3) node position matrix
 function nodePositions(model::AbstractModel)
     return vcat([node.position' for node in model.nodes]...)
 end
+
+"""
+    updateDOF!(model::AbstractModel)
+
+Update the free/fixed degrees of freedom for a model
+"""
+function updateDOF!(model::AbstractModel)
+    model.DOFs = vcat(getproperty.(model.nodes, :dof)...)
+    model.freeDOFs = findall(model.DOFs)
+    model.fixedDOFs = findall(.!model.DOFs)
+end
