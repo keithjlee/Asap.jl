@@ -24,7 +24,7 @@ mutable struct FDMnode
     function FDMnode(pos::Vector{<:Real}, dof::Bool)
         @assert length(pos) == 3 "pos should be length 3"
         
-        return new(pos..., dof)
+        return FDMnode(pos..., dof)
     end
 
     #with an id
