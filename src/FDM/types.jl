@@ -17,14 +17,14 @@ mutable struct FDMnode
 
     # individual coordinate basis
     function FDMnode(x::Real, y::Real, z::Real, dof::Bool)
-        return new(x, y, z, dof, nothing)
+        return new(x, y, z, dof)
     end
 
     # using a vector to represent position
     function FDMnode(pos::Vector{<:Real}, dof::Bool)
         @assert length(pos) == 3 "pos should be length 3"
         
-        return new(pos..., dof, nothing)
+        return new(pos..., dof)
     end
 
     #with an id
