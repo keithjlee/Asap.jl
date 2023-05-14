@@ -123,7 +123,7 @@ Define a point load acting on an element at a parameterized (from 0 to 1) distan
 PointLoad(element::Element, position::Float64, value::Vector{<:Real})
 ```
 
-Define as many elements as you like, and collect them in a vector:
+Define as many loads as you like, and collect them in a vector:
 ```julia
 loads = [load1, load2, ...]
 ```
