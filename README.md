@@ -108,7 +108,7 @@ NodeForce(node::Node, value::Vector{<:Real})
 ### `NodeMoment`
 Define a moment acting at a node in the global X,Y,Z axes \[Force×Distance, Force×Distance, Force×Distance]
 ```julia
-NodeForce(node::Node, value::Vector{<:Real})
+NodeMoment(node::Node, value::Vector{<:Real})
 ```
 
 ### `LineLoad`
