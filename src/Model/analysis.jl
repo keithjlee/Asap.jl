@@ -47,6 +47,15 @@ Perform a structural analysis. `reprocess = true` re-generates the stiffness mat
 function solve!(model::Model; reprocess = false)
 
     if !model.processed || reprocess
+        # clear existing load associations
+        for node in model.nodes
+            empty!(node.loadIDs)
+        end
+
+        for element in model.elements
+            empty!(element.loadIDs)
+            element.Q = zero(element.Q)
+        end
         process!(model)
     end
 
@@ -70,6 +79,11 @@ end
 function solve!(model::TrussModel; reprocess = false)
 
     if !model.processed || reprocess
+        # clear existing load associations
+        for node in model.nodes
+            empty!(node.loadIDs)
+        end
+    
         process!(model)
     end
 
