@@ -16,7 +16,7 @@ mutable struct Section <: AbstractSection
     Explicitly define section parameters
     """
     function Section(A::Float64, E::Float64, G::Float64, Izz::Float64, Iyy::Float64, J::Float64)
-        println("Density ρ not provided, defaults to ρ = 1; self-weight analysis will not function")
+        # println("Density ρ not provided, defaults to ρ = 1; self-weight analysis will not function")
         return new(A, E, G, Izz, Iyy, J, 1.)
     end
 
@@ -38,7 +38,7 @@ mutable struct TrussSection <: AbstractSection
     ρ::Float64
 
     function TrussSection(A::Float64, E::Float64)
-        println("Density ρ not provided, defaults to ρ = 1; self-weight analysis will not function")
+        # println("Density ρ not provided, defaults to ρ = 1; self-weight analysis will not function")
         return new(A, E, 1.)
     end
 
