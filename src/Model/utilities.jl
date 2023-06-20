@@ -38,3 +38,12 @@ function updateDOF!(model::AbstractModel)
     model.freeDOFs = findall(model.DOFs)
     model.fixedDOFs = findall(.!model.DOFs)
 end
+
+"""
+    volume(model::AbstractModel)
+
+Get the material volume of a structural model
+"""
+function volume(model::AbstractModel)
+    dot(getproperty.(model.elements, :length), getproperty.(getproperty.(model.elements, :section), :A))
+end

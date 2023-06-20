@@ -48,6 +48,10 @@ include("Model/utilities.jl")
 export Model
 export TrussModel
 export updateDOF!
+export connectivity
+export nodePositions
+export volume
+
 
 include("Model/preprocessing.jl")
 include("Model/bridgeprocessing.jl")
