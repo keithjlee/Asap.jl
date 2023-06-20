@@ -144,146 +144,28 @@ function midpoint(element::AbstractElement)
 end
 
 """
-displacement function for the transverse translation and in-plane rotation for a GIVEN PLANE IN THE LCS OF AN ELEMENT:
+    axialforce(element::TrussElement)
 
-u_xy= [ v₁
-        θ₁
-        v₂
-        θ₂ ]
-
-IE for the local XY plane:
-
-v₁, v₂ are the start and end displacements in the local Y direction
-θ₁, θ₂ are the start and end rotations in the **local Z** direction (ie rotation in plane of local XY)
-
-Gives:
-
-v_y(x) = N × u_xy (translational displacement in local Y at point x)
-
+Extract the axial force of an element
 """
-function N(x::Float64, L::Float64)
-    n1 = 1 - 3(x/L)^2 + 2(x/L)^3
-    n2 = x * (1 - x/L)^2
-    n3 = 3(x/L)^2 - 2(x/L)^3
-    n4 = x^2/L * (-1 + x/L)
-
-    # n1 = 1 + 1 / L^3 * (-3L * x + 2x^3)
-    # n2 = x + 1 / L^2 * (-2L * x^2 + x^3)
-    # n3 = 1 / L^3 * (3L * x^2 - 2x^3)
-    # n4 = 1 / L^2 * (-L * x^2 + x^3)
-
-    return [n1 n2 n3 n4]
+function axialforce(element::TrussElement)
+    element.forces[2]
 end
 
 """
-Second derivative of (assumed cubic) shape function N, for use in calculating internal moments:
-
-M(x) = -EI d²v/dx² = -EI ⋅ (d²N/dx² × u_xy)
-
-Note that this is essentially useless as it reduces a cubic function into a linear one and thus cannot accurately decribe the moment across an element unless highly discretized.
-
-As such the third derivative (d³N/dx³) to determine internal Shear is also effectively useless as it will give a constant value across the entire section
+    axialforce(element::Element)
+    
+Extract the axial force of an element
 """
-function dN2(x::Float64, L::Float64)
-    # n1 = 1 - 3(x/L)^2 + 2(x/L)^3
-    # n2 = x*(1 - x/L)^2
-    # n3 = 3(x/L)^2 - 2(x/L)^3
-    # n4 = x^2/L * (-1 + x/L)
-
-    n1 = 1 / L^3 * (12x - 6L)
-    n2 = 1 / L^2 * (6x - 4L)
-    n3 = 1 / L^3 * (6L - 12x)
-    n4 = 1 / L^2 * (-2L + 6x)
-
-    return [n1 n2 n3 n4]
+function axialforce(element::Element)
+    element.forces[7]
 end
 
 """
-Axial displacement function: linear interpolation between start and end displacements
+    axialforce(elements::Vector{<:AbstractElement})
+
+Extract the axial forces from a vector of elements
 """
-function Naxial(x::Float64, L::Float64)
-    n1 = 1 - x/L
-    n2 = x / L
-
-    return [n1 n2]
-end
-
-"""
-stress function
-"""
-function B(y::Float64, x::Float64, L::Float64)
-    b1 = 6 * (-1 + 2 * x / L)
-    b2 = 2L * (-2 + 3 * x / L)
-    b3 = 6 * (1 - 2 * x / L)
-    b4 = 2L * (-1 + 3 * x / L)
-
-    return -y/L^2 .* [b1 b2 b3 b4]
-end
-
-
-const releaseMask = Dict(:fixedfixed => [1., 1., 1., 1.],
-    :freefixed => [1., 0., 1., 1.],
-    :fixedfree => [1., 1., 1., 0.],
-    :freefree => [1., 0., 1., 0.],
-    :joist => [1., 0., 1., 0.])
-
-"""
-    displacements(element::Element; n::Integer = 20)
-
-Get the [3 × n] matrix where each column represents the local [x,y,z] displacement of the element from end forces
-"""
-function localdisplacements(element::Element; n::Integer = 20)
-
-    # base properties
-    ulocal = element.R * [element.nodeStart.displacement; element.nodeEnd.displacement]
-    L = element.length
-
-    # masking
-    mask = releaseMask[element.release]
-
-    # extracting relevant nodal DOFs
-    uX = ulocal[[1, 7]]
-    uY = ulocal[[2, 6, 8, 12]] .* mask
-    uZ = ulocal[[3, 5, 9, 11]] .* [1, -1, 1, -1] .* mask
-
-    # discretizing length of element
-    xrange = range(0, L, n)
-    mask = releaseMask[element.release]
-
-    nA = vcat(Naxial.(xrange, L)...)
-    nT = vcat(N.(xrange, L)...)
-
-    dx = nA * uX
-    dy = nT * uY
-    dz = nT * uZ
-
-    [dx' ; dy' ; dz']
-
-    # [@inbounds hcat([Naxial(x, L) * uX for x in xrange]...);
-    #     @inbounds hcat([N(x, L) .* mask * uY for x in xrange]...);
-    #     @inbounds hcat([N(x, L) .* mask * uZ for x in xrange]...)]
-end
-
-
-"""
-    displacedshape(element::Element; factor::Real = 1, n::Integer = 20)
-
-Generate a [3 × n] matrix whose columns describe the displaced shape of an element with a displacement scale factor of `factor`
-"""
-function displacedshape(element::Element; factor::Real = 1, n::Integer = 20)
-    ΔLCS = localdisplacements(element; n = n)
-    ΔGCS = hcat([sum(Δ .* element.LCS) for Δ in eachcol(ΔLCS)]...)
-
-    # xlocal = first(element.LCS)
-
-    # xinc = xlocal * range(0, element.length, n)'
-    # xinc .+ factor .* Δ
-
-    # init = element.nodeStart.position
-
-    xlocal = first(element.LCS)
-    xinc = xlocal * range(0, element.length, n)'
-
-    element.nodeStart.position .+ xinc .+ factor .* ΔGCS
-    # hcat([init .+ xlocal .* i .+ factor .* sum(disp .* element.LCS) for (i, disp) in zip(inc, eachcol(Δ))]...)
+function axialforce(elements::Union{Vector{TrussElement}, Vector{Element}})
+    axialforce.(elements)
 end

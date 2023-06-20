@@ -32,7 +32,7 @@ export TrussElement
 export release!
 export endpoints
 export midpoint
-export displacedshape
+export axialforce
 
 include("Loads/loads.jl")
 include("Loads/utilities.jl")
