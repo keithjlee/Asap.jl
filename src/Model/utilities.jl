@@ -47,3 +47,38 @@ Get the material volume of a structural model
 function volume(model::AbstractModel)
     dot(getproperty.(model.elements, :length), getproperty.(getproperty.(model.elements, :section), :A))
 end
+
+function Base.copy(model::TrussModel)
+    
+    #new model
+    nodes = Vector{TrussNode}()
+    elements = Vector{TrussElement}()
+    loads = Vector{NodeForce}()
+
+    #new nodes
+    for node in model.nodes
+        newnode = TrussNode(node.position, node.dof)
+        newnode.id = node.id
+        push!(nodes, newnode)
+    end
+
+    #new elements
+    for element in model.elements
+        newelement = TrussElement(nodes, element.nodeIDs, element.section)
+        newelement.id = element.id
+        push!(elements, newelement)
+    end
+
+    #new loads
+    for load in model.loads
+        newload = NodeForce(nodes[load.node.nodeID], load.value)
+        newload.id = load.id
+        push!(loads, newload)
+    end
+
+    model = TrussModel(nodes, elements, loads)
+    solve!(model)
+
+    return model
+
+end
