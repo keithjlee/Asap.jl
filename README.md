@@ -1,3 +1,5 @@
+![](READMEassets/aSAP.png)
+
 # aSAP
 aSAP is...
 - the anti-SAP (2000)
