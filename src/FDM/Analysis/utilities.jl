@@ -2,7 +2,7 @@
 Get initial lengths for form finding;
 assumes units of E, A are consistent with L
 """
-function initialLengths(network::Network, E::Real, A::Real)
+function initial_lengths(network::Network, E::Real, A::Real)
     
     n = length(network.elements) #number of elements
     Id = I(n) #identity matrix n × n
@@ -16,7 +16,7 @@ end
 """
 Initial length method for varying section properties
 """
-function initialLengths(network::Network, E::Vector{<:Real}, A::Vector{<:Real})
+function initial_lengths(network::Network, E::Vector{<:Real}, A::Vector{<:Real})
     n = length(network.elements)
 
     # make sure material property vectors are the same
