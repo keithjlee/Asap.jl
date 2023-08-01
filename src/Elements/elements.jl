@@ -49,25 +49,25 @@ mutable struct Element <: FrameElement
     forces::Vector{Float64} #elemental forces in LCS
     id::Union{Symbol, Nothing} #optional identifier
 
-    function Element(section::Section, release::Symbol)
+    function Element(section::Section, release::Symbol, id = nothing)
         element = new(section)
         
         @assert in(release, releases)
 
         element.Ψ = pi/2
-        element.id = nothing
+        element.id = id
         element.Q = zeros(12)
         element.loadIDs = Vector{Int64}()
     end
 
     Element(section::Section) = Element(section, :fixedfixed)
 
-    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
+    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing)
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
         element.Ψ = pi/2
-        element.id = nothing
+        element.id = id
         element.Q = zeros(12)
         element.loadIDs = Vector{Int64}()
 
@@ -76,13 +76,13 @@ mutable struct Element <: FrameElement
         return element
     end
 
-    function Element(nodeStart::Node, nodeEnd::Node, section::Section)
+    function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing)
         element = new(section)
         element.nodeStart = nodeStart
         element.nodeEnd = nodeEnd
 
         element.Ψ = pi/2
-        element.id = nothing
+        element.id = id
         element.Q = zeros(12)
         element.loadIDs = Vector{Int64}()
 
@@ -91,7 +91,7 @@ mutable struct Element <: FrameElement
         return element
     end
 
-    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol)
+    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol, id = nothing)
 
         @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
@@ -99,7 +99,7 @@ mutable struct Element <: FrameElement
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
         element.Ψ = pi/2
-        element.id = nothing
+        element.id = id
         element.Q = zeros(12)
         element.loadIDs = Vector{Int64}()
 
@@ -108,7 +108,7 @@ mutable struct Element <: FrameElement
         return element
     end
 
-    function Element(nodeStart::Node, nodeEnd::Node, section::Section, release::Symbol)
+    function Element(nodeStart::Node, nodeEnd::Node, section::Section, release::Symbol, id = nothing)
 
         @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
@@ -117,7 +117,7 @@ mutable struct Element <: FrameElement
         element.nodeEnd = nodeEnd
 
         element.Ψ = pi/2
-        element.id = nothing
+        element.id = id
         element.Q = zeros(12)
         element.loadIDs = Vector{Int64}()
 
@@ -148,14 +148,15 @@ mutable struct BridgeElement <: FrameElement
             elementEnd::Element, 
             posEnd::Float64, 
             section::Section,
-            release::Symbol = :fixedfixed)
+            release::Symbol = :fixedfixed),
+            id = nothing
 
         @assert 0 < posStart < 1 && 0 < posEnd < 1 "posStart/End must be ∈ ]0,1["
         @assert in(release, releases)
 
         be = new(elementStart, posStart, elementEnd, posEnd, section, release)
         be.Ψ = pi/2
-        be.id = nothing
+        be.id = id
         be.loadIDs = Vector{Int64}()
 
         return be
@@ -191,22 +192,22 @@ mutable struct TrussElement <: AbstractElement
     LCS::Vector{Vector{Float64}}
     id::Union{Symbol, Nothing} #optional identifier
 
-    function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection)
+    function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = nothing)
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.id = nothing
+        element.id = id
 
         element.Ψ = pi/2
 
         return element
     end
 
-    function TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection)
+    function TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = nothing)
         element = new(section)
         element.nodeStart = nodeStart
         element.nodeEnd = nodeEnd
-        element.id = nothing
+        element.id = id
         element.Ψ = pi/2
 
         return element

@@ -38,18 +38,18 @@ mutable struct Node <: AbstractNode
     displacement::Vector{Float64}
     id::Union{Symbol, Nothing}
 
-    function Node(position::Vector{Float64}, dofs::Vector{Bool})
+    function Node(position::Vector{Float64}, dofs::Vector{Bool}, id = nothing)
         @assert length(position) == 3 && length(dofs) == 6 "Position vector must be in R³, DOFs must be length 6"
 
         node = new(position, dofs)
 
-        node.id = nothing
+        node.id = id
         node.loadIDs = Vector{Int64}()
 
         return node
     end
 
-    function Node(position::Vector{Float64}, fixity::Symbol)
+    function Node(position::Vector{Float64}, fixity::Symbol, id = nothing)
 
         @assert length(position) == 3 "Position vector must be in R³"
 
@@ -57,7 +57,7 @@ mutable struct Node <: AbstractNode
 
         node = new(position, dofs)
 
-        node.id = nothing
+        node.id = id
         node.loadIDs = Vector{Int64}()
 
         return node
@@ -101,7 +101,7 @@ mutable struct TrussNode <: AbstractNode
     displacement::Vector{Float64}
     id::Union{Symbol, Nothing}
 
-    function TrussNode(position::Vector{Float64}, dofs::Vector{Bool})
+    function TrussNode(position::Vector{Float64}, dofs::Vector{Bool}, id = nothing)
         
         @assert length(position) == length(dofs) == 3  "Position and dof vector must be in R³"
 
@@ -110,13 +110,13 @@ mutable struct TrussNode <: AbstractNode
         node.displacement = zeros(6)
         node.reaction = zeros(6)
 
-        node.id = nothing
+        node.id = id
         node.loadIDs = Vector{Int64}()
 
         return node
     end
 
-    function TrussNode(position::Vector{Float64}, fixity::Symbol)
+    function TrussNode(position::Vector{Float64}, fixity::Symbol, id = nothing)
         
         @assert length(position) == 3 "Position vector must be in R³"
 
@@ -127,7 +127,7 @@ mutable struct TrussNode <: AbstractNode
         node.displacement = zeros(3)
         node.reaction = zeros(3)
 
-        node.id = nothing
+        node.id = id
         node.loadIDs = Vector{Int64}()
 
         return node
