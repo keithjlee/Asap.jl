@@ -148,7 +148,7 @@ mutable struct BridgeElement <: FrameElement
             elementEnd::Element, 
             posEnd::Float64, 
             section::Section,
-            release::Symbol = :fixedfixed),
+            release::Symbol = :fixedfixed)
             id = nothing
 
         @assert 0 < posStart < 1 && 0 < posEnd < 1 "posStart/End must be ∈ ]0,1["
