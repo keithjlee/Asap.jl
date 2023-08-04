@@ -57,21 +57,21 @@ function Base.copy(model::TrussModel)
 
     #new nodes
     for node in model.nodes
-        newnode = TrussNode(node.position, node.dof)
+        newnode = TrussNode(copy(node.position), node.dof)
         newnode.id = node.id
         push!(nodes, newnode)
     end
 
     #new elements
     for element in model.elements
-        newelement = TrussElement(nodes, element.nodeIDs, element.section)
+        newelement = TrussElement(nodes, copy(element.nodeIDs), element.section)
         newelement.id = element.id
         push!(elements, newelement)
     end
 
     #new loads
     for load in model.loads
-        newload = NodeForce(nodes[load.node.nodeID], load.value)
+        newload = NodeForce(nodes[load.node.nodeID], copy(load.value))
         newload.id = load.id
         push!(loads, newload)
     end

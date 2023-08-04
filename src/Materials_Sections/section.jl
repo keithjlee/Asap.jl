@@ -3,7 +3,7 @@ abstract type AbstractSection end
 """
 Define a full cross section
 """
-mutable struct Section <: AbstractSection
+struct Section <: AbstractSection
     A::Float64 # area
     E::Float64 # young's modulus
     G::Float64 # shear modulus
@@ -32,7 +32,7 @@ end
 """
 Define a simplified cross section for trusses
 """
-mutable struct TrussSection <: AbstractSection
+struct TrussSection <: AbstractSection
     A::Float64
     E::Float64
     ρ::Float64
