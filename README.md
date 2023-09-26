@@ -4,7 +4,7 @@
 aSAP is...
 - the anti-SAP (2000)
 - results as Soon As Possible
-- a Structural Analysis Package
+- another Structural Analysis Package
 
 Designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
 
