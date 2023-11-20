@@ -1,18 +1,18 @@
 abstract type AbstractModel end
 
-function makeids!(nodes::Vector{<:AbstractNode})
+function make_ids!(nodes::Vector{<:AbstractNode})
     @inbounds for (i, node) in enumerate(nodes)
         node.nodeID = i
     end
 end
 
-function makeids!(elements::Vector{<:AbstractElement})
+function make_ids!(elements::Vector{<:AbstractElement})
     @inbounds for (i, element) in enumerate(elements)
         element.elementID = i
     end
 end
 
-function makeids!(loads::Vector{<:Load})
+function make_ids!(loads::Vector{<:Load})
     @inbounds for (i, load) in enumerate(loads)
         load.loadID = i
     end
@@ -45,9 +45,9 @@ mutable struct Model <: AbstractModel
     function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:Load})
         structure = new(nodes, elements, loads)
 
-        makeids!(structure.nodes)
-        makeids!(structure.elements)
-        makeids!(structure.loads)
+        make_ids!(structure.nodes)
+        make_ids!(structure.elements)
+        make_ids!(structure.loads)
 
         structure.processed = false
         structure.tol = 1e-3
@@ -59,8 +59,8 @@ mutable struct Model <: AbstractModel
     #     structure = new(nodes, elements)
     #     structure.loads = Vector{Load}()
 
-    #     makeids!(structure.nodes)
-    #     makeids!(structure.elements)
+    #     make_ids!(structure.nodes)
+    #     make_ids!(structure.elements)
 
     #     structure.processed = false
 
@@ -95,9 +95,9 @@ mutable struct TrussModel <: AbstractModel
     function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement}, loads::Vector{NodeForce})
         structure = new(nodes, elements, loads)
 
-        makeids!(structure.nodes)
-        makeids!(structure.elements)
-        makeids!(structure.loads)
+        make_ids!(structure.nodes)
+        make_ids!(structure.elements)
+        make_ids!(structure.loads)
 
         structure.processed = false
         structure.tol = 1e-3
@@ -109,8 +109,8 @@ mutable struct TrussModel <: AbstractModel
     #     structure = new(nodes, elements)
     #     structure.loads = Vector{NodeForce}()
 
-    #     makeids!(structure.nodes)
-    #     makeids!(structure.elements)
+    #     make_ids!(structure.nodes)
+    #     make_ids!(structure.elements)
 
     #     structure.processed = false
 

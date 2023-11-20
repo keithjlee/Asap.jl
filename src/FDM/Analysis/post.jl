@@ -1,7 +1,7 @@
 """
 applied to network
 """
-function xyzupdate!(network::Network)
+function xyz_update!(network::Network)
     for index in network.N
         network.nodes[index].position = network.xyz[index, :]
     end

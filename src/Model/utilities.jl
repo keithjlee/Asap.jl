@@ -1,8 +1,10 @@
 """
-Fix DOFs of all nodes to become planar
+    planarize!(model::AbstractModel, plane = :XY)
+
+Fix all nodal DOFs to remain on plane = `plane`
 """
-function planarize!(model::AbstractModel; plane = :XY)
-    planarize!(model.nodes; plane = plane)
+function planarize!(model::AbstractModel, plane = :XY)
+    planarize!(model.nodes, plane)
     if plane == :XY
         for element in model.elements
             element.Ψ = 0.
@@ -11,7 +13,9 @@ function planarize!(model::AbstractModel; plane = :XY)
 end
 
 """
-Generate the element-node connectivity matrix
+    connectivity(model::AbstractModel)
+
+Get the [nₑ × nₙ] sparse matrix where C[i, j] = -1 if element i starts at node j, and C[i,j] = 1 if element i ends at node j, and 0 otherwise.
 """
 function connectivity(model::AbstractModel)
     I = vcat([[i, i] for i = 1:model.nElements]...)
@@ -22,22 +26,30 @@ function connectivity(model::AbstractModel)
 end
 
 """
-Generate the (nₙ × 3) node position matrix
+    node_positions(model::AbstractModel)
+
+Generate the [nₙ × 3] node position matrix
 """
-function nodePositions(model::AbstractModel)
+function node_positions(model::AbstractModel)
     return vcat([node.position' for node in model.nodes]...)
 end
 
+export nodePositions
+nodePositions(model::AbstractModel) = node_positions(model)
+
 """
-    updateDOF!(model::AbstractModel)
+    update_DOF!(model::AbstractModel)
 
 Update the free/fixed degrees of freedom for a model
 """
-function updateDOF!(model::AbstractModel)
+function update_DOF!(model::AbstractModel)
     model.DOFs = vcat(getproperty.(model.nodes, :dof)...)
     model.freeDOFs = findall(model.DOFs)
     model.fixedDOFs = findall(.!model.DOFs)
 end
+
+export updateDOF!
+updateDOF!(model::AbstractModel) = update_DOF!(model)
 
 """
     volume(model::AbstractModel)
@@ -57,21 +69,21 @@ function Base.copy(model::TrussModel)
 
     #new nodes
     for node in model.nodes
-        newnode = TrussNode(copy(node.position), node.dof)
+        newnode = TrussNode(deepcopy(node.position), node.dof)
         newnode.id = node.id
         push!(nodes, newnode)
     end
 
     #new elements
     for element in model.elements
-        newelement = TrussElement(nodes, copy(element.nodeIDs), element.section)
+        newelement = TrussElement(nodes, deepcopy(element.nodeIDs), element.section)
         newelement.id = element.id
         push!(elements, newelement)
     end
 
     #new loads
     for load in model.loads
-        newload = NodeForce(nodes[load.node.nodeID], copy(load.value))
+        newload = NodeForce(nodes[load.node.nodeID], deepcopy(load.value))
         newload.id = load.id
         push!(loads, newload)
     end

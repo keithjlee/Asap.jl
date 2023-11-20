@@ -1,5 +1,12 @@
 """
-FDMnode in fdm network. Includes positional data and fixed/free information
+    FDMnode
+
+A node in an FDM network with fields:
+- position::Vector{Float64}: the [x,y,z] position of the node
+- dof::Bool: true = free; false = fixed
+- id::Symbol: identifier (optional)
+- nodeID::Integer: global indentifier (internal)
+- reaction::Vector{Float64}: the [x,y,z] reaction forces if node is fixed
 """
 mutable struct FDMnode
     position::Vector{Float64}

@@ -16,11 +16,11 @@ function Base.findall(nodes::Vector{TrussNode}, i::Symbol)
 end
 
 """
-    planarize!(nodes::Vector{AbstractNode}; plane = :XY)
+    planarize!(nodes::Vector{AbstractNode}, plane = :XY)
 
 Restrict the dofs of a set of nodes to remain on a plane. Choose from: :XY, :YZ, :ZX
 """
-function planarize!(nodes::Vector{Node}; plane = :XY)
+function planarize!(nodes::Vector{Node}, plane = :XY)
     idx = planeDict[plane]
 
     for node in nodes
@@ -28,7 +28,7 @@ function planarize!(nodes::Vector{Node}; plane = :XY)
     end
 end
 
-function planarize!(nodes::Vector{TrussNode}; plane = :XY)
+function planarize!(nodes::Vector{TrussNode}, plane = :XY)
     idx = planeDict[plane][1]
 
     for node in nodes

@@ -32,7 +32,7 @@ export TrussElement
 export release!
 export endpoints
 export midpoint
-export axialforce
+export axial_force
 
 include("Loads/loads.jl")
 include("Loads/utilities.jl")
@@ -47,9 +47,9 @@ include("Model/model.jl")
 include("Model/utilities.jl")
 export Model
 export TrussModel
-export updateDOF!
+export update_DOF!
 export connectivity
-export nodePositions
+export node_positions
 export volume
 
 

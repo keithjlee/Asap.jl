@@ -318,14 +318,14 @@ solve!(model, newloads)
 
 `solve!` updates displacements, forces, reactions, etc. It treats the new load set as if it were the original set. It replaces `model.loads` with the new load set.
 
-### `updateDOF!`
+### `update_DOF!`
 Sometimes the activity of your nodes might change under the same loading conditions. Instead of redefining a new model simply:
 ```julia
 for node in model.nodes[:groupA]
     fixnode!(node, :xfree)
 end
 
-updateDOF!(model)
+update_DOF!(model)
 solve!(model)
 ```
 

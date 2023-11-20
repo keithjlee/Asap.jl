@@ -44,7 +44,7 @@ end
 """
 Creates the branch-node connectivity matrix C
 """
-function branchmatrix(elements::Vector{FDMelement}, points::Vector{FDMnode})
+function branch_matrix(elements::Vector{FDMelement}, points::Vector{FDMnode})
 
     #initialize
     c = spzeros(Int64, length(elements), length(points))
@@ -61,14 +61,14 @@ end
 """
 Directly on a network
 """
-function branchmatrix!(network::Network)
-    network.C = branchmatrix(network.elements, network.nodes)
+function branch_matrix!(network::Network)
+    network.C = branch_matrix(network.elements, network.nodes)
 end
 
 """
 Creates an nx3 matrix of nodal positions
 """
-function deconstructnodes(points::Vector{FDMnode})
+function deconstruct_nodes(points::Vector{FDMnode})
     positions = getproperty.(points, :position)
     return Float64.([getindex.(positions, 1) getindex.(positions, 2) getindex.(positions, 3)])
 end
@@ -76,29 +76,29 @@ end
 """
 Directly on a network
 """
-function deconstructnodes!(network::Network)
-    network.xyz = deconstructnodes(network.nodes)
+function deconstruct_nodes!(network::Network)
+    network.xyz = deconstruct_nodes(network.nodes)
 end
 
 """
 Extracts force density vector (q) from elements
 """
-function forcedensities(elements::Vector{FDMelement})
+function force_densities(elements::Vector{FDMelement})
     getproperty.(elements, :q)
 end
 
 """
 Extracts q from elements and populates network fields
 """
-function forcedensities!(network::Network)
-    network.q = forcedensities(network.elements)
+function force_densities!(network::Network)
+    network.q = force_densities(network.elements)
     network.Q = spdiagm(network.q)
 end
 
 """
 directly on a network
 """
-function loadMatrix!(network::Network)
+function load_matrix!(network::Network)
     network.P = zeros(length(network.nodes), 3)
 
     for load in network.loads
@@ -119,18 +119,18 @@ function process!(network::Network)
     NF!(network)
 
     #branch node matrix C
-    branchmatrix!(network)
+    branch_matrix!(network)
     network.Cn = network.C[:, network.N]
     network.Cf = network.C[:, network.F]
 
     #nodal positions [x y z]
-    deconstructnodes!(network)
+    deconstruct_nodes!(network)
 
     #force density vector q
-    forcedensities!(network)
+    force_densities!(network)
 
     #load matrix P
-    loadMatrix!(network)
+    load_matrix!(network)
     network.Pn = network.P[network.N, :]
 
     network.processed = true

@@ -144,28 +144,28 @@ function midpoint(element::AbstractElement)
 end
 
 """
-    axialforce(element::TrussElement)
+    axial_force(element::TrussElement)
 
 Extract the axial force of an element
 """
-function axialforce(element::TrussElement)
+function axial_force(element::TrussElement)
     element.forces[2]
 end
 
 """
-    axialforce(element::Element)
+    axial_force(element::Element)
     
 Extract the axial force of an element
 """
-function axialforce(element::Element)
+function axial_force(element::Element)
     element.forces[7]
 end
 
 """
-    axialforce(elements::Vector{<:AbstractElement})
+    axial_force(elements::Vector{<:AbstractElement})
 
 Extract the axial forces from a vector of elements
 """
-function axialforce(elements::Union{Vector{TrussElement}, Vector{Element}})
-    axialforce.(elements)
+function axial_force(elements::Union{Vector{TrussElement}, Vector{Element}})
+    axial_force.(elements)
 end
