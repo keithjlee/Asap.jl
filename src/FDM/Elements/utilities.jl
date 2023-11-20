@@ -1,10 +1,10 @@
-function vector(element::FDMelement; unit = true)
+function localx(element::FDMelement; unit = false)
     vec = element.pEnd.position - element.pStart.position
 
     unit ? normalize(vec) : vec
 end
 
-Base.length(element::FDMelement) = norm(vector(element; unit = false))
+Base.length(element::FDMelement) = norm(localx(element; unit = false))
 
 function force(element::FDMelement)
     return length(element) * element.q

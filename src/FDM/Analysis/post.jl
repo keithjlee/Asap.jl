@@ -19,7 +19,7 @@ function reactions!(network::Network)
 
         for index in iels
             e = network.elements[index]
-            eforce = vector(e) * force(e)
+            eforce = localx(e) * force(e)
 
             if network.C[index, i] < 0
                 rxn .+= eforce
