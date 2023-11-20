@@ -1,4 +1,4 @@
-function localx(element::FDMelement; unit = false)
+function localx(element::FDMelement; unit = true)
     vec = element.pEnd.position - element.pStart.position
 
     unit ? normalize(vec) : vec
