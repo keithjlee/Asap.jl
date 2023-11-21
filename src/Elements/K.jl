@@ -6,24 +6,24 @@ function k_fixedfixed(element::Element)
     A = element.section.A
     L = element.length
     G = element.section.G
-    Izz = element.section.Izz
-    Iyy = element.section.Iyy
+    Ix = element.section.Ix
+    Iy = element.section.Iy
     J = element.section.J
 
 
     k = E / L^3 * [
         A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
-        0 12Izz 0 0 0 6L*Izz 0 -12Izz 0 0 0 6L*Izz;
-        0 0 12Iyy 0 -6L*Iyy 0 0 0 -12Iyy 0 -6L*Iyy 0;
+        0 12Ix 0 0 0 6L*Ix 0 -12Ix 0 0 0 6L*Ix;
+        0 0 12Iy 0 -6L*Iy 0 0 0 -12Iy 0 -6L*Iy 0;
         0 0 0 G*J*L^2/E 0 0 0 0 0 -G*J*L^2/E 0 0;
-        0 0 -6L*Iyy 0 4L^2*Iyy 0 0 0 6L*Iyy 0 2L^2*Iyy 0;
-        0 6L*Izz 0 0 0 4L^2*Izz 0 -6L*Izz 0 0 0 2L^2*Izz;
+        0 0 -6L*Iy 0 4L^2*Iy 0 0 0 6L*Iy 0 2L^2*Iy 0;
+        0 6L*Ix 0 0 0 4L^2*Ix 0 -6L*Ix 0 0 0 2L^2*Ix;
         -A*L^2 0 0 0 0 0 A*L^2 0 0 0 0 0;
-        0 -12Izz 0 0 0 -6L*Izz 0 12Izz 0 0 0 -6L*Izz;
-        0 0 -12Iyy 0 6L*Iyy 0 0 0 12Iyy 0 6L*Iyy 0;
+        0 -12Ix 0 0 0 -6L*Ix 0 12Ix 0 0 0 -6L*Ix;
+        0 0 -12Iy 0 6L*Iy 0 0 0 12Iy 0 6L*Iy 0;
         0 0 0 -G*J*L^2/E 0 0 0 0 0 G*J*L^2/E 0 0;
-        0 0 -6L*Iyy 0 2L^2*Iyy 0 0 0 6L*Iyy 0 4L^2*Iyy 0;
-        0 6L*Izz 0 0 0 2L^2*Izz 0 -6L*Izz 0 0 0 4L^2*Izz
+        0 0 -6L*Iy 0 2L^2*Iy 0 0 0 6L*Iy 0 4L^2*Iy 0;
+        0 6L*Ix 0 0 0 2L^2*Ix 0 -6L*Ix 0 0 0 4L^2*Ix
         ]
 
     return k
@@ -36,21 +36,21 @@ function k_freefixed(element::Element)
     E = element.section.E
     A = element.section.A
     L = element.length
-    Izz = element.section.Izz
-    Iyy = element.section.Iyy
+    Ix = element.section.Ix
+    Iy = element.section.Iy
 
     k = E / L^3 .* [A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
-        0 3Izz 0 0 0 0 0 -3Izz 0 0 0 3L*Izz;
-        0 0 3Iyy 0 0 0 0 0 -3Iyy 0 -3L*Iyy 0;
+        0 3Ix 0 0 0 0 0 -3Ix 0 0 0 3L*Ix;
+        0 0 3Iy 0 0 0 0 0 -3Iy 0 -3L*Iy 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
         -A*L^2 0 0 0 0 0 A*L^2 0 0 0 0 0;
-        0 -3Izz 0 0 0 0 0 3Izz 0 0 0 -3L*Izz;
-        0 0 -3Iyy 0 0 0 0 0 3Iyy 0 3L*Iyy 0;
+        0 -3Ix 0 0 0 0 0 3Ix 0 0 0 -3L*Ix;
+        0 0 -3Iy 0 0 0 0 0 3Iy 0 3L*Iy 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 -3L*Iyy 0 0 0 0 0 3L*Iyy 0 3L^2*Iyy 0;
-        0 3L*Izz 0 0 0 0 0 -3L*Izz 0 0 0 3L^2*Izz    
+        0 0 -3L*Iy 0 0 0 0 0 3L*Iy 0 3L^2*Iy 0;
+        0 3L*Ix 0 0 0 0 0 -3L*Ix 0 0 0 3L^2*Ix    
     ]
 
     return k
@@ -63,18 +63,18 @@ function k_fixedfree(element::Element)
     E = element.section.E
     A = element.section.A
     L = element.length
-    Izz = element.section.Izz
-    Iyy = element.section.Iyy
+    Ix = element.section.Ix
+    Iy = element.section.Iy
 
     k = E / L^3 .* [A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
-        0 3Izz 0 0 0 3L*Izz 0 -3Izz 0 0 0 0;
-        0 0 3Iyy 0 -3L*Iyy 0 0 0 -3Iyy 0 0 0;
+        0 3Ix 0 0 0 3L*Ix 0 -3Ix 0 0 0 0;
+        0 0 3Iy 0 -3L*Iy 0 0 0 -3Iy 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
-        0 0 -3L*Iyy 0 3L^2*Iyy 0 0 0 3L*Iyy 0 0 0;
-        0 3L*Izz 0 0 0 3L^2*Izz 0 -3L*Izz 0 0 0 0 ;
+        0 0 -3L*Iy 0 3L^2*Iy 0 0 0 3L*Iy 0 0 0;
+        0 3L*Ix 0 0 0 3L^2*Ix 0 -3L*Ix 0 0 0 0 ;
         -A*L^2 0 0 0 0 0 A*L^2 0 0 0 0 0;
-        0 -3Izz 0 0 0 -3L*Izz 0 3Izz 0 0 0 0;
-        0 0 -3Iyy 0 3L*Iyy 0 0 0 3Iyy 0 0 0;
+        0 -3Ix 0 0 0 -3L*Ix 0 3Ix 0 0 0 0;
+        0 0 -3Iy 0 3L*Iy 0 0 0 3Iy 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0    

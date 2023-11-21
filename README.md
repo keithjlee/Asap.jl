@@ -62,14 +62,14 @@ Where:
 
 A cross section includes both material and geometric information, and is constructed by:
 ```julia
-section1 = Section(material::Material, A::T, Izz::T, Iyy::T, J::T) where T <: Real
-section2 = Section(A::T, E::T, G::T, Izz::T, Iyy::T, J::T) where T <: Real
+section1 = Section(material::Material, A::T, Ix::T, Iy::T, J::T) where T <: Real
+section2 = Section(A::T, E::T, G::T, Ix::T, Iy::T, J::T) where T <: Real
 ```
 Where:
 - `material` is a `Material` structure
 - A: cross sectional area \[Distance^2]
-- Izz: moment of inertia of primary bending axis \[Distance^4]
-- Iyy: moment of inertia of secondary (orthogonal) bending axis \[Distance^4]
+- Ix: moment of inertia of primary bending axis \[Distance^4]
+- Iy: moment of inertia of secondary (orthogonal) bending axis \[Distance^4]
 
 The definition of a `Material` can be bypassed by explicitly providing material properties via the first method.
 
