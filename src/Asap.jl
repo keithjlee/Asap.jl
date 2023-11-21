@@ -61,6 +61,8 @@ export process!
 export solve!
 export solve
 export connectivity
+export node_positions
+export volume
 
 # FORCE DENSITY METHOD
 include("FDM/FDM.jl")
