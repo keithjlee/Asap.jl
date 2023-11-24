@@ -34,3 +34,43 @@ end
 function forces(network::Network)
     return norm.(eachrow(network.C * network.xyz)) .* network.q
 end
+
+"""
+    update_q!(network::Network, q::Float64)
+
+Set all force density values to `q` and resolve.
+"""
+function update_q!(network::Network, q::Float64)
+    setfield!.(network.elements, :q, q)
+    force_densities!(network)
+
+    solve!(network)
+end
+
+"""
+    update_q!(network::Network, q::Vector{Float64})
+
+Update all force densities with `q` and resolve.
+"""
+function update_q!(network::Network, q::Vector{Float64})
+    @assert length(q) == length(network.elements)
+
+    setfield!.(network.elements, :q, q)
+    force_densities!(network)
+
+    solve!(network)
+end
+
+"""
+    update_q!(network::Network, q::Vector{Float64}, indices::Vector{Int64}))
+
+Update all force densities of elements at `indices` with values in `q` and resolve.
+"""
+function update_q!(network::Network, q::Vector{Float64}, indices::Vector{Int64})
+    @assert length(q) == length(indices)
+
+    setfield!.(network.elements[indices], :q, q)
+    force_densities!(network)
+
+    solve!(network)
+end

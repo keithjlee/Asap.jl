@@ -19,3 +19,4 @@ export solve!
 export solve
 export initial_lengths
 export forces
+export update_q!
