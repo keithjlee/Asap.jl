@@ -175,4 +175,4 @@ end
 
 End moments [Tx, My, Mz] in LCS
 """
-moment(element::Element) = [element.forces[[4,5,6]]]
+moment(element::Element) = [element.forces[[10,11,12]]]
