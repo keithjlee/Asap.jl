@@ -169,3 +169,10 @@ Extract the axial forces from a vector of elements
 function axial_force(elements::Union{Vector{TrussElement}, Vector{Element}})
     axial_force.(elements)
 end
+
+"""
+    moment(element::Element)
+
+End moments [Tx, My, Mz] in LCS
+"""
+moment(element::Element) = [element.forces[[4,5,6]]]
