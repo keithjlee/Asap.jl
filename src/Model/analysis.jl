@@ -136,6 +136,14 @@ function solve!(model::Model, L::Vector{<:Load})
 
     model.loads = L
 
+    for node in model.nodes
+        empty!(node.loadIDs)
+    end
+
+    for element in model.elements
+        empty!(element.loadIDs)
+    end
+
     process!(model)
     solve!(model)
 
@@ -172,6 +180,10 @@ Replace the assigned model loads with a new load vector and solve.
 function solve!(model::TrussModel, L::Vector{NodeForce})
 
     model.loads = L
+
+    for node in model.nodes
+        empty!(node.loadIDs)
+    end
 
     process!(model)
     solve!(model)

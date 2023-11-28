@@ -1,7 +1,6 @@
 abstract type AbstractModel end
 
 function make_ids!(nodes::Vector{<:AbstractNode})
-    empty!.(getproperty.(nodes, :loadIDs))
     @inbounds for (i, node) in enumerate(nodes)
         node.nodeID = i
     end
@@ -14,7 +13,6 @@ function make_ids!(elements::Vector{TrussElement})
 end
 
 function make_ids!(elements::Vector{<:FrameElement})
-    empty!.(getproperty.(elements, :loadIDs))
     @inbounds for (i, element) in enumerate(elements)
         element.elementID = i
     end
