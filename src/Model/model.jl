@@ -13,7 +13,7 @@ function make_ids!(elements::Vector{TrussElement})
     end
 end
 
-function make_ids!(elements::Vector{Element})
+function make_ids!(elements::Vector{<:FrameElement})
     empty!.(getproperty.(elements, :loadIDs))
     @inbounds for (i, element) in enumerate(elements)
         element.elementID = i
