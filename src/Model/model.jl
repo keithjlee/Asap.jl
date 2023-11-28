@@ -1,12 +1,20 @@
 abstract type AbstractModel end
 
 function make_ids!(nodes::Vector{<:AbstractNode})
+    empty!.(getproperty.(nodes, :loadIDs))
     @inbounds for (i, node) in enumerate(nodes)
         node.nodeID = i
     end
 end
 
-function make_ids!(elements::Vector{<:AbstractElement})
+function make_ids!(elements::Vector{TrussElement})
+    @inbounds for (i, element) in enumerate(elements)
+        element.elementID = i
+    end
+end
+
+function make_ids!(elements::Vector{Element})
+    empty!.(getproperty.(elements, :loadIDs))
     @inbounds for (i, element) in enumerate(elements)
         element.elementID = i
     end
@@ -16,6 +24,14 @@ function make_ids!(loads::Vector{<:Load})
     @inbounds for (i, load) in enumerate(loads)
         load.loadID = i
     end
+end
+
+function make_ids!(model::AbstractModel)
+
+    make_ids!(model.nodes)
+    make_ids!(model.elements)
+    make_ids!(model.loads)
+
 end
 
 """
@@ -44,10 +60,6 @@ mutable struct Model <: AbstractModel
     
     function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:Load})
         structure = new(nodes, elements, loads)
-
-        make_ids!(structure.nodes)
-        make_ids!(structure.elements)
-        make_ids!(structure.loads)
 
         structure.processed = false
         structure.tol = 1e-3
@@ -94,10 +106,6 @@ mutable struct TrussModel <: AbstractModel
     
     function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement}, loads::Vector{NodeForce})
         structure = new(nodes, elements, loads)
-
-        make_ids!(structure.nodes)
-        make_ids!(structure.elements)
-        make_ids!(structure.loads)
 
         structure.processed = false
         structure.tol = 1e-3

@@ -3,6 +3,8 @@ process a network
 """
 function process!(model::Model)
 
+    make_ids!(model)
+
     if any(typeof.(model.elements) .== BridgeElement)
         processBridge!(model)
     else
@@ -23,6 +25,8 @@ function process!(model::Model)
 end
 
 function process!(model::TrussModel)
+
+    make_ids!(model)
 
     processElements!(model)
 
@@ -130,40 +134,10 @@ Replace the assigned model loads with a new load vector and solve.
 """
 function solve!(model::Model, L::Vector{<:Load})
 
-    @assert model.processed "Model must be already processed"
-
     model.loads = L
 
-    # clear existing load associations
-    for node in model.nodes
-        empty!(node.loadIDs)
-    end
-
-    for element in model.elements
-        empty!(element.loadIDs)
-        element.Q = zero(element.Q)
-    end
-
-    # assign new load associations
-    for (i, load) in enumerate(model.loads)
-        load.loadID = i
-        assign!(load)
-    end
-
-    # create P, Pf matrix
-    populateLoads!(model)
-    
-    # reduce scope of problem and solve
-    idx = model.freeDOFs
-    F = model.P[idx] - model.Pf[idx]
-    U = model.S[idx, idx] \ F
-
-    #compliance
-    model.compliance = U' * F
-
-    #full DOF displacement vector
-    model.u = zeros(model.nDOFs)
-    model.u[idx] = U
+    process!(model)
+    solve!(model)
 
     # post process
     postprocess!(model)
@@ -197,34 +171,10 @@ Replace the assigned model loads with a new load vector and solve.
 """
 function solve!(model::TrussModel, L::Vector{NodeForce})
 
-    @assert model.processed "Model must be already processed"
-
     model.loads = L
 
-    # clear existing load associations
-    for node in model.nodes
-        empty!(node.loadIDs)
-    end
-
-    # assign new load associations
-    for (i, load) in enumerate(model.loads)
-        load.loadID = i
-        assign!(load)
-    end
-
-    # create P, Pf matrix
-    populateLoads!(model)
-    
-    # reduce scope of problem and solve
-    idx = model.freeDOFs
-    U = model.S[idx, idx] \ model.P[idx]
-
-    #compliance
-    model.compliance = U' * model.P[idx]
-
-    #full DOF displacement vector
-    model.u = zeros(model.nDOFs)
-    model.u[idx] = U
+    process!(model)
+    solve!(model)
 
     # post process
     postprocess!(model)
