@@ -1,7 +1,7 @@
 """
     solve!(network::Network; reprocess = false)
 
-Solve an FDM problem
+Solve an FDM network for equilibrium positions.
 """
 function solve!(network::Network; reprocess = false)
     if !network.processed || reprocess

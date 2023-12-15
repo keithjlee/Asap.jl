@@ -40,7 +40,7 @@ function release!(element::Element, release::Symbol)
 
     element.release = release
     element.Q = zeros(12)
-    makeK!(element)
+    global_K!(element)
 end
 
 
@@ -82,7 +82,7 @@ function lcs(element::AbstractElement, Ψ::Float64; tol = 1e-6)
 end
 
 """
-lcs(element::AbstractElement, Ψ::Float64; tol = 1e-6)
+    lcs(element::AbstractElement, Ψ::Float64; tol = 1e-6)
 
 Populate local coordinate system unit vectors of a given element and pitch angle Ψ: [local_x, local_y, local_z]
 """

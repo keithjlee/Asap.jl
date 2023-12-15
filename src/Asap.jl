@@ -1,6 +1,6 @@
 module Asap
 
-using LinearAlgebra, SparseArrays, Statistics
+using LinearAlgebra, SparseArrays
 
 # global axes
 const globalX::Vector{Float64} = [1., 0., 0.]

@@ -1,7 +1,10 @@
 """
-    FDMnode
+    FDMnode(x::Real, y::Real, z::Real, dof::Bool, id = nothing)
+    FDMnode(pos::Vector{<:Real}, dof::Bool, id = nothing)
 
-A node in an FDM network with fields:
+A node in an FDM network defined by its spatial position [x, y, z] and degree of freedom (free = `true`, fixed = `false`)
+
+# Fields
 - position::Vector{Float64}: the [x,y,z] position of the node
 - dof::Bool: true = free; false = fixed
 - id::Symbol: identifier (optional)

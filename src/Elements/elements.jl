@@ -4,8 +4,6 @@ abstract type FrameElement <: AbstractElement end
 """
     Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
     Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
-    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
-    Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
 
 Create a frame element.
 
@@ -52,38 +50,6 @@ mutable struct Element <: FrameElement
     id::Union{Symbol, Nothing} #optional identifier
 
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
-        element = new(section)
-
-        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.Ψ = pi/2
-        element.id = id
-        element.Q = zeros(12)
-        element.loadIDs = Vector{Int64}()
-
-        element.release = release
-
-        return element
-    end
-
-    function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
-        element = new(section)
-        element.nodeStart = nodeStart
-        element.nodeEnd = nodeEnd
-
-        element.Ψ = pi/2
-        element.id = id
-        element.Q = zeros(12)
-        element.loadIDs = Vector{Int64}()
-
-        element.release = release
-
-        return element
-    end
-
-    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
-
-        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
-
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]

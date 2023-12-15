@@ -164,7 +164,7 @@ function shatter!(model::Model,
 
 end
 
-function transfer!(load::LineLoad, id::Int64, inout::Bool, model::Model, elementids::Vector{Int64}, newloads::Vector{Load})
+function transfer!(load::LineLoad, id::Int64, inout::Bool, model::Model, elementids::Vector{Int64}, newloads::Vector{AbstractLoad})
 
     if !inout && typeof(load.element) == Element
         return
@@ -180,7 +180,7 @@ function transfer!(load::LineLoad, id::Int64, inout::Bool, model::Model, element
     end
 end
 
-function transfer!(load::PointLoad, id::Int64, inout::Bool, model::Model, elementids::Vector{Int64}, newloads::Vector{Load})
+function transfer!(load::PointLoad, id::Int64, inout::Bool, model::Model, elementids::Vector{Int64}, newloads::Vector{AbstractLoad})
     etype = typeof(load.element)
     typecheck = etype == Element
 
@@ -218,7 +218,7 @@ end
 function convertloads!(model::Model, itrue::Vector{Int64})
     
     # collection of new loads
-    newloads = Vector{Load}()
+    newloads = Vector{AbstractLoad}()
 
     # indexes to remove
     rmid = Vector{Int64}()
@@ -459,7 +459,7 @@ function process_bridge!(model::Model)
 
     # process loads
     # convertloads!(model, itrueactive)
-    newloads = Vector{Asap.Load}()
+    newloads = Vector{Asap.AbstractLoad}()
 
     rmid = Vector{Int64}()
 

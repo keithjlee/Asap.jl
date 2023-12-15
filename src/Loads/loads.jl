@@ -1,12 +1,13 @@
 """
 Define loads applied to structure/elements
 """
-abstract type Load end
-abstract type NodeLoad <: Load end
-abstract type ElementLoad <: Load end
+abstract type AbstractLoad end
+abstract type NodeLoad <: AbstractLoad end
+abstract type ElementLoad <: AbstractLoad end
 
 """
     NodeForce(node::AbstractNode, value::Vector{Float64})
+    NodeForce(nodes::Vector{<:AbstractNode}, index::Integer, value::Vector{Float64})
 
 A force vector [Fx, Fy, Fz] in the global coordinate system applied to a node.
 """

@@ -83,7 +83,7 @@ function solve!(model::Model; reprocess = false)
     model.u[idx] = U
 
     # post process
-    postprocess!(model)
+    post_process!(model)
 end
 
 """
@@ -114,15 +114,15 @@ function solve!(model::TrussModel; reprocess = false)
     model.u[idx] = U
 
     # post process
-    postprocess!(model)
+    post_process!(model)
 end
 
 """
-    solve(model::Model, L::Vector{Load})
+    solve(model::Model, L::Vector{AbstractLoad})
 
 Return the displacement vector under a given load set L.
 """
-function solve(model::Model, L::Vector{<:Load})
+function solve(model::Model, L::Vector{<:AbstractLoad})
 
    model.processed  || process!(model)
     
@@ -139,11 +139,11 @@ function solve(model::Model, L::Vector{<:Load})
 end
 
 """
-    solve!(model::Model, L::Vector{Load})
+    solve!(model::Model, L::Vector{AbstractLoad})
 
 Replace the assigned model loads with a new load vector and solve.
 """
-function solve!(model::Model, L::Vector{<:Load})
+function solve!(model::Model, L::Vector{<:AbstractLoad})
 
     model.loads = L
 
@@ -159,7 +159,7 @@ function solve!(model::Model, L::Vector{<:Load})
     solve!(model)
 
     # post process
-    postprocess!(model)
+    post_process!(model)
 end
 
 """
@@ -200,5 +200,5 @@ function solve!(model::TrussModel, L::Vector{NodeForce})
     solve!(model)
 
     # post process
-    postprocess!(model)
+    post_process!(model)
 end

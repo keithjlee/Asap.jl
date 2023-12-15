@@ -1,5 +1,9 @@
 """
-FDMelement represents an edge in the network. Includes the global indices and positional information of the start and end nodes, as well as the force density.
+    FDMelement(points::Vector{FDMnode}, iStart::Int64, iEnd::Int64, q::Real, id = nothing)
+    FDMelement(points::Vector{FDMnode}, indices::Vector{Int64}, q::Real, id = nothing)
+    FDMelement(pointStart::FDMnode, pointEnd::FDMnode, q::Real, id = nothing)
+
+An element in a Force Density Method network that connects two nodes with force density `q` and an optional identifier `id::Symbol`
 """
 mutable struct FDMelement
     pStart::FDMnode #start point

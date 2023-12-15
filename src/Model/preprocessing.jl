@@ -83,7 +83,7 @@ function process_elements!(model::Model)
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
         element.length = length(element)
-        makeK!(element)
+        global_K!(element)
     end
 end
 
@@ -98,7 +98,7 @@ function process_elements!(elements::Vector{<:FrameElement})
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
         element.length = length(element)
-        makeK!(element)
+        global_K!(element)
     end
 end
 
@@ -112,7 +112,7 @@ function process_elements!(model::TrussModel)
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
         element.length = length(element)
-        makeK!(element)
+        global_K!(element)
     end
 end
 
@@ -214,7 +214,7 @@ end
 
 create load vector F = P - Pf
 """
-function create_F(model::Model, loads::Vector{Load})
+function create_F(model::Model, loads::Vector{AbstractLoad})
 
     P = zeros(model.nDOFs)
     Pf = zeros(model.nDOFs)

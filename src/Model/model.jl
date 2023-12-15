@@ -18,7 +18,7 @@ function make_ids!(elements::Vector{<:FrameElement})
     end
 end
 
-function make_ids!(loads::Vector{<:Load})
+function make_ids!(loads::Vector{<:AbstractLoad})
     @inbounds for (i, load) in enumerate(loads)
         load.loadID = i
     end
@@ -33,14 +33,14 @@ function make_ids!(model::AbstractModel)
 end
 
 """
-    Model(nodes::Vector{Node}, elements::Vector{Element}, loads::Vector{Load})
+    Model(nodes::Vector{Node}, elements::Vector{Element}, loads::Vector{AbstractLoad})
 
 Create a complete structural model ready for analysis.
 """
 mutable struct Model <: AbstractModel
     nodes::Vector{Node}
     elements::Vector{FrameElement}
-    loads::Vector{Load}
+    loads::Vector{AbstractLoad}
     nNodes::Int64
     nElements::Int64
     DOFs::Vector{Bool} #vector of DOFs
@@ -56,7 +56,7 @@ mutable struct Model <: AbstractModel
     tol::Float64
     processed::Bool
     
-    function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:Load})
+    function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:AbstractLoad})
         structure = new(nodes, elements, loads)
 
         structure.processed = false
@@ -67,7 +67,7 @@ mutable struct Model <: AbstractModel
 
     # function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement})
     #     structure = new(nodes, elements)
-    #     structure.loads = Vector{Load}()
+    #     structure.loads = Vector{AbstractLoad}()
 
     #     make_ids!(structure.nodes)
     #     make_ids!(structure.elements)

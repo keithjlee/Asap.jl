@@ -1,3 +1,8 @@
+"""
+    populate_indices!(network::Network)
+
+Populate the node/element global IDs in a network.
+"""
 function populate_indices!(network::Network)
     for (i, node) in enumerate(network.nodes)
         node.nodeID = i
@@ -12,8 +17,9 @@ end
 
 
 """
-Extracts the vector of Boolean DOFs in node sequence.
-|dofs| = |nodes|
+    dofs(points::Vector{FDMnode})
+
+Return the fixed/free DOF information from a vector of nodes.
 """
 function dofs(points::Vector{FDMnode})
     getproperty.(points, :dof)
@@ -27,7 +33,9 @@ function NF(d::Union{Vector{Bool}, BitVector})
 end
 
 """
-Extracts the fixed/free indices of a vector of nodes
+    NF(points::Vector{FDMnode})
+
+Return fixed/free DOF indices from a vector of nodes.
 """
 function NF(points::Vector{FDMnode})
     d = dofs(points)
@@ -35,14 +43,18 @@ function NF(points::Vector{FDMnode})
 end
 
 """
-Directly on network
+    NF!(network::Network)
+
+Extract fixed/free DOF indices from a vector of nodes.
 """
 function NF!(network::Network)
     network.N, network.F = NF(network.nodes)
 end
 
 """
-Creates the branch-node connectivity matrix C
+    branch_matrix(elements::Vector{FDMelement}, points::Vector{FDMnode})
+
+Return the [n_elements × n_nodes] sparse connectivity matrix, `network.C`
 """
 function branch_matrix(elements::Vector{FDMelement}, points::Vector{FDMnode})
 
@@ -59,14 +71,18 @@ function branch_matrix(elements::Vector{FDMelement}, points::Vector{FDMnode})
 end
 
 """
-Directly on a network
+    branch_matrix!(network::Network)
+
+Populate the [n_elements × n_nodes] sparse connectivity matrix, `network.C`
 """
 function branch_matrix!(network::Network)
     network.C = branch_matrix(network.elements, network.nodes)
 end
 
 """
-Creates an nx3 matrix of nodal positions
+    deconstruct_nodes(points::Vector{FDMnode})
+
+return the [n_nodes × 3] matrix of nodal positions, `network.xyz`
 """
 function deconstruct_nodes(points::Vector{FDMnode})
     positions = getproperty.(points, :position)
@@ -74,21 +90,27 @@ function deconstruct_nodes(points::Vector{FDMnode})
 end
 
 """
-Directly on a network
+    deconstruct_nodes!(network::Network)
+
+Populate the [n_nodes × 3] matrix of nodal positions, `network.xyz`
 """
 function deconstruct_nodes!(network::Network)
     network.xyz = deconstruct_nodes(network.nodes)
 end
 
 """
-Extracts force density vector (q) from elements
+    force_densities(elements::Vector{FDMelement})
+
+Extract the force densities of a vector of elements.
 """
 function force_densities(elements::Vector{FDMelement})
     getproperty.(elements, :q)
 end
 
 """
-Extracts q from elements and populates network fields
+    force_densities!(network::Network)
+
+Extract the force densities of elements in a network and assemble the global Q matrix, `network.Q`
 """
 function force_densities!(network::Network)
     network.q = force_densities(network.elements)
@@ -96,7 +118,9 @@ function force_densities!(network::Network)
 end
 
 """
-directly on a network
+    load_matrix!(network::Network)
+
+Generate the [n_nodes × 3] matrix of nodal forces, P
 """
 function load_matrix!(network::Network)
     network.P = zeros(length(network.nodes), 3)
@@ -109,7 +133,9 @@ end
 
 
 """
-Preprocessing of data for a new FDM network
+    process!(network::Network)
+
+Preprocess a network. Assign indices and references, and generate global collectors of position, force density, etc.
 """
 function process!(network::Network)
     #populate indices

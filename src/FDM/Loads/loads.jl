@@ -1,5 +1,8 @@
 """
-Load type is associated with a node (and its position in node vector), as well as a length 3 force vector (x,y,z)
+    FDMload(points::Vector{FDMnode}, i::Int64, force::Vector{<:Real})
+    FDMload(point::FDMnode, force::Vector{<:Real})
+
+An external force applied to a FDM node: `load = [Px, Py, Pz]`
 """
 mutable struct FDMload
     point::FDMnode # point at which load is applied

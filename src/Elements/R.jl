@@ -1,5 +1,9 @@
 """
-Transformation matrix of an element
+    R(element::Element; tol = 1e-4)
+
+Get the [12 × 12] transformation matrix for a given element.
+
+`tol` defines the threshold criteria for triggering special `R` computation for elements aligned with the global Y axis
 """
 function R(element::Element; tol = 1e-4)
     
@@ -34,7 +38,11 @@ function R(element::Element; tol = 1e-4)
 end
 
 """
-Transformation matrix of a directional vector and roll angle
+    R(xvec::Vector{Float64}, Ψ; tol = 1e-4)
+
+Return the [12 × 12] transformation matrix given a local x vector `xvec`
+
+`tol` defines the threshold criteria for triggering special `R` computation for elements aligned with the global Y axis
 """
 function R(xvec::Vector{Float64}, Ψ; tol = 1e-4)
 
@@ -68,15 +76,22 @@ function R(xvec::Vector{Float64}, Ψ; tol = 1e-4)
 end
 
 """
-Truss transformation matrix
+    R(element::TrussElement)
+
+Get the [2 × 6] transformation matrix for a truss element.
 """
 function R(element::TrussElement)
     Cx, Cy, Cz = local_x(element)
     return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
 end
 
-function R(vec::Vector{Float64})
-    Cx, Cy, Cz = normalize(vec)
+"""
+    R(xvec::Vector{Float64})
+
+Get the [2 × 6] transformation matrix given a local x vector `xvec`
+"""
+function R(xvec::Vector{Float64})
+    Cx, Cy, Cz = normalize(xvec)
     return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
 end
 
