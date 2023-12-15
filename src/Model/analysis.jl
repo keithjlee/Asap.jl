@@ -169,7 +169,7 @@ Return the displacement vector to a new set of loads.
 """
 function solve(model::TrussModel, L::Vector{NodeForce})
 
-    !model.processed || process!(model)
+    model.processed || process!(model)
     
     F = create_F(model, L)
     
