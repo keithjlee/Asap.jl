@@ -45,21 +45,25 @@ end
 
 
 """
-Get the local x vector of an element
-Defaults to normalized unit vector
+    local_x(element::AbstractElement; unit = true)
+
+Get the local x vector of an element: element.nodeEnd.position - element.nodeStart.position.
+`unit = true` gives the normalized vector.
 """
-function localx(element::AbstractElement; unit = true)
+function local_x(element::AbstractElement; unit = true)
     x = element.nodeEnd.position .- element.nodeStart.position
     unit ? normalize(x) : x
 end
 
 """
-Local coordinate system of element with roll angle
+    lcs(element::AbstractElement, Ψ::Float64; tol = 1e-6)
+
+Get the local coordinate system unit vectors of a given element and pitch angle Ψ: [local_x, local_y, local_z]
 """
-function lcs(element::AbstractElement, Ψ::Float64; tol = 0.001)
+function lcs(element::AbstractElement, Ψ::Float64; tol = 1e-6)
 
     # local x vector
-    xvec = localx(element)
+    xvec = local_x(element)
     
     if norm(cross(xvec, globalY)) < tol
         CYx = xvec[2] #cosine to global Y axis
@@ -78,12 +82,14 @@ function lcs(element::AbstractElement, Ψ::Float64; tol = 0.001)
 end
 
 """
-Local coordinate system of element with roll angle
+lcs(element::AbstractElement, Ψ::Float64; tol = 1e-6)
+
+Populate local coordinate system unit vectors of a given element and pitch angle Ψ: [local_x, local_y, local_z]
 """
 function lcs!(element::AbstractElement, Ψ::Float64; tol = 0.001)
 
     # local x vector
-    xvec = localx(element)
+    xvec = local_x(element)
     
     if norm(cross(xvec, globalY)) < tol
         CYx = xvec[2] #cosine to global Y axis
@@ -103,9 +109,11 @@ end
 
 
 """
-Local coordinate system of a directional vector and roll angle
+    lcs(xin::Vector{Float64}, Ψ::Float64; tol = 1e-4)
+
+Get the local coordinate system unit vectors of a given local x axis and pitch angle Ψ: [local_x, local_y, local_z]
 """
-function lcs(xin::Vector{Float64}, Ψ::Float64; tol = 0.001)
+function lcs(xin::Vector{Float64}, Ψ::Float64; tol = 1e-4)
 
     xvec = normalize(copy(xin))
     # local x vector
@@ -160,19 +168,3 @@ Extract the axial force of an element
 function axial_force(element::Element)
     element.forces[7]
 end
-
-"""
-    axial_force(elements::Vector{<:AbstractElement})
-
-Extract the axial forces from a vector of elements
-"""
-function axial_force(elements::Union{Vector{TrussElement}, Vector{Element}})
-    axial_force.(elements)
-end
-
-"""
-    moment(element::Element)
-
-End moments [Tx, My, Mz] in LCS
-"""
-moment(element::Element) = [element.forces[[10,11,12]]]

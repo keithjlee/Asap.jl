@@ -1,7 +1,9 @@
 """
-populate global DOF indices of nodes and elements
+    populate_DOF_indices!(model::Model)
+
+Populate all indices, references, and other information in a model.
 """
-function populateDOF!(model::Model)
+function populate_DOF_indices!(model::Model)
 
     model.DOFs = vcat(getproperty.(model.nodes, :dof)...)
     model.nDOFs = length(model.DOFs)
@@ -36,9 +38,11 @@ function populateDOF!(model::Model)
 end
 
 """
-populate global DOF indices of nodes and elements
+    populate_DOF_indices!(model::TrussModel)
+
+Populate all indices, references, and other information in a truss model.
 """
-function populateDOF!(model::TrussModel)
+function populate_DOF_indices!(model::TrussModel)
 
     model.DOFs = vcat(getproperty.(model.nodes, :dof)...)
     model.nDOFs = length(model.DOFs)
@@ -69,9 +73,11 @@ function populateDOF!(model::TrussModel)
 end
 
 """
-Process elements: get transformation matrix and global elemental stiffness matrix
+    process_elements!(model::Model)
+    
+Populate the transformation matrix and global elemental stiffness matrix of the elements in a model.
 """
-function processElements!(model::Model)
+function process_elements!(model::Model)
     for element in model.elements
         element.Q = zeros(12) # reset Qf
         element.R = R(element)
@@ -81,7 +87,12 @@ function processElements!(model::Model)
     end
 end
 
-function processElements!(elements::Vector{<:FrameElement})
+"""
+    process_elements!(elements::Vector{<:FrameElement})
+    
+Populate the transformation matrix and global elemental stiffness matrix of the elements in a vector of elements.
+"""
+function process_elements!(elements::Vector{<:FrameElement})
     for element in elements
         element.Q = zeros(12) # reset Qf
         element.R = R(element)
@@ -92,9 +103,11 @@ function processElements!(elements::Vector{<:FrameElement})
 end
 
 """
-Process elements: get transformation matrix and global elemental stiffness matrix
+    process_elements!(model::TrussModel)
+    
+Populate the transformation matrix and global elemental stiffness matrix of the elements in a truss model.
 """
-function processElements!(model::TrussModel)
+function process_elements!(model::TrussModel)
     for element in model.elements
         element.R = R(element)
         element.LCS = lcs(element, element.Ψ)
@@ -104,94 +117,113 @@ function processElements!(model::TrussModel)
 end
 
 """
-Populate a node force load
+    populate_load!(model::AbstractModel, load::NodeForce)
+
+Populate the global load vector `model.P` with a nodal force.
 """
-function populateLoad!(model::Model, load::NodeForce)
+function populate_load!(model::AbstractModel, load::NodeForce)
     idx = load.node.globalID[1:3]
     model.P[idx] += load.value
 end
 
 """
-Populate a node force load
+    populate_load!(P::Vector{Float64}, load::NodeForce)
+
+Populate the global load vector P` with a nodal force.
 """
-function populateLoad!(model::TrussModel, load::NodeForce)
-    idx = load.node.globalID
-    model.P[idx] += load.value
-end
-
-
-function populateLoad!(P::Vector{Float64}, load::NodeForce)
+function populate_load!(P::Vector{Float64}, load::NodeForce)
     idx = load.node.globalID[1:3]
     P[idx] += load.value
 end
 
 """
-Populate a node moment load
+    populate_load!(model::Model, load::NodeMoment)
+
+Populate the global load vector `model.P` with a nodal moment.
 """
-function populateLoad!(model::Model, load::NodeMoment)
+function populate_load!(model::Model, load::NodeMoment)
     idx = load.node.globalID[4:6]
     model.P[idx] += load.value
 end
 
-function populateLoad!(P::Vector{Float64}, load::NodeMoment)
+
+"""
+    populate_load!(model::Model, load::NodeMoment)
+
+Populate the global load vector `model.P` with a nodal moment.
+"""
+function populate_load!(P::Vector{Float64}, load::NodeMoment)
     idx = load.node.globalID[4:6]
     P[idx] += load.value
 end
 
 """
-Populate element loads
+    populate_load!(model::Model, load::ElementLoad)
+
+Generate the fixed-end force vector `Q` for a given load, and populate the global fixed-end force vector `Pf`.
 """
-function populateLoad!(model::Model, load::ElementLoad)
+function populate_load!(model::Model, load::ElementLoad)
     idx = load.element.globalID
     load.element.Q += load.element.R' * Q(load)
     model.Pf[idx] += load.element.Q
 end
 
-function populateLoad!(P::Vector{Float64}, load::ElementLoad)
+"""
+    populate_load!(P::Vector{Float64}, load::ElementLoad)
+
+Populate an external fixed-end force vector Pf with respect the an elemental load `load`
+"""
+function populate_load!(Pf::Vector{Float64}, load::ElementLoad)
     idx = load.element.globalID
-    P[idx] += load.element.R' * Q(load)
+    Pf[idx] += load.element.R' * Q(load)
 end
 
 """
-Create load vectors P and Pf
+    populate_loads!(model::Model)
+
+Generate the nodal force vectors `model.P` (external) and `model.Pf` (fixed-end)
 """
-function populateLoads!(model::Model)
+function populate_loads!(model::Model)
     #initialize
     model.P = zeros(model.nDOFs)
     model.Pf = zeros(model.nDOFs)
 
     #create load vectors
     for load in model.loads
-        populateLoad!(model, load)
+        populate_load!(model, load)
     end
 end
 
 """
-Create load vectors P and Pf
+    populate_loads!(model::TrussModel)
+
+Generate the nodal force vectors `model.P`
 """
-function populateLoads!(model::TrussModel)
+function populate_loads!(model::TrussModel)
     #initialize
     model.P = zeros(model.nDOFs)
 
     #create load vectors
     for load in model.loads
-        populateLoad!(model, load)
+        populate_load!(model, load)
     end
 end
 
 """
-create load vector F = P-Pf
+    create_F(model::TrussModel, loads::Vector{NodeForce})
+
+create load vector F = P - Pf
 """
-function createF(model::Model, loads::Vector{Load})
+function create_F(model::Model, loads::Vector{Load})
 
     P = zeros(model.nDOFs)
     Pf = zeros(model.nDOFs)
 
     for load in loads
         if typeof(load) <: ElementLoad
-            populateLoad!(Pf, load)
+            populate_load!(Pf, load)
         else
-            populateLoad!(P, load)
+            populate_load!(P, load)
         end
     end
 
@@ -199,23 +231,27 @@ function createF(model::Model, loads::Vector{Load})
 end
 
 """
-create load vector F = P-Pf
+    create_F(model::TrussModel, loads::Vector{NodeForce})
+
+create load vector F = P
 """
-function createF(model::TrussModel, loads::Vector{NodeForce})
+function create_F(model::TrussModel, loads::Vector{NodeForce})
 
     P = zeros(model.nDOFs)
 
     for load in loads
-        populateLoad!(P, load)
+        populate_load!(P, load)
     end
 
     return P
 end
 
 """
-Create global stiffness matrix
+    create_S!(model::Model)
+
+Assemble the global stiffness matrix S.
 """
-function globalS!(model::Model)
+function create_S!(model::Model)
     I = Vector{Int64}()
     J = Vector{Int64}()
     V = Vector{Float64}()
@@ -240,9 +276,11 @@ function globalS!(model::Model)
 end
 
 """
-Create global stiffness matrix
+    create_S!(model::TrussModel)
+
+Assemble the global stiffness matrix S.
 """
-function globalS!(model::TrussModel)
+function create_S!(model::TrussModel)
     I = Vector{Int64}()
     J = Vector{Int64}()
     V = Vector{Float64}()

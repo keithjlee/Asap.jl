@@ -14,9 +14,8 @@ export Network
 
 include("Analysis/analysis.jl")
 export process!
-export FL
+export forces
 export solve!
 export solve
 export initial_lengths
-export forces
 export update_q!

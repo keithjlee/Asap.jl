@@ -55,7 +55,7 @@ function shatter!(model::Model,
         element = model.elements[indexerRev[index]]
         startpos = element.nodeStart.position
         # L = length(element)
-        # vec = localx(element)
+        # vec = local_x(element)
         L = element.length
         vec = first(element.LCS)
 
@@ -160,7 +160,7 @@ function shatter!(model::Model,
     model.elements = [model.elements; newelements]
     model.nodes = [model.nodes; newnodes]
 
-    processElements!(model)
+    process_elements!(model)
 
 end
 
@@ -261,7 +261,7 @@ function processBridge!(model::Model)
     iBridge = findall(typeof.(elements) .== BridgeElement)
 
     #get geometric information
-    processElements!(elements[iElement])
+    process_elements!(elements[iElement])
 
     #number of each type
     n = length(iElement)
@@ -287,13 +287,13 @@ function processBridge!(model::Model)
     convertloads!(model, itrueactive)
 
     #generate DOF indices
-    # populateDOF!(model)
+    # populate_DOF_indices!(model)
 
     # #generate global load vectors
-    # populateLoads!(model)
+    # populate_loads!(model)
 
     # #generate stiffnessmatrix
-    # globalS!(model)
+    # create_S!(model)
 
     # model.processed = true
 
@@ -312,7 +312,7 @@ function process_bridge!(model::Model)
     iElement = findall(typeof.(elements) .== Element)
     iBridge = findall(typeof.(elements) .== BridgeElement)
 
-    processElements!(Vector{Element}(elements[iElement]))
+    process_elements!(Vector{Element}(elements[iElement]))
 
     n = length(iElement)
     m = length(iBridge)
@@ -455,7 +455,7 @@ function process_bridge!(model::Model)
     model.elements = [model.elements; newelements]
     model.nodes = [model.nodes; newnodes]
 
-    processElements!(model)
+    process_elements!(model)
 
     # process loads
     # convertloads!(model, itrueactive)
@@ -527,11 +527,11 @@ function process_bridge!(model::Model)
 
 
     # populating DOFs
-    populateDOF!(model)
+    populate_DOF_indices!(model)
 
-    populateLoads!(model)
+    populate_loads!(model)
 
-    Asap.globalS!(model)
+    Asap.create_S!(model)
 
     model.processed = true
 end

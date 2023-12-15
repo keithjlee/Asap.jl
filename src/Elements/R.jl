@@ -3,7 +3,7 @@ Transformation matrix of an element
 """
 function R(element::Element; tol = 1e-4)
     
-    xvec = localx(element)
+    xvec = local_x(element)
     CXx, CYx, CZx = xvec # local x cosines
 
     cΨ = cos(element.Ψ)
@@ -71,7 +71,7 @@ end
 Truss transformation matrix
 """
 function R(element::TrussElement)
-    Cx, Cy, Cz = localx(element)
+    Cx, Cy, Cz = local_x(element)
     return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
 end
 

@@ -2,9 +2,12 @@ abstract type AbstractElement end
 abstract type FrameElement <: AbstractElement end
 
 """
-    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section)
+    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
+    Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
+    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
+    Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
 
-Instantiate a frame element with a given section that connects two nodes.
+Create a frame element.
 
 # Example
 ```julia-repl
@@ -12,21 +15,20 @@ julia> Element(nodes, [1,2], sec)
 Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 2], Node([0.0, 0.0, 0.0], Bool[0, 0, 0, 0, 0, 0], #undef, #undef, #undef, nothing), Node([5000.0, 500.0, 5200.0], Bool[0, 0, 0, 1, 1, 1], #undef, #undef, #undef, nothing), #undef, 7231.18247591637, :fixedfixed, #undef, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], #undef, 1.5707963267948966, #undef, #undef, nothing)
 ```
 
------------------------------
+# Optional argument `release` 
+This property enables decoupling of nodal DOFs with respect to the end of the element.
 
-    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol)
+## Available releases:
+- :fixedfixed (default) - all DOFs are tied to nodes
+- :fixedfree - rotational DOFs are released at end node
+- :freefixed - rotational DOFs are released at start node
+- :freefree - all rotational DOFs are released (truss element)
+- :joist - all rotational DOFs except torsion are released
 
-Instantiate a frame element with a given section that connects two nodes with a given end release.
-Available releases:
-- :fixedfixed (default)
-- :fixedfree
-- :freefixed
-- :freefree
-
-# Example
+## Example
 
 ```julia-repl
-julia> Element(nodes, [1,2], sec, :fixedfree)
+julia> Element(nodes, [1,2], sec; release = :fixedfree)
 Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 2], Node([0.0, 0.0, 0.0], Bool[0, 0, 0, 0, 0, 0], #undef, #undef, #undef, nothing), Node([5000.0, 500.0, 5200.0], Bool[0, 0, 0, 1, 1, 1], #undef, #undef, #undef, nothing), #undef, 7231.18247591637, :fixedfree, #undef, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], #undef, 1.5707963267948966, #undef, #undef, nothing)
 ```
 
@@ -49,20 +51,7 @@ mutable struct Element <: FrameElement
     forces::Vector{Float64} #elemental forces in LCS
     id::Union{Symbol, Nothing} #optional identifier
 
-    function Element(section::Section, release::Symbol, id = nothing)
-        element = new(section)
-        
-        @assert in(release, releases)
-
-        element.Ψ = pi/2
-        element.id = id
-        element.Q = zeros(12)
-        element.loadIDs = Vector{Int64}()
-    end
-
-    Element(section::Section) = Element(section, :fixedfixed)
-
-    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing)
+    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
@@ -71,12 +60,12 @@ mutable struct Element <: FrameElement
         element.Q = zeros(12)
         element.loadIDs = Vector{Int64}()
 
-        element.release = :fixedfixed
+        element.release = release
 
         return element
     end
 
-    function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing)
+    function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
         element = new(section)
         element.nodeStart = nodeStart
         element.nodeEnd = nodeEnd
@@ -86,12 +75,12 @@ mutable struct Element <: FrameElement
         element.Q = zeros(12)
         element.loadIDs = Vector{Int64}()
 
-        element.release = :fixedfixed
+        element.release = release
 
         return element
     end
 
-    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, release::Symbol, id = nothing)
+    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
 
         @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
@@ -108,7 +97,7 @@ mutable struct Element <: FrameElement
         return element
     end
 
-    function Element(nodeStart::Node, nodeEnd::Node, section::Section, release::Symbol, id = nothing)
+    function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
 
         @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
@@ -129,7 +118,9 @@ mutable struct Element <: FrameElement
 end
 
 """
-special element that is generated between two existing elements
+    BridgeElement(elementStart::Element, posStart::Float64, elementEnd::Element, posEnd::Float64, section::Section, id = nothing; release = :fixedfixed)
+
+Create a bridge element between two frame elements. Connects from `elementStart` at a position `elementStart.length * posStart` away from `elementStart.nodeStart.position` to `elementEnd` at `elementEnd.length * posEnd` away from `elementEnd.nodeStart.position`. IE `posStart, posEnd ∈ ]0, 1[`
 """
 mutable struct BridgeElement <: FrameElement
     elementStart::Element
@@ -148,8 +139,8 @@ mutable struct BridgeElement <: FrameElement
             elementEnd::Element, 
             posEnd::Float64, 
             section::Section,
-            release::Symbol = :fixedfixed)
-            id = nothing
+            id = nothing;
+            release = :fixedfixed)
 
         @assert 0 < posStart < 1 && 0 < posEnd < 1 "posStart/End must be ∈ ]0,1["
         @assert in(release, releases)
@@ -166,9 +157,10 @@ end
 
 
 """
-    TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection)
+    TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = nothing)
+    TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = nothing)
 
-Instantiate a truss element with a given section that connects two truss nodes.
+Create a truss element.
 
 # Example
 ```julia-repl

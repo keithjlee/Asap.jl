@@ -1,6 +1,7 @@
 """
-Get initial lengths for form finding;
-assumes units of E, A are consistent with L
+    initial_lengths(network::Network, E::Real, A::Real)
+
+Get the required unstressed length of elements given a material stiffness E and cross sectional area A.
 """
 function initial_lengths(network::Network, E::Real, A::Real)
     
@@ -14,7 +15,9 @@ function initial_lengths(network::Network, E::Real, A::Real)
 end
 
 """
-Initial length method for varying section properties
+    initial_lengths(network::Network, E::Vector{<:Real}, A::Vector{<:Real})
+
+Get the required unstressed length of elements given an element-wise material stiffness vector E and cross sectional area vector A.
 """
 function initial_lengths(network::Network, E::Vector{<:Real}, A::Vector{<:Real})
     n = length(network.elements)
@@ -31,6 +34,11 @@ function initial_lengths(network::Network, E::Vector{<:Real}, A::Vector{<:Real})
     return diag((Id + (Em * Am) \ network.Q * L) \ Id)
 end
 
+"""
+    forces(network::Network)
+
+Return the axial forces in a network.
+"""
 function forces(network::Network)
     return norm.(eachrow(network.C * network.xyz)) .* network.q
 end
@@ -38,7 +46,7 @@ end
 """
     update_q!(network::Network, q::Float64)
 
-Set all force density values to `q` and resolve.
+Set all force density values to `q` and re-solve.
 """
 function update_q!(network::Network, q::Float64)
     setfield!.(network.elements, :q, q)
@@ -50,7 +58,7 @@ end
 """
     update_q!(network::Network, q::Vector{Float64})
 
-Update all force densities with `q` and resolve.
+Update all force densities with `q` and re-solve.
 """
 function update_q!(network::Network, q::Vector{Float64})
     @assert length(q) == length(network.elements)

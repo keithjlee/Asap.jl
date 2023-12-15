@@ -33,7 +33,6 @@ export release!
 export endpoints
 export midpoint
 export axial_force
-export moment
 
 include("Loads/loads.jl")
 include("Loads/utilities.jl")

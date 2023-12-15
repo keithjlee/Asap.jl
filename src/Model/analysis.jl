@@ -1,5 +1,7 @@
 """
-process a network
+    process!(model::Model)
+
+Process a structural model: add linkages between nodes and elements, determine DOF orders, generate the load vectors P, Pf, and assemble the global stiffness matrix, S.
 """
 function process!(model::Model)
 
@@ -8,45 +10,50 @@ function process!(model::Model)
     if any(typeof.(model.elements) .== BridgeElement)
         processBridge!(model)
     else
-        processElements!(model)
+        process_elements!(model)
     end
 
     #global DOF 
-    populateDOF!(model)
+    populate_DOF_indices!(model)
 
     #loads
-    populateLoads!(model)
+    populate_loads!(model)
 
     #stiffness matrix
-    globalS!(model)
-
-    #processing finished
-    model.processed = true
-end
-
-function process!(model::TrussModel)
-
-    make_ids!(model)
-
-    processElements!(model)
-
-    #global DOF 
-    populateDOF!(model)
-
-    #loads
-    populateLoads!(model)
-
-    #stiffness matrix
-    globalS!(model)
+    create_S!(model)
 
     #processing finished
     model.processed = true
 end
 
 """
-    solve!(model::AbstractModel; reprocess = false)
+    process!(model::TrussModel)
 
-Perform a structural analysis. `reprocess = true` re-generates the stiffness matrix and resets all saved solutions.
+Process a structural truss model: add linkages between nodes and elements, determine DOF orders, generate the load vector P, and assemble the global stiffness matrix, S.
+"""
+function process!(model::TrussModel)
+
+    make_ids!(model)
+
+    process_elements!(model)
+
+    #global DOF 
+    populate_DOF_indices!(model)
+
+    #loads
+    populate_loads!(model)
+
+    #stiffness matrix
+    create_S!(model)
+
+    #processing finished
+    model.processed = true
+end
+
+"""
+    solve!(model::Model; reprocess = false)
+
+Solve for the nodal displacements of a structural model. `reprocess = true` reevaluates all node/element properties and reassembles the global stiffness matrix.
 """
 function solve!(model::Model; reprocess = false)
 
@@ -79,7 +86,11 @@ function solve!(model::Model; reprocess = false)
     postprocess!(model)
 end
 
+"""
+    solve!(model::TrussModel; reprocess = false)
 
+Solve for the nodal displacements of a structural truss model. `reprocess = true` reevaluates all node/element properties and reassembles the global stiffness matrix.
+"""
 function solve!(model::TrussModel; reprocess = false)
 
     if !model.processed || reprocess
@@ -109,13 +120,13 @@ end
 """
     solve(model::Model, L::Vector{Load})
 
-Return the displacement vector to a new set of loads
+Return the displacement vector under a given load set L.
 """
 function solve(model::Model, L::Vector{<:Load})
 
-    @assert model.processed "Model must be already processed"
+   model.processed  || process!(model)
     
-    F = createF(model, L)
+    F = create_F(model, L)
     
     idx = model.freeDOFs
 
@@ -154,13 +165,13 @@ end
 """
     solve(model::TrussModel, L::Vector{NodeForce})
 
-Return the displacement vector to a new set of loads
+Return the displacement vector to a new set of loads.
 """
 function solve(model::TrussModel, L::Vector{NodeForce})
 
-    !model.processed && process!(model)
+    !model.processed || process!(model)
     
-    F = createF(model, L)
+    F = create_F(model, L)
     
     idx = model.freeDOFs
 

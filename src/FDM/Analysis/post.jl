@@ -1,5 +1,7 @@
 """
-applied to network
+    xyz_update!(network::Network)
+
+Update network.xyz to reflect new equilibrium positions of nodes.
 """
 function xyz_update!(network::Network)
     for index in network.N
@@ -7,6 +9,11 @@ function xyz_update!(network::Network)
     end
 end
 
+"""
+    reactions!(network::Network)
+
+Get the reaction force vectors of fixed nodes.
+"""
 function reactions!(network::Network)
     
     for i in network.F
@@ -19,7 +26,7 @@ function reactions!(network::Network)
 
         for index in iels
             e = network.elements[index]
-            eforce = localx(e) * force(e)
+            eforce = local_x(e) * force(e)
 
             if network.C[index, i] < 0
                 rxn .+= eforce
@@ -31,11 +38,4 @@ function reactions!(network::Network)
         node.reaction = rxn
     end
 
-end
-
-"""
-∑|F|L
-"""
-function FL(network::Network)
-    return sum(norm.(eachrow(network.C * network.xyz)).^2 .* network.q)
 end
