@@ -27,9 +27,6 @@ function q_local(load::PointLoad)
     mz2 = -py * a^2 * b / l^2
 
     # shear in local Y
-    # vy2 = (py * a - mz1 - mz2) / l
-    # vy2 = (py * a - mz1 - mz2) / l
-    # vy1 = py - vy2
     vy1 = py * b^2 / l^3 * (3a + b)
     vy2 = py * a^2 / l^3 * (a + 3b)
 
@@ -41,9 +38,6 @@ function q_local(load::PointLoad)
     my2 = pz * a^2 * b / l^2
 
     # shear in local Z
-    # vz2 = (pz * a - my1 - my2) / l
-    # vz2 = (pz * a - my1 + my2) / l
-    # vz1 = pz - vz2
     vz1 = pz * b^2 / l^3 * (3a + b)
     vz2 = pz * a^2 / l^3 * (a + 3b)
 
