@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/426740094.svg)](https://zenodo.org/doi/10.5281/zenodo.10581559)
+
 ![](READMEassets/aSAP.png)
 
 # aSAP
