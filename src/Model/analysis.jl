@@ -64,9 +64,14 @@ function solve!(model::Model; reprocess = false)
         end
 
         for element in model.elements
-            empty!(element.loadIDs)
-            element.Q = zero(element.Q)
+            if typeof(element) == BridgeElement
+                empty!(element.loadIDs)
+            else
+                empty!(element.loadIDs)
+                element.Q = zero(element.Q)
+            end
         end
+        
         process!(model)
     end
 
