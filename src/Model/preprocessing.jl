@@ -164,8 +164,9 @@ Generate the fixed-end force vector `Q` for a given load, and populate the globa
 """
 function populate_load!(model::Model, load::ElementLoad)
     idx = load.element.globalID
-    load.element.Q += load.element.R' * q(load)
-    model.Pf[idx] += load.element.Q
+    fixed_end_forces_GCS = load.element.R' * q(load)
+    load.element.Q += fixed_end_forces_GCS
+    model.Pf[idx] += fixed_end_forces_GCS
 end
 
 """
@@ -175,7 +176,7 @@ Populate an external fixed-end force vector Pf with respect the an elemental loa
 """
 function populate_load!(Pf::Vector{Float64}, load::ElementLoad)
     idx = load.element.globalID
-    Pf[idx] += load.element.R' * Q(load)
+    Pf[idx] += load.element.R' * q(load)
 end
 
 """
