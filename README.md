@@ -1,6 +1,6 @@
 [![DOI](https://zenodo.org/badge/426740094.svg)](https://zenodo.org/doi/10.5281/zenodo.10581559)
 
-![](READMEassets/aSAP.png)
+![](READMEassets/forces-axo.png)
 
 # aSAP
 aSAP is...
@@ -9,8 +9,6 @@ aSAP is...
 - another Structural Analysis Package
 
 Designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
-
-![](READMEassets/spaceframe_irregular.png)
 
 # Overview
 The primary information object is the  `Model` data structure, that is constructed from a vector of `Node`s, `Element`s and `Load`s. Model nodes contain 6 DOF by default; for convenience, a subtype `TrussModel` (`TrussNode`, `TrussElement`) for large truss analysis is also provided. The following provides a quick overview of the general taxonomy and workflow.
