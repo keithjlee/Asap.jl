@@ -2,6 +2,36 @@
 
 ![](READMEassets/forces-axo.png)
 
+# Installation
+Asap.jl is not yet registered. Add via:
+```julia
+using Pkg
+Pkg.add(url="https://github.com/keithjlee/Asap")
+```
+
+## Citing
+When using or extending this software for research purposes, please cite using the following:
+
+### Bibtex
+```
+@software{lee_2024_10581560,
+  author       = {Lee, Keith Janghyun},
+  title        = {Asap.jl},
+  month        = jan,
+  year         = 2024,
+  publisher    = {Zenodo},
+  version      = {v0.1},
+  doi          = {10.5281/zenodo.10581560},
+  url          = {https://doi.org/10.5281/zenodo.10581560}
+}
+```
+
+### Other styles
+Or find a pre-written citation in the style of your choice [here](https://zenodo.org/records/10724610) (see the Citation box on the right side). E.g., for APA:
+```
+Lee, K. J. (2024). Asap.jl (v0.1). Zenodo. https://doi.org/10.5281/zenodo.10581560
+```
+
 # Asap.jl
 Asap is...
 - the anti-SAP (2000)
