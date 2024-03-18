@@ -10,7 +10,7 @@ Asap is...
 
 Designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
 
-See also: [AsapToolkit](https://github.com/keithjlee/AsapToolkit), [AsapOptim](https://github.com/keithjlee/AsapOptim), [AsapHarmonics](https://github.com/keithjlee/AsapHarmonics.)
+See also: [AsapToolkit](https://github.com/keithjlee/AsapToolkit), [AsapOptim](https://github.com/keithjlee/AsapOptim), [AsapHarmonics](https://github.com/keithjlee/AsapHarmonics).
 
 # Installation
 Asap.jl is now a registered Julia package. Install through package mode in the REPL:
