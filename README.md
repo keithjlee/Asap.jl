@@ -2,11 +2,25 @@
 
 ![](READMEassets/forces-axo.png)
 
+# Asap.jl
+Asap is...
+- the anti-SAP (2000)
+- results as Soon As Possible
+- another Structural Analysis Package
+
+Designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
+
+See also: [AsapToolkit](https://github.com/keithjlee/AsapToolkit), [AsapOptim](https://github.com/keithjlee/AsapOptim), [AsapHarmonics](https://github.com/keithjlee/AsapHarmonics.)
+
 # Installation
-Asap.jl is not yet registered. Add via:
+Asap.jl is now a registered Julia package. Install through package mode in the REPL:
+```julia
+pkg> add Asap
+```
+or
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/keithjlee/Asap")
+Pkg.Add("Asap")
 ```
 
 ## Citing
@@ -31,16 +45,6 @@ Or find a pre-written citation in the style of your choice [here](https://zenodo
 ```
 Lee, K. J. (2024). Asap.jl (v0.1). Zenodo. https://doi.org/10.5281/zenodo.10581560
 ```
-
-# Asap.jl
-Asap is...
-- the anti-SAP (2000)
-- results as Soon As Possible
-- another Structural Analysis Package
-
-Designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
-
-See also: [AsapToolkit](https://github.com/keithjlee/AsapToolkit), [AsapOptim](https://github.com/keithjlee/AsapOptim), [AsapHarmonics](https://github.com/keithjlee/AsapHarmonics.)
 
 # Overview
 The primary information object is the  `Model` data structure, that is constructed from a vector of `Node`s, `Element`s and `Load`s. Model nodes contain 6 DOF by default; for convenience, a subtype `TrussModel` (`TrussNode`, `TrussElement`) for large truss analysis is also provided. The following provides a quick overview of the general taxonomy and workflow.
