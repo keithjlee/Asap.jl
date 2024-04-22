@@ -1,9 +1,9 @@
 """
-    xyz_update!(network::Network)
+    update_xyz!(network::Network)
 
 Update network.xyz to reflect new equilibrium positions of nodes.
 """
-function xyz_update!(network::Network)
+function update_xyz!(network::Network)
     for index in network.N
         network.nodes[index].position = network.xyz[index, :]
     end

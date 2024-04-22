@@ -2,15 +2,15 @@ abstract type AbstractElement end
 abstract type FrameElement <: AbstractElement end
 
 """
-    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
+    Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id::Symbol = nothing; release = :fixedfixed)
     Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
 
-Create a frame element.
+Create a frame element with an optional `id` tag.
 
 # Example
 ```julia-repl
 julia> Element(nodes, [1,2], sec)
-Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 2], Node([0.0, 0.0, 0.0], Bool[0, 0, 0, 0, 0, 0], #undef, #undef, #undef, nothing), Node([5000.0, 500.0, 5200.0], Bool[0, 0, 0, 1, 1, 1], #undef, #undef, #undef, nothing), #undef, 7231.18247591637, :fixedfixed, #undef, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], #undef, 1.5707963267948966, #undef, #undef, nothing)
+julia> Element(node1, node2, sec, :groundfloor_element)
 ```
 
 # Optional argument `release` 
@@ -27,7 +27,6 @@ This property enables decoupling of nodal DOFs with respect to the end of the el
 
 ```julia-repl
 julia> Element(nodes, [1,2], sec; release = :fixedfree)
-Element(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0), [1, 2], Node([0.0, 0.0, 0.0], Bool[0, 0, 0, 0, 0, 0], #undef, #undef, #undef, nothing), Node([5000.0, 500.0, 5200.0], Bool[0, 0, 0, 1, 1, 1], #undef, #undef, #undef, nothing), #undef, 7231.18247591637, :fixedfree, #undef, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], #undef, 1.5707963267948966, #undef, #undef, nothing)
 ```
 
 """

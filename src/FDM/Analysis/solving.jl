@@ -12,7 +12,7 @@ function solve!(network::Network; reprocess = false)
     network.xyz[network.N, :] = (network.Cn' * network.Q * network.Cn) \ (network.Pn .- network.Cn' * network.Q * network.Cf * network.xyz[network.F, :])
 
     # update nodal positions
-    xyz_update!(network)
+    update_xyz!(network)
 
     #get reactions 
     reactions!(network)

@@ -416,5 +416,3 @@ Note that the original `element.id` is also transferred to all new sub-elements,
 
 # Extensions, Related packages
 See [AsapToolkit.jl](https://github.com/keithjlee/AsapToolkit) for even more utility and post-processing functions.
-
-See [SteelSections.jl](https://github.com/keithjlee/SteelSections) for readily accessible `Section` generation of tabulated AISC steel sections.

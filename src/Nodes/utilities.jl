@@ -15,10 +15,20 @@ function Base.findall(nodes::Vector{TrussNode}, i::Symbol)
     return findall([node.id == i for node in nodes])
 end
 
-"""
-    planarize!(nodes::Vector{AbstractNode}, plane = :XY)
+import Base: -
+-(node1::AbstractNode, node2::AbstractNode) = node1.position - node2.position
 
-Restrict the dofs of a set of nodes to remain on a plane. Choose from: :XY, :YZ, :ZX
+"""
+    planarize!(nodes, plane = :XY)
+
+Restrict the DOFs of a set of nodes to a given global plane. E.g., when analyzing a 2D structure.
+
+# Arguments
+- `nodes::Vector{<:AbstractNode}` vector of nodes to restrict
+- `plane::Symbol = :XY` plane to restrict DOFs. Defaults to the XY plane, can be:
+    - :XY
+    - :XZ
+    - :YZ
 """
 function planarize!(nodes::Vector{Node}, plane = :XY)
     idx = planeDict[plane]
@@ -39,13 +49,16 @@ end
 """
     fixnode!(node::AbstractNode, fixity::Symbol)
 
-Change the DOFs of a node to a common boundary condition.
-Available boundary conditions:
-- :free
-- :fixed
-- :pinned
-- :(x/y/z)free
-- :(x/y/z)fixed
+Fix the DOFs of a node to a common boundary condition.
+
+# Arguments
+- `node::AbstractNode`node to modify
+- `fixity::Symbol` boundary condition to apply. Available boundary conditions:
+    - :free
+    - :fixed
+    - :pinned
+    - :(x/y/z)free
+    - :(x/y/z)fixed
 """
 function fixnode!(node::Node, fixity::Symbol)
     node.dof = copy(fixDict[fixity])
@@ -53,11 +66,4 @@ end
 
 function fixnode!(node::TrussNode, fixity::Symbol)
     node.dof = copy((fixDict[fixity])[1:3])
-end
-
-"""
-Distance between two nodes
-"""
-function dist(n1::AbstractNode, n2::AbstractNode)
-    return norm(n1.position .- n2.position)
 end

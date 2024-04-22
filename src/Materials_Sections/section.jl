@@ -24,7 +24,6 @@ struct Section <: AbstractSection
     ρ::Float64 # density
 
     function Section(A::Float64, E::Float64, G::Float64, Ix::Float64, Iy::Float64, J::Float64, ρ::Float64 = 1.)
-        # println("Density ρ not provided, defaults to ρ = 1; self-weight analysis will not function")
         return new(A, E, G, Ix, Iy, J, ρ)
     end
 
@@ -51,7 +50,6 @@ struct TrussSection <: AbstractSection
     ρ::Float64
 
     function TrussSection(A::Float64, E::Float64, ρ = 1.)
-        # println("Density ρ not provided, defaults to ρ = 1; self-weight analysis will not function")
         return new(A, E, ρ)
     end
 
