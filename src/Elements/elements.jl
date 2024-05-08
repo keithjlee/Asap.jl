@@ -3,7 +3,7 @@ abstract type FrameElement <: AbstractElement end
 
 """
     Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id::Symbol = nothing; release = :fixedfixed)
-    Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
+    Element(nodeStart::Node, nodeEnd::Node, section::Section, id = :element; release = :fixedfixed)
 
 Create a frame element with an optional `id` tag.
 
@@ -46,9 +46,9 @@ mutable struct Element <: FrameElement
     Ψ::Float64 #roll angle
     LCS::Vector{Vector{Float64}} #local coordinate frame (X, y, z)
     forces::Vector{Float64} #elemental forces in LCS
-    id::Union{Symbol, Nothing} #optional identifier
+    id::Symbol #optional identifier
 
-    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = nothing; release = :fixedfixed)
+    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = :element; release = :fixedfixed)
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
@@ -62,7 +62,7 @@ mutable struct Element <: FrameElement
         return element
     end
 
-    function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = nothing; release = :fixedfixed)
+    function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = :element; release = :fixedfixed)
 
         @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
@@ -83,7 +83,7 @@ mutable struct Element <: FrameElement
 end
 
 """
-    BridgeElement(elementStart::Element, posStart::Float64, elementEnd::Element, posEnd::Float64, section::Section, id = nothing; release = :fixedfixed)
+    BridgeElement(elementStart::Element, posStart::Float64, elementEnd::Element, posEnd::Float64, section::Section, id = :element; release = :fixedfixed)
 
 Create a bridge element between two frame elements. Connects from `elementStart` at a position `elementStart.length * posStart` away from `elementStart.nodeStart.position` to `elementEnd` at `elementEnd.length * posEnd` away from `elementEnd.nodeStart.position`. IE `posStart, posEnd ∈ ]0, 1[`
 """
@@ -104,7 +104,7 @@ mutable struct BridgeElement <: FrameElement
             elementEnd::Element, 
             posEnd::Float64, 
             section::Section,
-            id = nothing;
+            id = :element;
             release = :fixedfixed)
 
         @assert 0 < posStart < 1 && 0 < posEnd < 1 "posStart/End must be ∈ ]0,1["
@@ -122,8 +122,8 @@ end
 
 
 """
-    TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = nothing)
-    TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = nothing)
+    TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = :element)
+    TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = :element)
 
 Create a truss element.
 
@@ -149,7 +149,7 @@ mutable struct TrussElement <: AbstractElement
     LCS::Vector{Vector{Float64}}
     id::Union{Symbol, Nothing} #optional identifier
 
-    function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = nothing)
+    function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = :element)
         element = new(section)
 
         element.nodeStart, element.nodeEnd = nodes[nodeIndex]
@@ -160,7 +160,7 @@ mutable struct TrussElement <: AbstractElement
         return element
     end
 
-    function TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = nothing)
+    function TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = :element)
         element = new(section)
         element.nodeStart = nodeStart
         element.nodeEnd = nodeEnd

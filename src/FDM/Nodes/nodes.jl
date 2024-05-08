@@ -1,6 +1,6 @@
 """
-    FDMnode(x::Real, y::Real, z::Real, dof::Bool, id = nothing)
-    FDMnode(pos::Vector{<:Real}, dof::Bool, id = nothing)
+    FDMnode(x::Real, y::Real, z::Real, dof::Bool, id = :node)
+    FDMnode(pos::Vector{<:Real}, dof::Bool, id = :node)
 
 A node in an FDM network defined by its spatial position [x, y, z] and degree of freedom (free = `true`, fixed = `false`)
 
@@ -14,8 +14,8 @@ A node in an FDM network defined by its spatial position [x, y, z] and degree of
 mutable struct FDMnode
     position::Vector{Float64}
     dof::Bool # true = free; false = fixed
-    id::Union{Symbol, Nothing}
-    nodeID::Integer
+    id::Symbol
+    nodeID::Int64
     reaction::Vector{Float64}
 
     #empty constructor
@@ -24,18 +24,18 @@ mutable struct FDMnode
     end
 
     # individual coordinate basis
-    function FDMnode(x::Real, y::Real, z::Real, dof::Bool, id = nothing)
+    function FDMnode(x::Real, y::Real, z::Real, dof::Bool, id = :node)
         return new(Float64.([x, y, z]), dof, id)
     end
 
     # # using a vector to represent position
-    # function FDMnode(pos::Vector{Float64}, dof::Bool, id = nothing)
+    # function FDMnode(pos::Vector{Float64}, dof::Bool, id = :node)
     #     @assert length(pos) == 3 "pos should be length 3"
         
     #     return FDMnode(pos, dof, id)
     # end
 
-    function FDMnode(pos::Vector{<:Real}, dof::Bool, id = nothing)
+    function FDMnode(pos::Vector{<:Real}, dof::Bool, id = :node)
         @assert length(pos) == 3 "pos should be length 3"
         
         return new(Float64.(pos), dof, id)

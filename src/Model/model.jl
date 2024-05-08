@@ -1,25 +1,25 @@
 abstract type AbstractModel end
 
 function make_ids!(nodes::Vector{<:AbstractNode})
-    @inbounds for (i, node) in enumerate(nodes)
+    for (i, node) in enumerate(nodes)
         node.nodeID = i
     end
 end
 
 function make_ids!(elements::Vector{TrussElement})
-    @inbounds for (i, element) in enumerate(elements)
+    for (i, element) in enumerate(elements)
         element.elementID = i
     end
 end
 
 function make_ids!(elements::Vector{<:FrameElement})
-    @inbounds for (i, element) in enumerate(elements)
+    for (i, element) in enumerate(elements)
         element.elementID = i
     end
 end
 
 function make_ids!(loads::Vector{<:AbstractLoad})
-    @inbounds for (i, load) in enumerate(loads)
+    for (i, load) in enumerate(loads)
         load.loadID = i
     end
 end

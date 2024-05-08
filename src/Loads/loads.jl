@@ -15,24 +15,24 @@ mutable struct NodeForce <: NodeLoad
     node::Union{Node, TrussNode}
     value::Vector{Float64}
     loadID::Int64
-    id::Union{Symbol, Nothing}
+    id::Symbol
     
-    function NodeForce(node::AbstractNode, value::Vector{Float64})
+    function NodeForce(node::AbstractNode, value::Vector{Float64}, id::Symbol = :force)
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
         force = new(node, value)
-        force.id = nothing
+        force.id = id
 
         return force
     end
 
-    function NodeForce(nodes::Vector{<:AbstractNode}, index::Integer, value::Vector{Float64})
+    function NodeForce(nodes::Vector{<:AbstractNode}, index::Integer, value::Vector{Float64}, id::Symbol = :force)
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
         force = new(nodes[index], value)
-        force.id = nothing
+        force.id = id
 
         return force
     end
@@ -47,14 +47,14 @@ mutable struct NodeMoment <: NodeLoad
     node::Node
     value::Vector{Float64}
     loadID::Int64
-    id::Union{Symbol, Nothing}
+    id::Symbol
     
-    function NodeMoment(node::Node, value::Vector{Float64})
+    function NodeMoment(node::Node, value::Vector{Float64}, id::Symbol = :moment)
 
         @assert length(value) == 3 "Moment vector must be in R³ (GCS)"
 
         force = new(node, value)
-        force.id = nothing
+        force.id = id
 
         return force
     end
@@ -74,14 +74,14 @@ mutable struct LineLoad <: ElementLoad
     element::FrameElement
     value::Vector{Float64}
     loadID::Int64
-    id::Union{Symbol, Nothing}
+    id::Symbol
 
-    function LineLoad(element::T, value::Vector{Float64}) where T <: FrameElement
+    function LineLoad(element::T, value::Vector{Float64}, id::Symbol = :lineload) where T <: FrameElement
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
         force = new(element, value)
-        force.id = nothing
+        force.id = id
         return force
     end
 end
@@ -97,11 +97,11 @@ mutable struct GravityLoad <: ElementLoad
     element::FrameElement
     factor::Float64
     loadID::Int64
-    id::Union{Symbol, Nothing}
+    id::Symbol
 
-    function GravityLoad(element::FrameElement, factor::Float64)
+    function GravityLoad(element::FrameElement, factor::Float64, id::Symbol = :gravityload)
         force = new(element, factor)
-        force.id = nothing
+        force.id = id
         return force
     end
 end
@@ -117,14 +117,14 @@ mutable struct PointLoad <: ElementLoad
     position::Float64
     value::Vector{Float64}
     loadID::Int64
-    id::Union{Symbol, Nothing}
+    id::Symbol
 
-    function PointLoad(element::FrameElement, position::Float64, value::Vector{Float64})
+    function PointLoad(element::FrameElement, position::Float64, value::Vector{Float64}, id::Symbol = :pointload)
         @assert 0 < position < 1 "position must be ∈ ]0, 1["
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
         force = new(element, position, value)
-        force.id = nothing
+        force.id = id
         return force
     end
 end

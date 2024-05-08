@@ -4,7 +4,7 @@ function topologizematrix(elements::Vector{<:FrameElement}, indexer::Dict{Int64,
 
     activeelements = Vector{Int64}()
 
-    @inbounds for (i, e) in enumerate(elements)
+    for (i, e) in enumerate(elements)
         rowstart = indexer[e.elementStart.elementID]
         rowend = indexer[e.elementEnd.elementID]
 
@@ -64,7 +64,7 @@ function shatter!(model::Model,
         istore = Vector{Int64}()
 
         #iterate through fractures
-        @inbounds for (j, frac) in enumerate(fractions)
+        for (j, frac) in enumerate(fractions)
             frac == 0 && continue #no fracture occurs
 
             # if first non-zero value
@@ -116,7 +116,7 @@ function shatter!(model::Model,
         releases = shatterReleaseDict[element.release]
 
         # create intermediary elements
-        @inbounds for k = 1:length(nodeset) - 1
+        for k = 1:length(nodeset) - 1
             el = Element(nodeset[k], nodeset[k+1], element.section)
             el.elementID = element.elementID
             el.Ψ = element.Ψ
@@ -138,7 +138,7 @@ function shatter!(model::Model,
 
 
     #create new bridge elements
-    @inbounds for (k, be) in enumerate(model.elements[ibridge])
+    for (k, be) in enumerate(model.elements[ibridge])
         rowstart = indexerFwd[be.elementStart.elementID]
         rowend = indexerFwd[be.elementEnd.elementID]
 
@@ -225,7 +225,7 @@ function convertloads!(model::Model, itrue::Vector{Int64})
 
     elementIDs = getproperty.(model.elements, :elementID)
 
-    @inbounds for (index, load) in enumerate(model.loads)
+    for (index, load) in enumerate(model.loads)
 
         #conversions only aplly to elemental loads
         typeof(load) <: NodeForce && continue
