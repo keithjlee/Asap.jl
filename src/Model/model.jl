@@ -57,10 +57,28 @@ mutable struct Model <: AbstractModel
     processed::Bool
     
     function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:AbstractLoad})
-        structure = new(nodes, elements, loads)
+        nnodes = length(nodes)
+        nelements = length(elements)
 
-        structure.processed = false
-        structure.tol = 1e-3
+        structure = new(
+            nodes,
+            elements,
+            loads,
+            nnodes,
+            nelements,
+            Bool[],
+            0,
+            Int64[],
+            Int64[],
+            spzeros(Float64, 6nnodes, 6nnodes),
+            zeros(6nnodes),
+            zeros(6nnodes),
+            zeros(6nnodes),
+            zeros(6nnodes),
+            0.0,
+            1e-6,
+            false
+        )
 
         return structure
     end
@@ -103,10 +121,27 @@ mutable struct TrussModel <: AbstractModel
     processed::Bool
     
     function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement}, loads::Vector{NodeForce})
-        structure = new(nodes, elements, loads)
+        nnodes = length(nodes)
+        nelements = length(elements)
 
-        structure.processed = false
-        structure.tol = 1e-3
+        structure = new(
+            nodes,
+            elements,
+            loads,
+            nnodes,
+            nelements,
+            Bool[],
+            0,
+            Int64[],
+            Int64[],
+            spzeros(Float64, 3nnodes, 3nnodes),
+            zeros(3nnodes),
+            zeros(3nnodes),
+            zeros(3nnodes),
+            0.0,
+            1e-6,
+            false
+        )
 
         return structure
     end

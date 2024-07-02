@@ -42,17 +42,15 @@ mutable struct Node <: AbstractNode
     function Node(position::Vector{Float64}, dofs::Vector{Bool}, id = :node)
         @assert length(position) == 3 && length(dofs) == 6 "Position vector must be in R³, DOFs must be length 6"
 
-        node = new(position, dofs)
-
-        node.id = id
-
-        # node = new(
-        #     position,
-        #     dofs,
-        #     0,
-        #     Vector{Int64}(undef, 6)
-        #     Vector{Int64}(),
-        # )
+        node = new(
+            position,
+            dofs,
+            0,
+            Vector{Int64}(undef, 6),
+            zeros(6),
+            zeros(6),
+            id
+        )
 
         return node
     end
@@ -63,9 +61,15 @@ mutable struct Node <: AbstractNode
 
         dofs = copy(fixDict[fixity])
 
-        node = new(position, dofs)
-
-        node.id = id
+        node = new(
+            position,
+            dofs,
+            0,
+            Vector{Int64}(undef, 6),
+            zeros(6),
+            zeros(6),
+            id
+        )
 
         return node
     end
@@ -113,12 +117,15 @@ mutable struct TrussNode <: AbstractNode
         
         @assert length(position) == length(dofs) == 3  "Position and dof vector must be in R³"
 
-        node = new(position, dofs)
-
-        node.displacement = zeros(6)
-        node.reaction = zeros(6)
-
-        node.id = id
+        node = new(
+            position,
+            dofs,
+            0,
+            Vector{Int64}(undef, 3),
+            zeros(3),
+            zeros(3),
+            id
+        )
 
         return node
     end
@@ -129,12 +136,15 @@ mutable struct TrussNode <: AbstractNode
 
         dofs = copy(fixDict[fixity][1:3])
 
-        node = new(position, dofs)
-
-        node.displacement = zeros(3)
-        node.reaction = zeros(3)
-
-        node.id = id
+        node = new(
+            position,
+            dofs,
+            0,
+            Vector{Int64}(undef, 3),
+            zeros(3),
+            zeros(3),
+            id
+        )
 
         return node
     end

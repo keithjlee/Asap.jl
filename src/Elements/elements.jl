@@ -48,14 +48,24 @@ mutable struct Element <: FrameElement
     id::Symbol #optional identifier
 
     function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = :element; release = :fixedfixed)
-        element = new(section)
 
-        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.Ψ = pi/2
-        element.id = id
-        element.Q = zeros(12)
-
-        element.release = release
+        element = new(
+            section,
+            nodes[nodeIndex[1]],
+            nodes[nodeIndex[2]],
+            Vector{Int64}(undef, 2),
+            0,
+            Vector{Int64}(undef, 12),
+            0.0,
+            release,
+            zeros(12,12),
+            zeros(12),
+            zeros(12,12),
+            pi/2,
+            repeat([zeros(3)], 3),
+            zeros(12),
+            id
+        )
 
         return element
     end
@@ -64,15 +74,23 @@ mutable struct Element <: FrameElement
 
         @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
-        element = new(section)
-        element.nodeStart = nodeStart
-        element.nodeEnd = nodeEnd
-
-        element.Ψ = pi/2
-        element.id = id
-        element.Q = zeros(12)
-
-        element.release = release
+        element = new(
+            section,
+            nodeStart,
+            nodeEnd,
+            Vector{Int64}(undef, 2),
+            0,
+            Vector{Int64}(undef, 12),
+            0.0,
+            release,
+            zeros(12,12),
+            zeros(12),
+            zeros(12,12),
+            pi/2,
+            repeat([zeros(3)], 3),
+            zeros(12),
+            id
+        )
 
         return element
     end
@@ -106,9 +124,7 @@ mutable struct BridgeElement <: FrameElement
         @assert 0 < posStart < 1 && 0 < posEnd < 1 "posStart/End must be ∈ ]0,1["
         @assert in(release, releases)
 
-        be = new(elementStart, posStart, elementEnd, posEnd, section, release)
-        be.Ψ = pi/2
-        be.id = id
+        be = new(elementStart, posStart, elementEnd, posEnd, section, release, pi/2, 0, id)
 
         return be
     end
@@ -130,7 +146,7 @@ TrussElement(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0),
 
 """
 mutable struct TrussElement <: AbstractElement
-    section::AbstractSection #cross section
+    section::Union{TrussSection,Section} #cross section
     nodeStart::TrussNode #start position
     nodeEnd::TrussNode #end position
     nodeIDs::Vector{Int64} #indices of start/end nodes 
@@ -145,22 +161,41 @@ mutable struct TrussElement <: AbstractElement
     id::Union{Symbol, Nothing} #optional identifier
 
     function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = :element)
-        element = new(section)
-
-        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.id = id
-
-        element.Ψ = pi/2
+        element = new(
+            section,
+            nodes[nodeIndex[1]],
+            nodes[nodeIndex[2]],
+            Vector{Int64}(undef, 2),
+            0,
+            Vector{Int64}(undef, 6),
+            0.0,
+            zeros(2,2),
+            zeros(2,6),
+            zeros(6),
+            pi/2,
+            repeat([zeros(3)], 3),
+            id
+        )
 
         return element
     end
 
     function TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = :element)
-        element = new(section)
-        element.nodeStart = nodeStart
-        element.nodeEnd = nodeEnd
-        element.id = id
-        element.Ψ = pi/2
+        element = new(
+            section,
+            nodeStart,
+            nodeEnd,
+            Vector{Int64}(undef, 2),
+            0,
+            Vector{Int64}(undef, 6),
+            0.0,
+            zeros(2,2),
+            zeros(2,6),
+            zeros(6),
+            pi/2,
+            repeat([zeros(3)], 3),
+            id
+        )
 
         return element
     end

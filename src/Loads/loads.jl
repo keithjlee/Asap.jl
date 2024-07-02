@@ -21,18 +21,14 @@ mutable struct NodeForce <: NodeLoad
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
-        force = new(node, value)
-        force.id = id
+        force = new(node, value, 0, id)
 
         return force
     end
 
     function NodeForce(nodes::Vector{<:AbstractNode}, index::Integer, value::Vector{Float64}, id::Symbol = :force)
 
-        @assert length(value) == 3 "load vector must be in R³ (GCS)"
-
-        force = new(nodes[index], value)
-        force.id = id
+        NodeForce(nodes[index], value, id)
 
         return force
     end
@@ -53,8 +49,7 @@ mutable struct NodeMoment <: NodeLoad
 
         @assert length(value) == 3 "Moment vector must be in R³ (GCS)"
 
-        force = new(node, value)
-        force.id = id
+        force = new(node, value, 0, id)
 
         return force
     end
@@ -75,8 +70,8 @@ mutable struct LineLoad <: ElementLoad
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
-        force = new(element, value)
-        force.id = id
+        force = new(element, value, 0, id)
+
         return force
     end
 end
@@ -95,8 +90,7 @@ mutable struct GravityLoad <: ElementLoad
     id::Symbol
 
     function GravityLoad(element::FrameElement, factor::Float64, id::Symbol = :gravityload)
-        force = new(element, factor)
-        force.id = id
+        force = new(element, factor, 0, id)
         return force
     end
 end
@@ -118,8 +112,7 @@ mutable struct PointLoad <: ElementLoad
         @assert 0 < position < 1 "position must be ∈ ]0, 1["
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
-        force = new(element, position, value)
-        force.id = id
+        force = new(element, position, value, 0, id)
         return force
     end
 end
