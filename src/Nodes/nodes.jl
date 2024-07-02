@@ -35,7 +35,6 @@ mutable struct Node <: AbstractNode
     dof::Vector{Bool}
     nodeID::Int64
     globalID::Vector{Int64}
-    loadIDs::Vector{Int64}
     reaction::Vector{Float64}
     displacement::Vector{Float64}
     id::Symbol
@@ -46,7 +45,14 @@ mutable struct Node <: AbstractNode
         node = new(position, dofs)
 
         node.id = id
-        node.loadIDs = Vector{Int64}()
+
+        # node = new(
+        #     position,
+        #     dofs,
+        #     0,
+        #     Vector{Int64}(undef, 6)
+        #     Vector{Int64}(),
+        # )
 
         return node
     end
@@ -60,7 +66,6 @@ mutable struct Node <: AbstractNode
         node = new(position, dofs)
 
         node.id = id
-        node.loadIDs = Vector{Int64}()
 
         return node
     end
@@ -100,7 +105,6 @@ mutable struct TrussNode <: AbstractNode
     dof::Vector{Bool}
     nodeID::Int64
     globalID::Vector{Int64}
-    loadIDs::Vector{Int64}
     reaction::Vector{Float64}
     displacement::Vector{Float64}
     id::Symbol
@@ -115,7 +119,6 @@ mutable struct TrussNode <: AbstractNode
         node.reaction = zeros(6)
 
         node.id = id
-        node.loadIDs = Vector{Int64}()
 
         return node
     end
@@ -132,7 +135,6 @@ mutable struct TrussNode <: AbstractNode
         node.reaction = zeros(3)
 
         node.id = id
-        node.loadIDs = Vector{Int64}()
 
         return node
     end

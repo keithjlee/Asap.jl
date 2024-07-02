@@ -20,11 +20,6 @@ function populate_DOF_indices!(model::Model)
         node.globalID = i * n_dof - (n_dof - 1) .+ dofset
     end
 
-    #assign an id to load, store load id into relevant node/element
-    for load in model.loads
-        assign!(load)
-    end
-
     # assign an id to element, get associated node IDs, extract global DOF
     for element in model.elements
         element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
@@ -54,10 +49,6 @@ function populate_DOF_indices!(model::TrussModel)
     n_dof = 3
     for (i, node) in enumerate(model.nodes)
         node.globalID = i * n_dof - (n_dof - 1) .+ collect(0:n_dof - 1)
-    end
-
-    for load in model.loads
-        assign!(load)
     end
 
     for element in model.elements

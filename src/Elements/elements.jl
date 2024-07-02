@@ -37,7 +37,6 @@ mutable struct Element <: FrameElement
     nodeIDs::Vector{Int64} #indices of start/end nodes 
     elementID::Int64
     globalID::Vector{Int64} #element global DOFs
-    loadIDs::Vector{Int64}
     length::Float64 #length of element
     release::Symbol #
     K::Matrix{Float64} # stiffness matrix in GCS
@@ -55,7 +54,6 @@ mutable struct Element <: FrameElement
         element.Ψ = pi/2
         element.id = id
         element.Q = zeros(12)
-        element.loadIDs = Vector{Int64}()
 
         element.release = release
 
@@ -73,7 +71,6 @@ mutable struct Element <: FrameElement
         element.Ψ = pi/2
         element.id = id
         element.Q = zeros(12)
-        element.loadIDs = Vector{Int64}()
 
         element.release = release
 
@@ -97,7 +94,6 @@ mutable struct BridgeElement <: FrameElement
     Ψ::Float64
     elementID::Int64
     id::Union{Symbol, Nothing}
-    loadIDs::Vector{Int64}
 
     function BridgeElement(elementStart::Element, 
             posStart::Float64, 
@@ -113,7 +109,6 @@ mutable struct BridgeElement <: FrameElement
         be = new(elementStart, posStart, elementEnd, posEnd, section, release)
         be.Ψ = pi/2
         be.id = id
-        be.loadIDs = Vector{Int64}()
 
         return be
     end

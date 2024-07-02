@@ -58,16 +58,8 @@ Solve for the nodal displacements of a structural model. `reprocess = true` reev
 function solve!(model::Model; reprocess = false)
 
     if !model.processed || reprocess
-        # clear existing load associations
-        for node in model.nodes
-            empty!(node.loadIDs)
-        end
-
         for element in model.elements
-            if typeof(element) == BridgeElement
-                empty!(element.loadIDs)
-            else
-                empty!(element.loadIDs)
+            if typeof(element) == Element
                 element.Q = zero(element.Q)
             end
         end
@@ -99,11 +91,6 @@ Solve for the nodal displacements of a structural truss model. `reprocess = true
 function solve!(model::TrussModel; reprocess = false)
 
     if !model.processed || reprocess
-        # clear existing load associations
-        for node in model.nodes
-            empty!(node.loadIDs)
-        end
-    
         process!(model)
     end
 
@@ -152,14 +139,6 @@ function solve!(model::Model, L::Vector{<:AbstractLoad})
 
     model.loads = L
 
-    for node in model.nodes
-        empty!(node.loadIDs)
-    end
-
-    for element in model.elements
-        empty!(element.loadIDs)
-    end
-
     process!(model)
     solve!(model)
 
@@ -196,11 +175,7 @@ Replace the assigned model loads with a new load vector and solve.
 function solve!(model::TrussModel, L::Vector{NodeForce})
 
     model.loads = L
-
-    for node in model.nodes
-        empty!(node.loadIDs)
-    end
-
+    
     process!(model)
     solve!(model)
 

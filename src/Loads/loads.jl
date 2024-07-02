@@ -60,11 +60,6 @@ mutable struct NodeMoment <: NodeLoad
     end
 end
 
-
-function assign!(load::NodeLoad)
-    push!(load.node.loadIDs, load.loadID)
-end
-
 """
     LineLoad(element::Element, value::Vector{Float64})
 
@@ -127,8 +122,4 @@ mutable struct PointLoad <: ElementLoad
         force.id = id
         return force
     end
-end
-
-function assign!(load::ElementLoad)
-    push!(load.element.loadIDs, load.loadID)
 end
