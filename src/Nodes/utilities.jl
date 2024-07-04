@@ -42,7 +42,7 @@ function planarize!(nodes::Vector{TrussNode}, plane = :XY)
     idx = planeDict[plane][1]
 
     for node in nodes
-        node.dof[idx] .= false
+        node.dof[idx] = false
     end
 end
 

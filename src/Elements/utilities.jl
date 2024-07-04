@@ -19,28 +19,10 @@ function Base.findall(elements::Vector{TrussElement}, i::Symbol)
     return findall([element.id == i for element in elements])
 end
 
-Base.length(element::AbstractElement) = norm(element.nodeEnd.position .- element.nodeStart.position)
+Base.length(element::T) where {T<:AbstractElement} = norm(element.nodeEnd.position .- element.nodeStart.position)
 
-function length!(element::AbstractElement)
+function length!(element::T) where {T<:AbstractElement}
     element.length = length(element)
-end
-
-"""
-    release!(element::Element, release::Symbol)
-
-Change the release condition of an element.
-Available releases:
-- :fixedfixed (default)
-- :fixedfree
-- :freefixed
-- :freefree
-"""
-function release!(element::Element, release::Symbol)
-    @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree"
-
-    element.release = release
-    element.Q = zeros(12)
-    global_K!(element)
 end
 
 
@@ -50,7 +32,7 @@ end
 Get the local x vector of an element: element.nodeEnd.position - element.nodeStart.position.
 `unit = true` gives the normalized vector.
 """
-function local_x(element::AbstractElement; unit = true)
+function local_x(element::T; unit = true) where {T<:AbstractElement}
     x = element.nodeEnd.position .- element.nodeStart.position
     unit ? normalize(x) : x
 end
@@ -60,7 +42,7 @@ end
 
 Get the local coordinate system unit vectors of a given element and pitch angle Ψ: [local_x, local_y, local_z]
 """
-function lcs(element::AbstractElement, Ψ::Float64; tol = 1e-6)
+function lcs(element::T, Ψ::Float64; tol = 1e-6) where {T<:AbstractElement}
 
     # local x vector
     xvec = local_x(element)
@@ -86,7 +68,7 @@ end
 
 Populate local coordinate system unit vectors of a given element and pitch angle Ψ: [local_x, local_y, local_z]
 """
-function lcs!(element::AbstractElement, Ψ::Float64; tol = 0.001)
+function lcs!(element::T, Ψ::Float64; tol = 1e-6) where {T<:AbstractElement}
 
     # local x vector
     xvec = local_x(element)
@@ -113,7 +95,7 @@ end
 
 Get the local coordinate system unit vectors of a given local x axis and pitch angle Ψ: [local_x, local_y, local_z]
 """
-function lcs(xin::Vector{Float64}, Ψ::Float64; tol = 1e-4)
+function lcs(xin::Vector{Float64}, Ψ::Float64; tol = 1e-6)
 
     xvec = normalize(copy(xin))
     # local x vector
@@ -138,7 +120,7 @@ end
 
 Extract the start and end points as two vectors.
 """
-function endpoints(element::AbstractElement)
+function endpoints(element::T) where {T<:AbstractElement}
     return [element.nodeStart.position, element.nodeEnd.position]
 end
 
@@ -147,7 +129,7 @@ end
 
 Extract the centerpoint of an element as a vector.
 """
-function midpoint(element::AbstractElement)
+function midpoint(element::T) where {T<:AbstractElement}
     return (element.nodeStart.position .+ element.nodeEnd.position) ./ 2
 end
 
@@ -167,4 +149,8 @@ Extract the axial force of an element
 """
 function axial_force(element::Element)
     element.forces[7]
+end
+
+function nodeids(element::T) where {T<:AbstractElement}
+    return [element.nodeStart.nodeID, element.nodeEnd.nodeID]
 end
