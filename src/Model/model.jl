@@ -37,10 +37,10 @@ end
 
 Create a complete structural model ready for analysis.
 """
-mutable struct Model <: AbstractModel
+mutable struct Model{E,L} <: AbstractModel
     nodes::Vector{Node}
-    elements::Vector{FrameElement}
-    loads::Vector{AbstractLoad}
+    elements::Vector{E}
+    loads::Vector{L}
     nNodes::Int64
     nElements::Int64
     DOFs::Vector{Bool} #vector of DOFs
@@ -56,11 +56,11 @@ mutable struct Model <: AbstractModel
     tol::Float64
     processed::Bool
     
-    function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:AbstractLoad})
+    function Model(nodes::Vector{Node}, elements::Vector{E}, loads::Vector{L}) where {E<:FrameElement, L<:AbstractLoad}
         nnodes = length(nodes)
         nelements = length(elements)
 
-        structure = new(
+        structure = new{E,L}(
             nodes,
             elements,
             loads,

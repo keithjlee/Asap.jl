@@ -13,7 +13,7 @@ function populate_DOF_indices!(model::Model)
     model.fixedDOFs = findall(.!model.DOFs)
 
     n_dof = 6
-    dofset = collect(0:n_dof-  1)
+    dofset = collect(0:n_dof - 1)
 
     # assign an id to node, extract global DOF index
     for (i, node) in enumerate(model.nodes)
@@ -22,12 +22,7 @@ function populate_DOF_indices!(model::Model)
 
     # assign an id to element, get associated node IDs, extract global DOF
     for element in model.elements
-        element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
-
-        idStart = element.nodeStart.globalID
-        idEnd = element.nodeEnd.globalID
-
-        element.globalID = [idStart; idEnd]
+        element.globalID = [element.nodeStart.globalID; element.nodeEnd.globalID]
     end
 
 end
@@ -52,13 +47,7 @@ function populate_DOF_indices!(model::TrussModel)
     end
 
     for element in model.elements
-
-        element.nodeIDs = [element.nodeStart.nodeID, element.nodeEnd.nodeID]
-
-        idStart = element.nodeStart.globalID
-        idEnd = element.nodeEnd.globalID
-
-        element.globalID = [idStart; idEnd]
+        element.globalID = [element.nodeStart.globalID; element.nodeEnd.globalID]
     end
 
 end
@@ -70,10 +59,10 @@ Populate the transformation matrix and global elemental stiffness matrix of the 
 """
 function process_elements!(model::Model)
     for element in model.elements
-        element.Q = zeros(12) # reset Qf
-        element.R = R(element)
-        element.LCS = lcs(element, element.Ψ)
-        element.length = length(element)
+        fill!(element.Q, 0.0)
+        lcs!(element, element.Ψ)
+        R!(element)
+        length!(element)
         global_K!(element)
     end
 end
@@ -83,12 +72,12 @@ end
     
 Populate the transformation matrix and global elemental stiffness matrix of the elements in a vector of elements.
 """
-function process_elements!(elements::Vector{<:FrameElement})
+function process_elements!(elements::Vector{T}) where {T<:FrameElement}
     for element in elements
-        element.Q = zeros(12) # reset Qf
-        element.R = R(element)
-        element.LCS = lcs(element, element.Ψ)
-        element.length = length(element)
+        fill!(element.Q, 0.0)
+        lcs!(element, element.Ψ)
+        R!(element)
+        length!(element)
         global_K!(element)
     end
 end
@@ -100,9 +89,9 @@ Populate the transformation matrix and global elemental stiffness matrix of the 
 """
 function process_elements!(model::TrussModel)
     for element in model.elements
-        element.R = R(element)
-        element.LCS = lcs(element, element.Ψ)
-        element.length = length(element)
+        lcs!(element, element.Ψ)
+        R!(element)
+        length!(element)
         global_K!(element)
     end
 end
@@ -176,9 +165,10 @@ end
 Generate the nodal force vectors `model.P` (external) and `model.Pf` (fixed-end)
 """
 function populate_loads!(model::Model)
-    #initialize
-    model.P = zeros(model.nDOFs)
-    model.Pf = zeros(model.nDOFs)
+
+    #clear load vectors
+    fill!(model.P, 0.0)
+    fill!(model.Pf, 0.0)
 
     #create load vectors
     for load in model.loads
@@ -192,8 +182,9 @@ end
 Generate the nodal force vectors `model.P`
 """
 function populate_loads!(model::TrussModel)
-    #initialize
-    model.P = zeros(model.nDOFs)
+    
+    #clear load vectors
+    fill!(model.P, 0.0)
 
     #create load vectors
     for load in model.loads
@@ -206,7 +197,7 @@ end
 
 create load vector F = P - Pf
 """
-function create_F(model::Model, loads::Vector{AbstractLoad})
+function create_F(model::Model, loads::Vector{T}) where {T<:AbstractLoad}
 
     P = zeros(model.nDOFs)
     Pf = zeros(model.nDOFs)

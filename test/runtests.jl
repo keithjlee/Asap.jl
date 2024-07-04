@@ -20,11 +20,11 @@ using LinearAlgebra
 
     sec = TrussSection(A, E)
 
-    e1 = TrussElement(nodes, [1,3], sec)
-    e2 = TrussElement(nodes, [3,4], sec)
-    e3 = TrussElement(nodes, [1,4], sec)
-    e4 = TrussElement(nodes, [2,3], sec)
-    e5 = TrussElement(nodes, [2,4], sec)
+    e1 = TrussElement(nodes[[1,3]]..., sec)
+    e2 = TrussElement(nodes[[3,4]]..., sec)
+    e3 = TrussElement(nodes[[1,4]]..., sec)
+    e4 = TrussElement(nodes[[2,3]]..., sec)
+    e5 = TrussElement(nodes[[2,4]]..., sec)
 
     elements = [e1,e2,e3,e4,e5]
 
@@ -65,9 +65,9 @@ using LinearAlgebra
 
     sec = Section(A, E, 1., I, I, 1.)
 
-    e1 = Element(nodes, [1,2], sec)
+    e1 = Element(nodes[[1,2]]..., sec)
     e1.Ψ = 0.
-    e2 = Element(nodes, [2,3], sec)
+    e2 = Element(nodes[[2,3]]..., sec)
     e2.Ψ = 0.
 
     elements = [e1, e2]
@@ -111,10 +111,10 @@ using LinearAlgebra
 
     nodes = [n1, n2, n3, n4, n5]
 
-    e1 = TrussElement(nodes, [1,5], sec)
-    e2 = TrussElement(nodes, [2,5], sec)
-    e3 = TrussElement(nodes, [3,5], sec)
-    e4 = TrussElement(nodes, [4,5], sec)
+    e1 = TrussElement(nodes[[1,5]]..., sec)
+    e2 = TrussElement(nodes[[2,5]]..., sec)
+    e3 = TrussElement(nodes[[3,5]]..., sec)
+    e4 = TrussElement(nodes[[4,5]]..., sec)
 
     elements = [e1, e2, e3, e4]
 
@@ -164,11 +164,11 @@ using LinearAlgebra
 
     sec = Section(A, E, G, Iz, Iy, J)
 
-    e1 = Element(nodes, [2,1], sec)
+    e1 = Element(nodes[[2,1]]..., sec)
     e1.Ψ = 0.
-    e2 = Element(nodes, [3,1], sec)
+    e2 = Element(nodes[[3,1]]..., sec)
     e2.Ψ  = pi/2
-    e3 = Element(nodes, [4,1], sec)
+    e3 = Element(nodes[[4,1]]..., sec)
     e3.Ψ = pi/6
 
     elements = [e1, e2, e3]
@@ -222,7 +222,7 @@ using LinearAlgebra
 
     sec = Section(1., E, 1., Is, Is, 1.)
 
-    e = Element(nodes, [1,2], sec)
+    e = Element(nodes[[1,2]]..., sec)
     elements = [e]
 
     p = NodeForce(n2, [0., -P, 0.])

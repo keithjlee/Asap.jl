@@ -111,38 +111,13 @@ function q_local(load::GravityLoad)
     return [ax1, vy1, vz1, 0., my1, mz1, ax2, vy2, vz2, 0., my2, mz2]
 end
 
-"""
-    q_freefixed(load::AbstractLoad)
+function q(load::ElementLoad{FixedFixed})
 
-End force releases for a free-fixed beam load.
-"""
-function q_freefixed(load::AbstractLoad)
-    #length of element
-    factor = 3 / 2 / load.element.length
-    #fixed end components
-    FAb, FSby, FSbz, FTb, FMby, FMbz, FAe, FSey, FSez, FTe, FMey, FMez = q_local(load)
+    return q_local(load)
 
-    #modified fixed end forces
-    return [FAb, #axial beginning
-        FSby - factor*FMbz, #shear local Y
-        FSbz + factor*FMby, #shear local Z
-        0, #torsion beginning
-        0, #moment local Y
-        0, #moment local Z
-        FAe, # axial end
-        FSey + factor*FMbz, #shear local Y
-        FSez - factor*FMby, #shear local Z
-        FTb + FTe, #torsion end
-        FMey - 1/2*FMby, #moment local Y
-        FMez - 1/2*FMbz] #moment local Z
 end
 
-"""
-    q_fixedfree(load::AbstractLoad)
-
-End force releases for a fixed-free beam load.
-"""
-function q_fixedfree(load::AbstractLoad)
+function q(load::ElementLoad{FixedFree})
     #length of element
     factor = 3 / 2 / load.element.length
     #fixed end components
@@ -163,12 +138,28 @@ function q_fixedfree(load::AbstractLoad)
         0]
 end
 
-"""
-    q_freefree(load::AbstractLoad)
+function q(load::ElementLoad{FreeFixed})
+    #length of element
+    factor = 3 / 2 / load.element.length
+    #fixed end components
+    FAb, FSby, FSbz, FTb, FMby, FMbz, FAe, FSey, FSez, FTe, FMey, FMez = q_local(load)
 
-End force releases for a free-free (truss) beam load.
-"""
-function q_freefree(load::AbstractLoad)
+    #modified fixed end forces
+    return [FAb, #axial beginning
+        FSby - factor*FMbz, #shear local Y
+        FSbz + factor*FMby, #shear local Z
+        0, #torsion beginning
+        0, #moment local Y
+        0, #moment local Z
+        FAe, # axial end
+        FSey + factor*FMbz, #shear local Y
+        FSez - factor*FMby, #shear local Z
+        FTb + FTe, #torsion end
+        FMey - 1/2*FMby, #moment local Y
+        FMez - 1/2*FMbz] #moment local Z
+end
+
+function q(load::ElementLoad{FreeFree})
     #length of element
     factor = 1 / load.element.length
     #fixed end components
@@ -189,53 +180,23 @@ function q_freefree(load::AbstractLoad)
         0]
 end
 
-"""
-    q_joist(load::AbstractLoad)
-
-End force releases for a torsion-only coupled (joist) beam load.
-"""
-function q_joist(load::AbstractLoad)
+function q(load::ElementLoad{Joist})
+    #length of element
+    factor = 1 / load.element.length
     #fixed end components
     FAb, FSby, FSbz, FTb, FMby, FMbz, FAe, FSey, FSez, FTe, FMey, FMez = q_local(load)
 
     #modified fixed end forces
     return [FAb, 
-        FSby,
-        FSbz,
+        FSby - factor*(FMbz + FMez),
+        FSbz + factor*(FMby + FMey),
         FTb,
         0,
         0,
         FAe,
-        FSey,
-        FSez,
+        FSey + factor*(FMbz + FMez),
+        FSez - factor*(FMby + FMey),
         FTe,
         0,
         0]
-end
-
-"""
-    q_fixedfixed(load::AbstractLoad)
-
-General form of fixed end forces
-"""
-function q_fixedfixed(load::AbstractLoad)
-    return q_local(load)
-end
-
-"""
-Map of release to proper Q function
-"""
-qDict = Dict(:fixedfixed => q_fixedfixed,
-    :freefixed => q_freefixed,
-    :fixedfree => q_fixedfree,
-    :freefree => q_freefree,
-    :joist => q_joist)
-
-"""
-Generate the fixed-end forces for a given load type
-"""
-function q(load::AbstractLoad)
-    #appropriate function
-    qFunction = qDict[load.element.release]
-    return qFunction(load)
 end

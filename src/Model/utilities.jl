@@ -19,7 +19,7 @@ Get the [nₑ × nₙ] sparse matrix where C[i, j] = -1 if element i starts at n
 """
 function connectivity(model::AbstractModel)
     I = vcat([[i, i] for i = 1:model.nElements]...)
-    J = vcat([e.nodeIDs for e in model.elements]...)
+    J = vcat([nodeids(e) for e in model.elements]...)
     V = repeat([-1, 1], model.nElements)
 
     return sparse(I, J, V)
