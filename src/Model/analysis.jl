@@ -7,7 +7,7 @@ function process!(model::Model)
 
     make_ids!(model)
 
-    if any(typeof.(model.elements) .== BridgeElement)
+    if any(typeof.(model.elements) .<: BridgeElement)
         processBridge!(model)
     else
         process_elements!(model)
@@ -59,7 +59,7 @@ function solve!(model::Model; reprocess = false)
 
     if !model.processed || reprocess
         for element in model.elements
-            if typeof(element) == Element
+            if typeof(element) <: Element
                 element.Q = zero(element.Q)
             end
         end
