@@ -1,7 +1,6 @@
 /Manifest.toml
 src/privateTests.jl
 .vscode
-.github
 test/scratch.jl
 figures/displaced.png
 figures/displaced2.png
