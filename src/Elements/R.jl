@@ -112,8 +112,13 @@ end
 Get the [2 × 6] transformation matrix for a truss element.
 """
 function R(element::TrussElement)
-    Cx, Cy, Cz = local_x(element)
+    Cx, Cy, Cz = element.LCS[1]
     return [Cx Cy Cz 0 0 0; 0 0 0 Cx Cy Cz]
+end
+
+function R!(element::TrussElement)
+    element.R[1, 1:3] = element.LCS[1]
+    element.R[2, 4:6] = element.LCS[1]
 end
 
 """
