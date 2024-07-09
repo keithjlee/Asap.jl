@@ -3,15 +3,7 @@
 
 [12 × 12] stiffness matrix for a beam element fully coupled at both ends.
 """
-function k_fixedfixed(element::Element)
-    E = element.section.E
-    A = element.section.A
-    L = element.length
-    G = element.section.G
-    Ix = element.section.Ix
-    Iy = element.section.Iy
-    J = element.section.J
-
+function k_fixedfixed(E, A, L, G, Ix, Iy, J)
 
     k = E / L^3 * [
         A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
@@ -36,12 +28,7 @@ end
 
 [12 × 12] stiffness matrix for a beam element with rotational DOFs decoupled at the start node.
 """
-function k_freefixed(element::Element)
-    E = element.section.E
-    A = element.section.A
-    L = element.length
-    Ix = element.section.Ix
-    Iy = element.section.Iy
+function k_freefixed(E, A, L, Ix, Iy)
 
     k = E / L^3 .* [A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
         0 3Ix 0 0 0 0 0 -3Ix 0 0 0 3L*Ix;
@@ -65,13 +52,8 @@ end
 
 [12 × 12] stiffness matrix for a beam element with rotational DOFs decoupled at the end node.
 """
-function k_fixedfree(element::Element)
-    E = element.section.E
-    A = element.section.A
-    L = element.length
-    Ix = element.section.Ix
-    Iy = element.section.Iy
-
+function k_fixedfree(E, A, L, Ix, Iy)
+    
     k = E / L^3 .* [A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
         0 3Ix 0 0 0 3L*Ix 0 -3Ix 0 0 0 0;
         0 0 3Iy 0 -3L*Iy 0 0 0 -3Iy 0 0 0;
@@ -94,10 +76,7 @@ end
 
 [12 × 12] stiffness matrix for a beam element with full decoupled rotational DOFs.
 """
-function k_freefree(element::Element)
-    E = element.section.E
-    A = element.section.A
-    L = element.length
+function k_freefree(E, A, L)
 
     k = zeros(12, 12)
     k[1,1] = 1
@@ -113,12 +92,7 @@ end
 
 [12 × 12] stiffness matrix for a beam element with only torsional DOFs coupled to nodes.
 """
-function k_joist(element::Element)
-    E = element.section.E
-    A = element.section.A
-    L = element.length
-    G = element.section.G
-    J = element.section.J
+function k_joist(E, A, L, G, J)
 
     k = E / L^3 .* [A*L^2 0 0 0 0 0 -A*L^2 0 0 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0;
@@ -133,16 +107,22 @@ function k_joist(element::Element)
         0 0 0 0 0 0 0 0 0 0 0 0;
         0 0 0 0 0 0 0 0 0 0 0 0    
     ]
+
+    return k
 end
 
-const releases::Vector{Symbol} = [:fixedfixed, :freefixed, :fixedfree, :freefree, :joist, :truss]
+"""
+    local_K(element::Element)
 
-const kDict = Dict(:fixedfixed => k_fixedfixed,
-    :freefixed => k_freefixed,
-    :fixedfree => k_fixedfree,
-    :freefree => k_freefree,
-    :truss => k_freefree,
-    :joist => k_joist)
+Return the element stiffness matrix in LCS.
+"""
+local_K(element::Element{FixedFixed}) = k_fixedfixed(element.section.E, element.section.A, element.length, element.section.G, element.section.Ix, element.section.Iy, element.section.J)
+local_K(element::Element{FixedFree}) = k_fixedfree(element.section.E, element.section.A, element.length, element.section.Ix, element.section.Iy)
+local_K(element::Element{FreeFixed}) = k_freefixed(element.section.E, element.section.A, element.length, element.section.Ix, element.section.Iy)
+local_K(element::Element{FreeFree}) = k_freefree(element.section.E, element.section.A, element.length)
+local_K(element::Element{Joist}) = k_joist(element.section.E, element.section.A, element.length, element.section.G, element.section.J)
+
+local_K(element::TrussElement) = element.section.E * element.section.A / element.length .* [1 -1; -1 1]
 
 """
     global_K!(element::Element)
@@ -150,13 +130,11 @@ const kDict = Dict(:fixedfixed => k_fixedfixed,
 Populate the element stiffness matrix `element.K` in GCS.
 """
 function global_K!(element::Element)
-    kfunction = kDict[element.release]
-    element.K = Symmetric(element.R' * kfunction(element) * element.R)
+    element.K = element.R' * local_K(element) * element.R
 end
 
 function global_K!(element::TrussElement)
-    k = element.section.E * element.section.A / element.length .* [1 -1; -1 1]
-    element.K = Symmetric(element.R' * k * element.R)
+    element.K = element.R' * local_K(element) * element.R
 end
 
 """
@@ -165,25 +143,9 @@ end
 Return the element stiffness matrix in GCS.
 """
 function global_K(element::Element)
-    kfunction = kDict[element.release]
-    return Symmetric(element.R' * kfunction(element) * element.R)
+    return element.R' * local_K(element) * element.R
 end
 
 function global_K(element::TrussElement)
-    k = element.section.E * element.section.A / element.length .* [1 -1; -1 1]
-    return Symmetric(element.R' * k * element.R)
-end
-
-"""
-    local_K(element::Element)
-
-Return the element stiffness matrix in LCS.
-"""
-function local_K(element::Element)
-    kfunction = kDict[element.release]
-    return kfunction(element)
-end
-
-function local_K(element::TrussElement)
-    return element.section.E * element.section.A / element.length .* [1 -1; -1 1]
+    return element.R' * local_K(element) * element.R
 end

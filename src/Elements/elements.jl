@@ -1,5 +1,21 @@
 abstract type AbstractElement end
-abstract type FrameElement <: AbstractElement end
+abstract type FrameElement{R} <: AbstractElement end
+
+# Element release type parameters
+abstract type Release end
+struct FixedFixed <: Release end
+struct FixedFree <: Release end
+struct FreeFixed <: Release end
+struct FreeFree <: Release end
+struct Joist <: Release end
+
+const _ReleaseDict = Dict(
+    :fixedfixed => FixedFixed,
+    :fixedfree => FixedFree,
+    :freefixed => FreeFixed,
+    :freefree => FreeFree,
+    :joist => Joist
+)
 
 """
     Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id::Symbol = nothing; release = :fixedfixed)
@@ -30,16 +46,13 @@ julia> Element(nodes, [1,2], sec; release = :fixedfree)
 ```
 
 """
-mutable struct Element <: FrameElement
+mutable struct Element{R<:Release} <: FrameElement{R}
     section::Section #cross section
     nodeStart::Node #start node
     nodeEnd::Node #end position
-    nodeIDs::Vector{Int64} #indices of start/end nodes 
     elementID::Int64
     globalID::Vector{Int64} #element global DOFs
-    loadIDs::Vector{Int64}
     length::Float64 #length of element
-    release::Symbol #
     K::Matrix{Float64} # stiffness matrix in GCS
     Q::Vector{Float64} # fixed end forces in GCS
     R::Matrix{Float64} # transformation matrix
@@ -48,34 +61,25 @@ mutable struct Element <: FrameElement
     forces::Vector{Float64} #elemental forces in LCS
     id::Symbol #optional identifier
 
-    function Element(nodes::Vector{Node}, nodeIndex::Vector{Int64}, section::Section, id = :element; release = :fixedfixed)
-        element = new(section)
-
-        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.Ψ = pi/2
-        element.id = id
-        element.Q = zeros(12)
-        element.loadIDs = Vector{Int64}()
-
-        element.release = release
-
-        return element
-    end
-
     function Element(nodeStart::Node, nodeEnd::Node, section::Section, id = :element; release = :fixedfixed)
 
-        @assert in(release, releases) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
+        @assert in(release, keys(_ReleaseDict)) "Release not recognized; choose from: :fixedfixed, :freefixed, :fixedfree, :freefree, :joist"
 
-        element = new(section)
-        element.nodeStart = nodeStart
-        element.nodeEnd = nodeEnd
-
-        element.Ψ = pi/2
-        element.id = id
-        element.Q = zeros(12)
-        element.loadIDs = Vector{Int64}()
-
-        element.release = release
+        element = new{_ReleaseDict[release]}(
+            section,
+            nodeStart,
+            nodeEnd,
+            0,
+            Vector{Int64}(undef, 12),
+            0.0,
+            zeros(12,12),
+            zeros(12),
+            zeros(12,12),
+            pi/2,
+            repeat([zeros(3)], 3),
+            zeros(12),
+            id
+        )
 
         return element
     end
@@ -87,7 +91,7 @@ end
 
 Create a bridge element between two frame elements. Connects from `elementStart` at a position `elementStart.length * posStart` away from `elementStart.nodeStart.position` to `elementEnd` at `elementEnd.length * posEnd` away from `elementEnd.nodeStart.position`. IE `posStart, posEnd ∈ ]0, 1[`
 """
-mutable struct BridgeElement <: FrameElement
+mutable struct BridgeElement{R<:Release} <: FrameElement{R}
     elementStart::Element
     posStart::Float64
     elementEnd::Element
@@ -97,7 +101,6 @@ mutable struct BridgeElement <: FrameElement
     Ψ::Float64
     elementID::Int64
     id::Union{Symbol, Nothing}
-    loadIDs::Vector{Int64}
 
     function BridgeElement(elementStart::Element, 
             posStart::Float64, 
@@ -108,12 +111,19 @@ mutable struct BridgeElement <: FrameElement
             release = :fixedfixed)
 
         @assert 0 < posStart < 1 && 0 < posEnd < 1 "posStart/End must be ∈ ]0,1["
-        @assert in(release, releases)
+        @assert in(release, keys(_ReleaseDict))
 
-        be = new(elementStart, posStart, elementEnd, posEnd, section, release)
-        be.Ψ = pi/2
-        be.id = id
-        be.loadIDs = Vector{Int64}()
+        be = new{_ReleaseDict[release]}(
+            elementStart, 
+            posStart, 
+            elementEnd, 
+            posEnd, 
+            section, 
+            release, 
+            pi/2, 
+            0, 
+            id
+        )
 
         return be
     end
@@ -135,10 +145,9 @@ TrussElement(Section(794.0, 200000.0, 77000.0, 737000.0, 737000.0, 1.47e6, 1.0),
 
 """
 mutable struct TrussElement <: AbstractElement
-    section::AbstractSection #cross section
+    section::Union{TrussSection,Section} #cross section
     nodeStart::TrussNode #start position
     nodeEnd::TrussNode #end position
-    nodeIDs::Vector{Int64} #indices of start/end nodes 
     elementID::Int64
     globalID::Vector{Int64} #element global DOFs
     length::Float64 #length of element
@@ -149,23 +158,22 @@ mutable struct TrussElement <: AbstractElement
     LCS::Vector{Vector{Float64}}
     id::Union{Symbol, Nothing} #optional identifier
 
-    function TrussElement(nodes::Vector{TrussNode}, nodeIndex::Vector{Int64}, section::AbstractSection, id = :element)
-        element = new(section)
-
-        element.nodeStart, element.nodeEnd = nodes[nodeIndex]
-        element.id = id
-
-        element.Ψ = pi/2
-
-        return element
-    end
-
     function TrussElement(nodeStart::TrussNode, nodeEnd::TrussNode, section::AbstractSection, id = :element)
-        element = new(section)
-        element.nodeStart = nodeStart
-        element.nodeEnd = nodeEnd
-        element.id = id
-        element.Ψ = pi/2
+        
+        element = new(
+            section,
+            nodeStart,
+            nodeEnd,
+            0,
+            Vector{Int64}(undef, 6),
+            0.0,
+            zeros(2,2),
+            zeros(2,6),
+            zeros(6),
+            pi/2,
+            repeat([zeros(3)], 3),
+            id
+        )
 
         return element
     end

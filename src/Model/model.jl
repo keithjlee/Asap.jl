@@ -37,10 +37,10 @@ end
 
 Create a complete structural model ready for analysis.
 """
-mutable struct Model <: AbstractModel
+mutable struct Model{E,L} <: AbstractModel
     nodes::Vector{Node}
-    elements::Vector{FrameElement}
-    loads::Vector{AbstractLoad}
+    elements::Vector{E}
+    loads::Vector{L}
     nNodes::Int64
     nElements::Int64
     DOFs::Vector{Bool} #vector of DOFs
@@ -56,11 +56,29 @@ mutable struct Model <: AbstractModel
     tol::Float64
     processed::Bool
     
-    function Model(nodes::Vector{Node}, elements::Vector{<:FrameElement}, loads::Vector{<:AbstractLoad})
-        structure = new(nodes, elements, loads)
+    function Model(nodes::Vector{Node}, elements::Vector{E}, loads::Vector{L}) where {E<:FrameElement, L<:AbstractLoad}
+        nnodes = length(nodes)
+        nelements = length(elements)
 
-        structure.processed = false
-        structure.tol = 1e-3
+        structure = new{E,L}(
+            nodes,
+            elements,
+            loads,
+            nnodes,
+            nelements,
+            Bool[],
+            0,
+            Int64[],
+            Int64[],
+            spzeros(Float64, 6nnodes, 6nnodes),
+            zeros(6nnodes),
+            zeros(6nnodes),
+            zeros(6nnodes),
+            zeros(6nnodes),
+            0.0,
+            1e-6,
+            false
+        )
 
         return structure
     end
@@ -103,10 +121,27 @@ mutable struct TrussModel <: AbstractModel
     processed::Bool
     
     function TrussModel(nodes::Vector{TrussNode}, elements::Vector{TrussElement}, loads::Vector{NodeForce})
-        structure = new(nodes, elements, loads)
+        nnodes = length(nodes)
+        nelements = length(elements)
 
-        structure.processed = false
-        structure.tol = 1e-3
+        structure = new(
+            nodes,
+            elements,
+            loads,
+            nnodes,
+            nelements,
+            Bool[],
+            0,
+            Int64[],
+            Int64[],
+            spzeros(Float64, 3nnodes, 3nnodes),
+            zeros(3nnodes),
+            zeros(3nnodes),
+            zeros(3nnodes),
+            0.0,
+            1e-6,
+            false
+        )
 
         return structure
     end

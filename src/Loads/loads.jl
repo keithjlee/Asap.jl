@@ -3,7 +3,7 @@ Define loads applied to structure/elements
 """
 abstract type AbstractLoad end
 abstract type NodeLoad <: AbstractLoad end
-abstract type ElementLoad <: AbstractLoad end
+abstract type ElementLoad{R} <: AbstractLoad end
 
 """
     NodeForce(node::AbstractNode, value::Vector{Float64})
@@ -21,18 +21,14 @@ mutable struct NodeForce <: NodeLoad
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
-        force = new(node, value)
-        force.id = id
+        force = new(node, value, 0, id)
 
         return force
     end
 
     function NodeForce(nodes::Vector{<:AbstractNode}, index::Integer, value::Vector{Float64}, id::Symbol = :force)
 
-        @assert length(value) == 3 "load vector must be in R³ (GCS)"
-
-        force = new(nodes[index], value)
-        force.id = id
+        NodeForce(nodes[index], value, id)
 
         return force
     end
@@ -53,16 +49,10 @@ mutable struct NodeMoment <: NodeLoad
 
         @assert length(value) == 3 "Moment vector must be in R³ (GCS)"
 
-        force = new(node, value)
-        force.id = id
+        force = new(node, value, 0, id)
 
         return force
     end
-end
-
-
-function assign!(load::NodeLoad)
-    push!(load.node.loadIDs, load.loadID)
 end
 
 """
@@ -70,18 +60,18 @@ end
 
 A distributed line load [wx, wy, wz] in (force/length) applied along an element in the global coordinate system.
 """
-mutable struct LineLoad <: ElementLoad
+mutable struct LineLoad{R<:Release} <: ElementLoad{R}
     element::FrameElement
     value::Vector{Float64}
     loadID::Int64
     id::Symbol
 
-    function LineLoad(element::T, value::Vector{Float64}, id::Symbol = :lineload) where T <: FrameElement
+    function LineLoad(element::FrameElement{R}, value::Vector{Float64}, id::Symbol = :lineload) where R
 
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
-        force = new(element, value)
-        force.id = id
+        force = new{R}(element, value, 0, id)
+
         return force
     end
 end
@@ -93,15 +83,14 @@ A gravity load (negative global Z) applied along a member.
 
 Generates distributed load w = element.section.A * element.section.ρ * factor, where factor should be the appropriate acceleration due to gravity.
 """
-mutable struct GravityLoad <: ElementLoad
+mutable struct GravityLoad{R<:Release} <: ElementLoad{R}
     element::FrameElement
     factor::Float64
     loadID::Int64
     id::Symbol
 
-    function GravityLoad(element::FrameElement, factor::Float64, id::Symbol = :gravityload)
-        force = new(element, factor)
-        force.id = id
+    function GravityLoad(element::FrameElement{R}, factor::Float64, id::Symbol = :gravityload) where R
+        force = new{R}(element, factor, 0, id)
         return force
     end
 end
@@ -112,23 +101,18 @@ end
 
 A point load [Px, Py, Pz] applied in the global coordinate system at a distance `position` × `element.length` from the starting node.
 """
-mutable struct PointLoad <: ElementLoad
+mutable struct PointLoad{R<:Release} <: ElementLoad{R}
     element::FrameElement
     position::Float64
     value::Vector{Float64}
     loadID::Int64
     id::Symbol
 
-    function PointLoad(element::FrameElement, position::Float64, value::Vector{Float64}, id::Symbol = :pointload)
+    function PointLoad(element::FrameElement{R}, position::Float64, value::Vector{Float64}, id::Symbol = :pointload) where R
         @assert 0 < position < 1 "position must be ∈ ]0, 1["
         @assert length(value) == 3 "load vector must be in R³ (GCS)"
 
-        force = new(element, position, value)
-        force.id = id
+        force = new{R}(element, position, value, 0, id)
         return force
     end
-end
-
-function assign!(load::ElementLoad)
-    push!(load.element.loadIDs, load.loadID)
 end
