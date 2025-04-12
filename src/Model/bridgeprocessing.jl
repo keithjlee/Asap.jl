@@ -18,11 +18,17 @@ function topologizematrix(elements::Vector{<:FrameElement}, indexer::Dict{Int64,
     return sort!(unique(activeelements))
 end
 
-shatterReleaseDict = Dict(:fixedfixed => (:fixedfixed, :fixedfixed),
-    :freefixed => (:freefixed, :fixedfixed),
-    :fixedfree => (:fixedfixed, :fixedfree),
-    :freefree => (:freefixed, :fixedfree),
-    :joist => (:freefixed, :fixedfree))
+shatterReleaseDict = Dict(Element{FixedFixed} => (:fixedfixed, :fixedfixed),
+    Element{FreeFixed} => (:freefixed, :fixedfixed),
+    Element{FixedFree} => (:fixedfixed, :fixedfree),
+    Element{FreeFixed} => (:freefixed, :fixedfree),
+    Element{Joist} => (:freefixed, :fixedfree))
+
+typeToRelease = Dict(BridgeElement{FixedFixed} => :fixedfixed,
+    BridgeElement{FreeFixed} => :freefixed,
+    BridgeElement{FixedFree} => :fixedfree,
+    BridgeElement{FreeFree} => :freefree,
+    BridgeElement{Joist} => :joist)
 
 function shatter!(model::Model, 
         n::Int64,
@@ -113,20 +119,22 @@ function shatter!(model::Model,
         nodeset = [element.nodeStart; nodestore[isorted]; element.nodeEnd]
 
 
-        releases = shatterReleaseDict[element.release]
+        releases = shatterReleaseDict[typeof(element)]
 
         # create intermediary elements
         for k = 1:length(nodeset) - 1
-            el = Element(nodeset[k], nodeset[k+1], element.section)
+            if k == 1
+                el = Element(nodeset[k], nodeset[k+1], element.section; release = releases[1])
+            elseif k == length(nodeset) - 1
+                el = Element(nodeset[k], nodeset[k+1], element.section; release = releases[2])
+            else
+                el = Element(nodeset[k], nodeset[k+1], element.section)
+            end
+
+
             el.elementID = element.elementID
             el.Ψ = element.Ψ
             el.id = element.id
-
-            if k == 1
-                el.release = releases[1]
-            elseif k == length(nodeset) - 1
-                el.release = releases[2]
-            end
 
             push!(elementstore, el)
         end
@@ -145,11 +153,10 @@ function shatter!(model::Model,
         nstart = newnodes[nodematrix[rowstart, k]]
         nend = newnodes[nodematrix[rowend, k]]
 
-        el = Element(nstart, nend, be.section)
+        el = Element(nstart, nend, be.section; release = typeToRelease[typeof(be)])
         el.elementID = be.elementID
         el.Ψ = be.Ψ
         el.id = be.id
-        el.release = be.release
 
         push!(newelements, el)
     end
@@ -166,7 +173,7 @@ end
 
 function transfer!(load::LineLoad, id::Int64, inout::Bool, model::Model, elementids::Vector{Int64}, newloads::Vector{AbstractLoad})
 
-    if !inout && typeof(load.element) == Element
+    if !inout && typeof(load.element) <: Element
         return
     end
 
@@ -182,7 +189,7 @@ end
 
 function transfer!(load::PointLoad, id::Int64, inout::Bool, model::Model, elementids::Vector{Int64}, newloads::Vector{AbstractLoad})
     etype = typeof(load.element)
-    typecheck = etype == Element
+    typecheck = etype <: Element
 
     if !inout && typecheck
         return
@@ -237,7 +244,7 @@ function convertloads!(model::Model, itrue::Vector{Int64})
         inout = in(id, itrue)
 
         #remove the existing load if applied to sh
-        if inout || (typeof(load.element) == BridgeElement)
+        if inout || (typeof(load.element) <: BridgeElement)
             push!(rmid, index)
         end
 
@@ -257,8 +264,8 @@ function processBridge!(model::Model)
     elements = model.elements
 
     #indices of regular and bridge elements
-    iElement = findall(typeof.(elements) .== Element)
-    iBridge = findall(typeof.(elements) .== BridgeElement)
+    iElement = findall(typeof.(elements) .<: Element)
+    iBridge = findall(typeof.(elements) .<: BridgeElement)
 
     #get geometric information
     process_elements!(elements[iElement])
@@ -287,7 +294,14 @@ function processBridge!(model::Model)
     convertloads!(model, itrueactive)
 
     #generate DOF indices
-    # populate_DOF_indices!(model)
+    populate_DOF_indices!(model)
+
+    #remake placeholders to reflect larger DOFs
+    model.S = spzeros(Float64, 6model.nNodes, 6model.nNodes)
+    model.P = zeros(Float64, 6model.nNodes)
+    model.Pf = zeros(Float64, 6model.nNodes)
+    model.u = zeros(Float64, 6model.nNodes)
+    model.reactions = zeros(Float64, 6model.nNodes)
 
     # #generate global load vectors
     # populate_loads!(model)
@@ -309,8 +323,8 @@ function process_bridge!(model::Model)
 
     elements = model.elements
 
-    iElement = findall(typeof.(elements) .== Element)
-    iBridge = findall(typeof.(elements) .== BridgeElement)
+    iElement = findall(typeof.(elements) <: Element)
+    iBridge = findall(typeof.(elements) .<: BridgeElement)
 
     process_elements!(Vector{Element}(elements[iElement]))
 
@@ -468,7 +482,7 @@ function process_bridge!(model::Model)
         id = load.element.elementID
         in(id, itrueactive) && push!(rmid, index)
 
-        if typeof(load) == LineLoad
+        if typeof(load) <: LineLoad
             # IF APPLIED TO A SHATTERED ELEMENT
             if in(id, itrueactive)
                 itransfer = findall(elementids .== id)
@@ -480,7 +494,7 @@ function process_bridge!(model::Model)
                     push!(newloads, newload)
                 end
 
-            elseif typeof(load.element) == BridgeElement #IF APPLIED TO A BRIDGE ELEMENT
+            elseif typeof(load.element) <: BridgeElement #IF APPLIED TO A BRIDGE ELEMENT
                 push!(rmid, index)
 
                 itransfer = findfirst(elementids .== id)
@@ -489,9 +503,9 @@ function process_bridge!(model::Model)
                 newload.id = load.id
                 push!(newloads, newload)
             end
-        elseif typeof(load) == PointLoad
+        elseif typeof(load) <: PointLoad
 
-            if typeof(load.element) == Element
+            if typeof(load.element) <: Element
 
                 if in(id, itrueactive)
 
@@ -528,6 +542,12 @@ function process_bridge!(model::Model)
 
     # populating DOFs
     populate_DOF_indices!(model)
+
+    model.S = spzeros(Float64, 6model.nNodes, 6model.nNodes)
+    model.P = zeros(Float64, 6model.nNodes)
+    model.Pf = zeros(Float64, 6model.nNodes)
+    model.u = zeros(Float64, 6model.nNodes)
+    model.reactions = zeros(Float64, 6model.nNodes)
 
     populate_loads!(model)
 

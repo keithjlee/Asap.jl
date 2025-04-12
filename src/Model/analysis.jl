@@ -9,6 +9,7 @@ function process!(model::Model)
 
     if any(typeof.(model.elements) .<: BridgeElement)
         processBridge!(model)
+        make_ids!(model)
     else
         process_elements!(model)
     end
