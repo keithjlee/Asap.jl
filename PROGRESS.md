@@ -42,14 +42,14 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] `VariableElement{T}` via internal DOFs (bridgeprocessing deletion lands with the module flip)
 - [x] Characterization suite green on new core — **module flipped**: legacy deleted, Asap IS the v1.0 core, 2347 tests green, version 1.0.0-DEV
 
-## Phase 2 — Loads 🔄 (largely landed during Phase 1)
+## Phase 2 — Loads ✅ COMPLETE
 
 - [x] Gauss/Hermite FEF engine (exact for piecewise-linear intensities)
 - [x] Canonical `DistributedLoad` + `LineLoad`/`PointLoad`/`SelfWeight`; case tags on all loads
 - [x] Generic end-spring FEF condensation (replaces per-release q() catalog)
 - [x] SelfWeight from ρA(section) — GravityLoad bug structurally impossible
-- [ ] `TrapezoidLoad` convenience constructor + `PointMoment`
-- [ ] Trapezoid FEFs cross-checked against closed-form oracles
-## Phase 3 — Force recovery (priority) ⬜
+- [x] `TrapezoidLoad` convenience constructor + `PointMoment` (derivative-Hermite kernel, classic-table verified)
+- [x] Trapezoid FEFs cross-checked against exact polynomial-integration oracles + classic triangle tables
+## Phase 3 — Force recovery (priority) 🔄 IN PROGRESS
 ## Phase 4 — Cases/combos/envelopes ⬜
 ## Phase 5 — Ecosystem migration (5a Optim / 5b Toolkit / 5c Harmonics / 5d DemandTransport2) ⬜

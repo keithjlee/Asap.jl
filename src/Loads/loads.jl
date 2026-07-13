@@ -135,6 +135,62 @@ function LineLoad(element::AbstractElement{T}, wvec::AbstractVector{<:Real};
 end
 
 """
+    TrapezoidLoad(element, t1, t2, w1, w2, direction;
+                  coords = :global, id = :trapezoidload, case = :LC1)
+
+A partial-span trapezoidal distributed load: intensity varying linearly
+from `w1` [force/length] at fraction `t1` to `w2` at fraction `t2` of the
+element length, zero elsewhere, acting along the unit `direction`. A
+triangular load is the `w1 = 0` (or `w2 = 0`) special case.
+
+Lowered to the canonical [`DistributedLoad`](@ref) — one integration engine
+covers every distributed shape.
+
+# Examples
+```julia-repl
+julia> TrapezoidLoad(beam, 0.0, 1.0, 2.0, 5.0, [0.0, 0.0, -1.0])   # full-span trapezoid
+
+julia> TrapezoidLoad(beam, 0.3, 0.9, 0.0, 4.0, [0.0, -1.0, 0.0])   # partial triangular ramp
+```
+"""
+function TrapezoidLoad(element::AbstractElement{T}, t1::Real, t2::Real,
+    w1::Real, w2::Real, direction::AbstractVector{<:Real};
+    coords::Symbol=:global, id::Symbol=:trapezoidload, case::Symbol=:LC1) where {T}
+    @assert t1 < t2 "need t1 < t2 for a trapezoid span"
+    return DistributedLoad(element, T[t1, t2], T[w1, w2], direction;
+        coords=coords, id=id, case=case)
+end
+
+"""
+    PointMoment{T} <: ElementLoad{T}
+
+A concentrated moment `[Mx, My, Mz]` [force·length] applied along an
+element at fraction `position` ∈ (0, 1) of its length — a capability the
+legacy library lacked. Its fixed-end forces pair the moment with the
+SLOPES of the shape functions (a moment does work through rotation), which
+is why the FEF kernel needs the Hermite derivatives.
+
+    PointMoment(element, position, value; coords = :global, id = :pointmoment, case = :LC1)
+"""
+struct PointMoment{T} <: ElementLoad{T}
+    element::AbstractElement{T}
+    position::T
+    value::SVector{3,T}
+    coords::Symbol
+    id::Symbol
+    case::Symbol
+
+    function PointMoment(element::AbstractElement{T}, position::Real,
+        value::AbstractVector{<:Real};
+        coords::Symbol=:global, id::Symbol=:pointmoment, case::Symbol=:LC1) where {T}
+        @assert 0 < position < 1 "position must be ∈ (0, 1) — a fraction of the element length"
+        @assert length(value) == 3 "moment vector must be [Mx, My, Mz]"
+        @assert coords in (:global, :local) "coords must be :global or :local"
+        return new{T}(element, T(position), SVector{3,T}(value), coords, id, case)
+    end
+end
+
+"""
     PointLoad{T} <: ElementLoad{T}
 
 A concentrated force `[Px, Py, Pz]` applied along an element at fraction

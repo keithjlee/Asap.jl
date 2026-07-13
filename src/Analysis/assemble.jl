@@ -187,6 +187,13 @@ function _restrict_load(load::PointLoad{T}, ta::Real, tb::Real, el) where {T}
     return PointLoad(el, τ, load.value; coords=load.coords, id=load.id, case=load.case)
 end
 
+function _restrict_load(load::PointMoment{T}, ta::Real, tb::Real, el) where {T}
+    inseg = (ta <= load.position < tb) || (tb == 1 && load.position == 1)
+    inseg || return nothing
+    τ = clamp((load.position - ta) / (tb - ta), eps(T), 1 - eps(T))
+    return PointMoment(el, τ, load.value; coords=load.coords, id=load.id, case=load.case)
+end
+
 function _restrict_load(load::SelfWeight{T}, ta::Real, tb::Real, el) where {T}
     return SelfWeight(el; g=load.g, factor=load.factor, id=load.id, case=load.case)
 end

@@ -121,6 +121,56 @@ function fixed_end_forces(load::PointLoad{T}, section::AbstractSection,
     return SVector{12,TQ}(q)
 end
 
+"""
+    shape_function_slopes(x, L) -> (Na′, Nb′, H1′, H2′, H3′, H4′)
+
+Derivatives (w.r.t. the local coordinate) of [`shape_functions`](@ref) —
+the kernel for concentrated MOMENTS, which do work through the rotation
+(slope) field rather than the displacement field.
+"""
+@inline function shape_function_slopes(x::Real, L::Real)
+    ξ = x / L
+    Na′ = -1 / L
+    Nb′ = 1 / L
+    H1′ = (-6ξ + 6ξ^2) / L
+    H2′ = 1 - 4ξ + 3ξ^2
+    H3′ = (6ξ - 6ξ^2) / L
+    H4′ = 3ξ^2 - 2ξ
+    return Na′, Nb′, H1′, H2′, H3′, H4′
+end
+
+function fixed_end_forces(load::PointMoment{T}, section::AbstractSection,
+    ends::EndConditions, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real},
+    Ψ::Real) where {T}
+
+    L = element_length(x1, x2)
+    Λ = local_frame(x1, x2, Ψ)
+    m = load.coords === :local ? load.value : Λ * load.value
+    x = load.position * L
+
+    Na, Nb, _ = shape_functions(x, L)
+    _, _, H1′, H2′, H3′, H4′ = shape_function_slopes(x, L)
+
+    TQ = promote_type(T, typeof(L))
+    q = _mutable12vec(TQ)
+    @inbounds begin
+        # torsion (moment about local x): linear interpolation, like axial
+        q[4] = -m[1] * Na
+        q[10] = -m[1] * Nb
+        # moment about local z: pairs with the x–y plane displacement slope
+        q[2] = -m[3] * H1′
+        q[6] = -m[3] * H2′
+        q[8] = -m[3] * H3′
+        q[12] = -m[3] * H4′
+        # moment about local y: x–z plane, flipped rotation pairing
+        q[3] = m[2] * H1′
+        q[5] = -m[2] * H2′
+        q[9] = m[2] * H3′
+        q[11] = -m[2] * H4′
+    end
+    return SVector{12,TQ}(q)
+end
+
 function fixed_end_forces(load::SelfWeight{T}, section::AbstractSection,
     ends::EndConditions, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real},
     Ψ::Real) where {T}

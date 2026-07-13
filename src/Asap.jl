@@ -54,7 +54,7 @@ export NodalSpring
 include("Loads/loads.jl")
 include("Elements/kernels/fixed_end_forces.jl")
 export AbstractLoad, NodeLoad, ElementLoad
-export NodeForce, NodeMoment, DistributedLoad, LineLoad, PointLoad, SelfWeight
+export NodeForce, NodeMoment, DistributedLoad, LineLoad, TrapezoidLoad, PointLoad, PointMoment, SelfWeight
 export fixed_end_forces, condense_fef
 
 # ── model ───────────────────────────────────────────────────────────────────
