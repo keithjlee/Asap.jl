@@ -57,3 +57,54 @@ end
 
 Base.show(io::IO, s::RigiditySection) =
     print(io, "RigiditySection(EA=$(s.EA), EIx=$(s.EIx), EIy=$(s.EIy), GJ=$(s.GJ))")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Nodes
+# ─────────────────────────────────────────────────────────────────────────────
+
+# human-readable DOF summary, e.g. "fixed: Tx Ty Tz" or "free"
+function _fixity_description(fixity)
+    names = ("Tx", "Ty", "Tz", "Rx", "Ry", "Rz")
+    fixed = [names[i] for i in 1:6 if !fixity[i]]
+    isempty(fixed) && return "free (no supports)"
+    length(fixed) == 6 && return "fully fixed (clamped)"
+    return "fixed: " * join(fixed, " ") * "  (all others free)"
+end
+
+function Base.show(io::IO, ::MIME"text/plain", n::Node)
+    println(io, "Node :$(n.id)")
+    println(io, "  position = $(collect(n.position))  [length]  (global X, Y, Z)")
+    print(io, "  supports = $(_fixity_description(n.fixity))")
+end
+
+Base.show(io::IO, n::Node) = print(io, "Node(:$(n.id), $(collect(n.position)))")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# End conditions (releases / semi-rigid connections)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_spring_word(k) = isinf(k) ? "rigid" : iszero(k) ? "released" : string(k)
+
+function Base.show(io::IO, ::MIME"text/plain", e::EndSprings)
+    println(io, "EndSprings  (element-end connection stiffnesses, local axes)")
+    println(io, "  kx = $(_spring_word(e.kx))  [force/length]      (axial)")
+    println(io, "  kt = $(_spring_word(e.kt))  [force·length/rad]  (torsion — twist about element axis)")
+    println(io, "  ky = $(_spring_word(e.ky))  [force·length/rad]  (bending rotation about local y)")
+    print(io,   "  kz = $(_spring_word(e.kz))  [force·length/rad]  (bending rotation about local z)")
+end
+
+Base.show(io::IO, e::EndSprings) =
+    print(io, "EndSprings(kx=$(_spring_word(e.kx)), kt=$(_spring_word(e.kt)), ky=$(_spring_word(e.ky)), kz=$(_spring_word(e.kz)))")
+
+function Base.show(io::IO, ::MIME"text/plain", ec::EndConditions)
+    sym = release_symbol(ec)
+    header = sym === nothing ? "EndConditions  (semi-rigid)" : "EndConditions  (:$sym)"
+    println(io, header)
+    println(io, "  start end: $(sprint(show, ec.e1))")
+    print(io,   "  far end:   $(sprint(show, ec.e2))")
+end
+
+Base.show(io::IO, ec::EndConditions) = begin
+    sym = release_symbol(ec)
+    sym === nothing ? print(io, "EndConditions($(ec.e1), $(ec.e2))") : print(io, "EndConditions(:$sym)")
+end

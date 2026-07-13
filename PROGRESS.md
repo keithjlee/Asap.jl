@@ -21,9 +21,9 @@
 
 Order is bottom-up; each layer validated against Phase 0 oracles before the next.
 
-- [ ] `Material{T}` + `AbstractSection{T}` accessor contract (EA/EIx/EIy/GJ/ρA) + `Section{T}` + `RigiditySection{T}` — with full docstrings + show methods
-- [ ] `Node{T}` (SVector position, 6-DOF fixity; TrussNode absorbed)
-- [ ] `EndSprings{T}`/`EndConditions{T}` + release symbol map
+- [x] `Material{T}` + `AbstractSection{T}` accessor contract (EA/EIx/EIy/GJ/ρA) + `Section{T}` + `RigiditySection{T}` — with full docstrings + show methods
+- [x] `Node{T}` (SVector position, 6-DOF fixity; TrussNode absorbed)
+- [x] `EndSprings{T}`/`EndConditions{T}` + release symbol map
 - [ ] Element kernels: `local_frame` (transformation), fixity-factor stiffness (Monforton–Wu), validated against pinned `local_K`/`R` oracles at release limits
 - [ ] Element structs: `FrameElement{T,S}`, `TrussElement{T,S}` + element interface (`dof_signature`, `ndofs`, …)
 - [ ] `NodalSpring{T}` (applicative spring supports)

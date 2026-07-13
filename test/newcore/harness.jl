@@ -14,6 +14,8 @@ const SRC = joinpath(@__DIR__, "..", "..", "src")
 
 include(joinpath(SRC, "Materials", "materials.jl"))
 include(joinpath(SRC, "Materials", "sections.jl"))
+include(joinpath(SRC, "Nodes", "node.jl"))
+include(joinpath(SRC, "Elements", "end_conditions.jl"))
 include(joinpath(SRC, "ShowMethods.jl"))
 
 end # module AsapNext
