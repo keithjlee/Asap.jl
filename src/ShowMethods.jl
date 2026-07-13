@@ -160,3 +160,38 @@ end
 
 Base.show(io::IO, sp::NodalSpring) =
     print(io, "NodalSpring(:$(sp.id) at :$(sp.node.id))")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Model & results
+# ─────────────────────────────────────────────────────────────────────────────
+
+function Base.show(io::IO, ::MIME"text/plain", m::Model)
+    nf = count(el -> el isa FrameElement, m.elements)
+    nt = count(el -> el isa TrussElement, m.elements)
+    println(io, "Model")
+    println(io, "  $(length(m.nodes)) nodes, $(length(m.elements)) elements " *
+                "($nf frame, $nt truss$(length(m.elements) - nf - nt > 0 ? ", $(length(m.elements) - nf - nt) other" : ""))")
+    println(io, "  $(length(m.loads)) loads, $(length(m.springs)) nodal springs")
+    if m.cache !== nothing
+        p = m.cache.partition
+        println(io, "  processed: $(length(p.free)) free / $(length(p.fixed)) fixed / " *
+                    "$(length(p.inactive)) inactive DOFs")
+    else
+        println(io, "  unprocessed (call process! or solve!)")
+    end
+    print(io, m.results === nothing ? "  unsolved" : "  solved (see model.results)")
+end
+
+Base.show(io::IO, m::Model) =
+    print(io, "Model($(length(m.nodes)) nodes, $(length(m.elements)) elements)")
+
+function Base.show(io::IO, ::MIME"text/plain", r::LinearResults)
+    umax = isempty(r.u) ? 0.0 : maximum(abs, r.u)
+    println(io, "LinearResults")
+    println(io, "  max |u| = $umax  [length or rad]  (largest displacement component)")
+    println(io, "  compliance = $(r.compliance)  [force·length]  (external work uᵀF)")
+    print(io,   "  access: displacement(res, node), reaction(res, node), element_forces(res, el)")
+end
+
+Base.show(io::IO, r::LinearResults) =
+    print(io, "LinearResults(compliance=$(r.compliance))")

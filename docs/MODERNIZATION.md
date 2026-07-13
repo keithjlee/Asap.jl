@@ -142,6 +142,9 @@ Note DemandTransport2 also exercises the **FDM/Network path** (`solve_network`, 
 - AsapOptim `Types/Utilities.jl` (all_inz), `Functions/*` — deletion targets in 5a
 - AsapToolkit `src/ForceAnalysis/*` — API to preserve (axis-fixed), then absorb
 
+## Documented deviations from legacy numerics
+- **Point-load axial/torsional FEF distribution**: legacy `q_local(::PointLoad)` splits the axial component 50/50 between the ends regardless of load position. The new engine uses the consistent (lever-rule, statically exact) distribution `−P·(1−ξ)` / `−P·ξ`. Totals agree; solves differ only for models with off-midspan point loads carrying an axial component. Characterization tests assert non-axial slots against the pins exactly and axial slots against the corrected formula.
+
 ## Known bugs to fix/regress along the way
 GravityLoad FEF (nonexistent `load.element.ρ`); dangling `release!` export; `copy(::TrussModel)` (`element.nodeIDs`); `shatterReleaseDict` duplicate key; stale `process_bridge!`; AsapOptim `SectionVariable.iglobal::Float64` and `f_axial_new` pullback early-return; AsapOptim missing `FreeFree` k method.
 

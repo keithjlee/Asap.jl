@@ -10,9 +10,12 @@ using LinearAlgebra
 include("harness.jl")
 include(joinpath(@__DIR__, "..", "characterization", "fixtures.jl"))  # pinned oracles
 
+const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
+
 @testset "New core (Phase 1)" begin
     include("test_materials.jl")
     include("test_nodes_ends.jl")
     include("test_kernels.jl")
     include("test_elements.jl")
+    include("test_pipeline.jl")
 end

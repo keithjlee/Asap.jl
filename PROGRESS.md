@@ -27,10 +27,10 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Element kernels: `local_frame` (transformation), fixity-factor stiffness (Monforton–Wu), validated against pinned `local_K`/`R` oracles at release limits
 - [x] Element structs: `FrameElement{T,S}`, `TrussElement{T,S}` + element interface (`dof_signature`, `ndofs`, …)
 - [x] `NodalSpring{T}` (applicative spring supports)
-- [ ] DOF layer: activity accumulation, free/fixed/inactive partition, internal-DOF blocks
-- [ ] Symbolic assembly (element groups, frozen pattern, nzmap + scatter)
-- [ ] In-place numeric assembly + solve pipeline (`process!`/`solve!`, cached factorization)
-- [ ] `LinearResults{T}` + accessors + element-wise reactions
+- [x] DOF layer: activity accumulation, free/fixed/inactive partition, internal-DOF blocks (internal blocks land with VariableElement)
+- [x] Symbolic assembly (element groups, frozen pattern, nzmap; scatter matrix lands with pure path)
+- [x] In-place numeric assembly + solve pipeline (`process!`/`solve!`, cached factorization)
+- [x] `LinearResults{T}` + accessors + element-wise reactions
 - [ ] Pure functional path (`ModelState`, `assemble_K`, `solve`) + `ext/AsapChainRulesExt.jl` (3 rrules)
 - [ ] Parity tests (pure ≡ in-place) + Zygote-vs-FiniteDiff gradient checks
 - [ ] `VariableElement{T,S}` via internal DOFs; delete bridgeprocessing
