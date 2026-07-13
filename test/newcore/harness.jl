@@ -9,6 +9,7 @@
 module AsapNext
 
 using LinearAlgebra, SparseArrays, StaticArrays
+import ChainRulesCore
 
 const SRC = joinpath(@__DIR__, "..", "..", "src")
 
@@ -29,6 +30,11 @@ include(joinpath(SRC, "Analysis", "symbolic.jl"))
 include(joinpath(SRC, "Analysis", "assemble.jl"))
 include(joinpath(SRC, "Results", "results.jl"))
 include(joinpath(SRC, "Analysis", "solve.jl"))
+include(joinpath(SRC, "Analysis", "functional.jl"))
 include(joinpath(SRC, "ShowMethods.jl"))
+
+# the AD rules (a package extension after the module flip; included directly
+# during dark development — HOST resolution handles both)
+include(joinpath(SRC, "..", "ext", "AsapChainRulesExt.jl"))
 
 end # module AsapNext

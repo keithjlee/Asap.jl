@@ -57,6 +57,10 @@ mutable struct AnalysisCache{T}
     Pf::Vector{T}
     q_local::Vector{Vector{T}}
     factorization::Any
+    # pure-path structures (constant per topology):
+    scatter::SparseMatrixCSC{T,Int}      # nnz(K) × Σnactive² — nzval = scatter·V + spring_nzvec
+    spring_nzvec::Vector{T}              # spring diagonal contributions in nzval layout
+    free_embed::SparseMatrixCSC{T,Int}   # n_global × n_free — u = free_embed · u_free
 end
 
 # active slots of an element (positions 1:12 where the signature is true)
@@ -152,9 +156,34 @@ function build_cache(model::Model{T}) where {T}
         end
     end
 
+    # pure-path scatter: column c holds the c-th element-stiffness entry (in
+    # group → element → column-major slot-pair order); row = its nzval slot
+    sI = Int[]
+    sJ = Int[]
+    col = 0
+    for g in groups, m in g.nzmap
+        for pos in m
+            col += 1
+            if pos > 0
+                push!(sI, pos)
+                push!(sJ, col)
+            end
+        end
+    end
+    scatter = sparse(sI, sJ, ones(T, length(sI)), nnz(K), col)
+
+    spring_nzvec = zeros(T, nnz(K))
+    for (pos, k) in spring_nz
+        spring_nzvec[pos] += k
+    end
+
+    free_embed = sparse(part.free, collect(1:length(part.free)),
+        ones(T, length(part.free)), part.n_global, length(part.free))
+
     return AnalysisCache{T}(part, groups, K, spring_nz,
         zeros(T, part.n_global), zeros(T, part.n_global),
-        [zeros(T, 12) for _ in model.elements], nothing)
+        [zeros(T, 12) for _ in model.elements], nothing,
+        scatter, spring_nzvec, free_embed)
 end
 
 # closure looking up the nzval position of entry (i, j) in a CSC matrix

@@ -17,6 +17,12 @@
 
 **Suite status: 6 legacy + 113 characterization passing, 1 expected broken (GravityLoad).**
 
+### Notable findings during Phase 1 (see commit messages for detail)
+- Legacy `q_local(::PointLoad)` splits axial FEF 50/50 regardless of position — physics bug, replaced by consistent lever-rule distribution (documented deviation in docs/MODERNIZATION.md).
+- DOF activity must be decided per node rotation *block* in global coordinates (Λ mixes torsion with bending rotations) — encoded in `dof_signature`.
+- Legacy `planarize!(model, :XY)` also zeroes element Ψ — ported.
+- Legacy Asap 0.2.1 (publication) ≡ 0.2.2 forward results verified at rtol 1e-9.
+
 ## Phase 1 — Core rework 🔄 IN PROGRESS
 
 Order is bottom-up; each layer validated against Phase 0 oracles before the next.
@@ -31,8 +37,8 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Symbolic assembly (element groups, frozen pattern, nzmap; scatter matrix lands with pure path)
 - [x] In-place numeric assembly + solve pipeline (`process!`/`solve!`, cached factorization)
 - [x] `LinearResults{T}` + accessors + element-wise reactions
-- [ ] Pure functional path (`ModelState`, `assemble_K`, `solve`) + `ext/AsapChainRulesExt.jl` (3 rrules)
-- [ ] Parity tests (pure ≡ in-place) + Zygote-vs-FiniteDiff gradient checks
+- [x] Pure functional path (`ModelState`, `assemble_K`, `solve`) + `ext/AsapChainRulesExt.jl` (3 rrules)
+- [x] Parity tests (pure ≡ in-place) + Zygote-vs-FiniteDiff gradient checks
 - [ ] `VariableElement{T,S}` via internal DOFs; delete bridgeprocessing
 - [ ] Characterization suite green on new core
 

@@ -107,6 +107,12 @@ entries of a differentiable state). Delegates to the pure
 stiffness(el::FrameElement, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}) =
     frame_stiffness(el.section, el.ends, x1, x2, el.Ψ)
 
+# pure-path variant: the section comes from a differentiable ModelState
+# rather than the element (positions likewise) — same kernel underneath
+stiffness(el::FrameElement, section::AbstractSection,
+    x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}) =
+    frame_stiffness(section, el.ends, x1, x2, el.Ψ)
+
 """
     TrussElement{T, S<:AbstractSection{T}} <: AbstractElement{T}
 
@@ -159,16 +165,12 @@ active 6×6 translational block is the pure [`truss_stiffness`](@ref)
 kernel; assembly consults [`dof_signature`](@ref) so the zero rotational
 rows are never scattered into the global matrix.
 """
-function stiffness(el::TrussElement, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real})
-    B = truss_stiffness(el.section, x1, x2)          # 6×6 on translations
-    T = eltype(B)
-    k = _mutable12(T)
-    tidx = SVector(1, 2, 3, 7, 8, 9)                  # translational slots
-    @inbounds for a in 1:6, b in 1:6
-        k[tidx[a], tidx[b]] = B[a, b]
-    end
-    return SMatrix{12,12,T}(k)
-end
+stiffness(el::TrussElement, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}) =
+    _SEL_TRANSLATIONS * truss_stiffness(el.section, x1, x2) * _SEL_TRANSLATIONS'
+
+stiffness(el::TrussElement, section::AbstractSection,
+    x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}) =
+    _SEL_TRANSLATIONS * truss_stiffness(section, x1, x2) * _SEL_TRANSLATIONS'
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared element utilities

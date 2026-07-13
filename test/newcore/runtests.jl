@@ -18,4 +18,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("test_kernels.jl")
     include("test_elements.jl")
     include("test_pipeline.jl")
+    include("test_ad.jl")
 end

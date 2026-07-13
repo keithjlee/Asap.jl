@@ -141,32 +141,31 @@ function local_stiffness(section::AbstractSection, L::Real, ends::EndConditions)
     py2 = fixity_factor(ends.e2.ky, eiy, L)
     By = bending_block(eiy, L, py1, py2; flip=true)
 
-    T = typeof(ka)
-    k = _mutable12(T)
-
-    # axial: DOFs 1, 7
-    k[1, 1] = ka; k[1, 7] = -ka
-    k[7, 1] = -ka; k[7, 7] = ka
-
-    # torsion: DOFs 4, 10
-    k[4, 4] = kt; k[4, 10] = -kt
-    k[10, 4] = -kt; k[10, 10] = kt
-
-    # x–y bending: DOFs (2, 6, 8, 12) ↦ block rows/cols (1, 2, 3, 4)
-    zidx = SVector(2, 6, 8, 12)
-    # x–z bending: DOFs (3, 5, 9, 11)
-    yidx = SVector(3, 5, 9, 11)
-    @inbounds for a in 1:4, b in 1:4
-        k[zidx[a], zidx[b]] = Bz[a, b]
-        k[yidx[a], yidx[b]] = By[a, b]
-    end
-
-    return SMatrix{12,12,T}(k)
+    # compose by embedding each action block through constant selector
+    # matrices — a pure (mutation-free) expression, so the identical kernel
+    # is differentiable by Zygote and fast on the in-place path
+    pair = SMatrix{2,2}(1, -1, -1, 1)
+    return _SEL_AXIAL * (ka * pair) * _SEL_AXIAL' +
+           _SEL_TORSION * (kt * pair) * _SEL_TORSION' +
+           _SEL_BEND_Z * Bz * _SEL_BEND_Z' +
+           _SEL_BEND_Y * By * _SEL_BEND_Y'
 end
 
-# Mutable 12×12 scratch: stack MMatrix for isbits scalars (Float64, Duals),
-# plain Matrix for boxed scalars (BigFloat) which MMatrix cannot setindex!.
-_mutable12(::Type{T}) where {T} = isbitstype(T) ? zeros(MMatrix{12,12,T}) : zeros(T, 12, 12)
+# constant selector (embedding) matrices: column j has a 1 at the local DOF
+# slot the block's j-th entry maps to
+function _selector(idx::NTuple{N,Int}) where {N}
+    return SMatrix{12,N,Float64}(ntuple(k -> begin
+            i = (k - 1) % 12 + 1
+            j = (k - 1) ÷ 12 + 1
+            idx[j] == i ? 1.0 : 0.0
+        end, 12N))
+end
+
+const _SEL_AXIAL = _selector((1, 7))
+const _SEL_TORSION = _selector((4, 10))
+const _SEL_BEND_Z = _selector((2, 6, 8, 12))    # x–y plane: (v, θz) pairs
+const _SEL_BEND_Y = _selector((3, 5, 9, 11))    # x–z plane: (v, θy) pairs
+const _SEL_TRANSLATIONS = _selector((1, 2, 3, 7, 8, 9))
 
 """
     truss_stiffness(section, x1, x2) -> SMatrix{6,6}

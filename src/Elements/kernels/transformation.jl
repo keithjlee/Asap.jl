@@ -79,13 +79,23 @@ Computed blockwise over the sixteen 3×3 sub-blocks (`K[a,b] = Λᵀ k[a,b] Λ`)
 — algebraically identical to the dense triple product but cheaper, and pure
 SMatrix arithmetic so it is stack-allocated and AD-transparent.
 """
-function transform_to_global(k::SMatrix{12,12,T}, Λ::SMatrix{3,3,TΛ}) where {T,TΛ}
-    TK = promote_type(T, TΛ)
-    K = _mutable12(TK)
-    @inbounds for a in 0:3, c in 0:3
-        ia = SVector(3a + 1, 3a + 2, 3a + 3)
-        ic = SVector(3c + 1, 3c + 2, 3c + 3)
-        K[ia, ic] = Λ' * k[ia, ic] * Λ
-    end
-    return SMatrix{12,12,TK}(K)
+function transform_to_global(k::SMatrix{12,12}, Λ::SMatrix{3,3})
+    # R = blockdiag(Λ, Λ, Λ, Λ), assembled through constant selectors so the
+    # whole transform is one pure static-matrix expression (AD-transparent)
+    R = _BLK1 * Λ * _BLK1' + _BLK2 * Λ * _BLK2' + _BLK3 * Λ * _BLK3' + _BLK4 * Λ * _BLK4'
+    return R' * k * R
 end
+
+# constant 12×3 block selectors for the four node-DOF 3-blocks
+function _block_selector(b::Int)
+    return SMatrix{12,3,Float64}(ntuple(k -> begin
+            i = (k - 1) % 12 + 1
+            j = (k - 1) ÷ 12 + 1
+            i == 3 * (b - 1) + j ? 1.0 : 0.0
+        end, 36))
+end
+
+const _BLK1 = _block_selector(1)
+const _BLK2 = _block_selector(2)
+const _BLK3 = _block_selector(3)
+const _BLK4 = _block_selector(4)
