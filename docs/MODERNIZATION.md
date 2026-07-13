@@ -9,7 +9,8 @@ Asap.jl (v0.2.2) is Keith's structural FEA package, 5–6 years old, Float64-str
 
 ## Locked decisions (Keith, 2026-07-13)
 
-- **Clean break**: new major version; AsapOptim/AsapToolkit/AsapHarmonics updated in lockstep, no shims.
+- **Clean break**: new major version; AsapOptim/AsapToolkit/AsapHarmonics/DemandTransport2 updated in lockstep, no shims.
+- **Branch policy**: `main` stays the stable v0.2.x for ongoing projects. ALL modernization work happens on `modernization/*` branches (Phase 0 on `modernization/phase-0`; later phases branch from the previous phase). Merge to `main` only when Keith calls v1.0 ready.
 - **AD-first core**: Asap provides both an in-place fast path and a pure functional path sharing one element kernel. AsapOptim shrinks to variables/indexers/objectives.
 - **Julia 1.10 LTS** floor. Deps: LinearAlgebra, SparseArrays, **+ StaticArrays** (hard), **+ ChainRulesCore** (weak dep / extension). No Unitful. No LinearSolve for now (CHOLMOD `cholesky!` behind a `factorize!` seam; extension later).
 - **First feature after core rework**: shape-function/equilibrium internal-force recovery.
@@ -33,7 +34,7 @@ Asap.jl (v0.2.2) is Keith's structural FEA package, 5–6 years old, Float64-str
   - `TrussElement{T,S}`.
   - `VariableElement{T,S}`: one user-facing element = chain of prismatic segments (`sections::Vector{S}`, `breaks`), via **internal DOFs** (6 per interior joint, allocated after nodal DOFs by process!) — NOT model-node shattering, NOT static condensation (keeps mass/geometric-stiffness exact later; recovery = same code path as primitives). Replaces BridgeElement; `bridgeprocessing.jl` deleted.
 - **Releases → end-spring data**: `EndSprings{T}` (kx, kt, ky, kz per end; Inf=rigid, 0=released). Release symbols (`:fixedfixed`…`:joist`) map to exact limits and stay the user API. Element vectors become concretely typed (releases no longer type params). Connection stiffness becomes a **differentiable design variable** (Forma concrete workflows).
-- `NodalSpring{T}`: diagonal stiffness per global DOF at a node (spring supports); marks DOFs active; reaction −k·u.
+- `NodalSpring{T}`: **applicative data, not a node property** — a standalone struct referencing a node (like a load references its target), stored in `model.springs`. Diagonal stiffness per global DOF; multiple springs on one node compose additively; marks DOFs active; reaction −k·u. Nodes never know about their springs.
 - Loads: immutable, parametric, `case::Symbol` tag, **no release type param**. `NodeForce/NodeMoment`; `DistributedLoad{T}` = canonical piecewise-linear intensity (breakpoints t ∈ [0,1], w per breakpoint, direction, :global/:local) with `LineLoad`/`TrapezoidLoad`/`TributaryLoad` convenience constructors lowering to it; `PointLoad`; new `PointMoment`; `SelfWeight` (lowers to DistributedLoad via `ρA(section)`, per-segment for VariableElement — GravityLoad's ρ bug impossible by construction).
 
 ### Element interface (extensibility contract)
@@ -101,7 +102,17 @@ ext/AsapChainRulesExt.jl
 | **5a** | AsapOptim: delete Functions/{K,Kframe,Ktruss,Rframe,Rtruss}.jl + assembly half of Solve.jl + all_inz layer; keep Variables/Indexers/Constraints; call `extract_state`/`solve(cache, state)` | Suite green; gradient check vs FiniteDifferences (truss + frame) |
 | **5b** | AsapToolkit: delete ForceAnalysis/ (absorbed); mechanical rename port (P→N, My↔Mz, accessor migration); keep Generation/SteelSections/AsapSections/IO | Plots regenerate identically vs fixtures |
 | **5c** | AsapHarmonics: rename pass (`node.reaction` → `reaction(res, node)` etc.) | Suite green |
+| **5d** | DemandTransport2: port legacy Truss types out of struct fields (`model_opt::TrussModel`, `ElementDemand(::TrussModel)`, `ResponsiveGeo2D(::TrussModel)` → unified `Model`); replace the one struct-embedded result read `element.forces[2]` (`src/Demand/data_structures.jl:47`) with the results accessor; objective functions move to the new differentiable results API | Truss + network optimization examples reproduce prior optima; Zygote gradients green |
 | Later | Geometric nonlinearity (`geometric_stiffness` hook + tangent assembly reuse), dynamics (`mass` hook), FDM parametrization, Forma integration | — |
+
+### Downstream AD contract (driven by DemandTransport2, the reference consumer)
+DemandTransport2 (`../DemandTransport2`, optimal transport + differentiable structural analysis) is a pure consumer of AsapOptim's differentiable API — no rrules or sparsity hacks of its own. The Phase 5a AsapOptim rework must preserve, on top of the new core pure path:
+- Gradients of displacements, axial forces, and element lengths **w.r.t. node positions** (`SpatialVariable`) and of the FDM network solve w.r.t. **force densities** (`QVariable`). It does not optimize areas.
+- A results object exposing displacements + element lengths (today `res.U`, `res.L`) and `axial_force(res, p)`; network results `res.X/Y/Z/Q`.
+- A **geometry-only, no-solve path** (today `GeometricProperties(x, p)` → `.L`) for length-based objectives.
+- `updatemodel(params, x)` returning a materialized, solved model for post-processing/viz.
+- Fixed sparsity across repeated solves of a fixed-topology model (already guaranteed by `AnalysisCache`).
+Note DemandTransport2 also exercises the **FDM/Network path** (`solve_network`, `NetworkOptParams`) — FDM stays functional through the transition even though its parametrization is deferred. Its own migration is Phase 5d; hardest hits are the legacy Truss types hard-coded in its struct fields and dispatch signatures (fails at precompile, not just call sites).
 
 ## Critical files
 - `src/Elements/K.jl` — closed-form matrices → generalized fixity-factor kernel (and test oracle)

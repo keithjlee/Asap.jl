@@ -4,6 +4,8 @@ Structural analysis (direct-stiffness FEA) package for trusses and frames, plus 
 
 **A major v1.0 modernization is underway — see `docs/MODERNIZATION.md` for the approved architecture and phased roadmap before making structural changes.** Until Phase 1 lands, the code described below is the *legacy* (v0.2.x) architecture; characterization tests in `test/` pin its numerics and are the regression contract for the rewrite.
 
+**Branch policy: `main` stays the stable v0.2.x — ongoing projects depend on it. All modernization work goes on `modernization/*` branches; never commit modernization changes to `main`.**
+
 ## Commands
 
 ```bash
@@ -46,4 +48,5 @@ Truss vs frame is duplicated everywhere (separate `create_S!`, `populate_DOF_ind
 - `../AsapOptim` — differentiable optimization layer (Zygote). Pinned `Asap = "0.2"`. Re-implements assembly functionally; reads `model.S` CSC internals (`all_inz`) and keeps verbatim copies of the local stiffness matrices — these must stay numerically identical to `Elements/K.jl`.
 - `../AsapToolkit` — utilities; owns `InternalForces` shear/moment diagrams today (moving into core in Phase 3). Heavy direct field access; treats field names as public API. Note its `.My` is actually the moment about local z.
 - `../AsapHarmonics` — connection analysis; light coupling (`connectivity`, `axial_force`, `node.reaction`, `element.LCS`).
+- `../DemandTransport2` — active research project (optimal transport + differentiable structural analysis). Pure consumer of AsapOptim's differentiable API; hard-codes `TrussModel`/`TrussNode` in its struct fields and reads `element.forces[2]`. Defines the downstream AD contract (see `docs/MODERNIZATION.md`).
 - Tasha's fork (github.com/natashahirt/Asap.jl) — reference for load features (TributaryLoad math); do not merge (Unitful dep).
