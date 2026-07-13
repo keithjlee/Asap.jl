@@ -66,4 +66,16 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Combination-aware recovery (`internal_forces(...; results, factors)`)
 - [x] `envelope`: station-wise extrema over combinations at common stations (all-cases-on station set so no combo's jumps are missed) — verified ≡ brute-force extrema
 - [x] Single-factorization reuse proven in tests
-## Phase 5 — Ecosystem migration (5a Optim / 5b Toolkit / 5c Harmonics / 5d DemandTransport2) ⬜
+## Phase 5 — Ecosystem migration 🔄
+
+### 5a AsapOptim ✅ COMPLETE (branch `asap-v1` in ../AsapOptim)
+- [x] Rewritten as a ~600-line Zygote-free design-vector layer on the core pure path (was 2400 lines of parallel implementation + hand-written adjoints)
+- [x] Unified `OptParams` (Truss/Frame aliases); Spatial/Area/Coupled variables with sparse scatter compilation
+- [x] `solve_structure`/`axial_force`/`axial_stress`/`compliance`/`GeometricProperties`/`updatemodel`
+- [x] First-ever AsapOptim test suite: 28 tests, gradcheck vs FiniteDifferences, design-eval ≡ direct solve
+- [x] Legacy preserved unloaded in `legacy_v0/`
+- [ ] Deferred: FDM network optimization path; SectionVariable (RigiditySection parameterization is the v1.0 idiom)
+
+### 5b AsapToolkit ⬜ (delete ForceAnalysis/, mechanical rename port)
+### 5c AsapHarmonics ⬜ (rename pass)
+### 5d DemandTransport2 ⬜ (port struct-field types + results API; U indexing 6/node)
