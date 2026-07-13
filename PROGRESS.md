@@ -76,11 +76,19 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Legacy preserved unloaded in `legacy_v0/`
 - [ ] Deferred: FDM network optimization path; SectionVariable (RigiditySection parameterization is the v1.0 idiom)
 
-### 5b AsapToolkit ⏸ PREPARED — needs interactive verification
-Toolkit has NO test suite, uncommitted WIP (`AsapSections/Sections.jl`), and its exit criterion is visual (plots regenerate). Full mechanical mapping written: `docs/MIGRATION_v1.md`. Do the port together: apply the table, regenerate reference plots side by side.
+### 5b AsapToolkit ✅ PORTED (branch `asap-v1`) — visual verification pending
+- [x] ForceAnalysis/ deleted (absorbed into core); generators/Geometry/IO/SteelSections/FDM-translations ported
+- [x] Frame generator: BridgeElement joists → explicit interior nodes; releases now actually applied (legacy passed them as the id positional — silently ignored!)
+- [x] ElementDisplacements reimplemented on core displacement recovery
+- [x] First test suite: 58 tests (generator smoke + equilibrium, displaced shape vs core, section bridges)
+- [ ] Keith: regenerate a few reference plots side-by-side (visual check); AsapSections WIP left uncommitted
 
-### 5c AsapHarmonics ⏸ PREPARED (no test suite; light coupling — see MIGRATION_v1.md)
-### 5d DemandTransport2 ⏸ PREPARED (active research repo; port notes in MIGRATION_v1.md; blocked on 5b viz + FDM-network optim path)
+### 5c AsapHarmonics ✅ PORTED (branch `asap-v1`)
+- [x] Rename pass complete; first test suite (3D spherical + planar 2D signatures, finite feature vectors)
+
+### 5d DemandTransport2 🔄 IN PROGRESS (branch `asap-v1`; package src only)
+- Package src port + first test suite (agent running); example scripts (highrise/vault) ported interactively later
+- Vault example blocked on the deferred AsapOptim network-optimization path
 
 ## Deferred / follow-ups
 - FDM network optimization path in AsapOptim (legacy_v0/ reference)
