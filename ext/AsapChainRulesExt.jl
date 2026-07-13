@@ -45,6 +45,28 @@ function ChainRulesCore.rrule(::typeof(HOST.sparse_from_pattern),
     return K, sparse_from_pattern_pullback
 end
 
+# constructor rules: Section/Material have custom inner constructors
+# (promotion logic), which Zygote's automatic struct adjoint refuses —
+# their pullbacks are simple field pass-throughs
+function ChainRulesCore.rrule(::Type{<:Asap.Section}, material::Asap.Material,
+    A::Real, Ix::Real, Iy::Real, J::Real)
+    sec = Asap.Section(material, A, Ix, Iy, J)
+    function Section_pullback(Δ)
+        Δs = unthunk(Δ)
+        return (NoTangent(), Δs.material, Δs.A, Δs.Ix, Δs.Iy, Δs.J)
+    end
+    return sec, Section_pullback
+end
+
+function ChainRulesCore.rrule(::Type{<:Asap.Material}, E::Real, G::Real, ρ::Real, ν::Real)
+    m = Asap.Material(E, G, ρ, ν)
+    function Material_pullback(Δ)
+        Δm = unthunk(Δ)
+        return (NoTangent(), Δm.E, Δm.G, Δm.ρ, Δm.ν)
+    end
+    return m, Material_pullback
+end
+
 # boundary rule between the plain position matrix (AD input container) and
 # the static vectors the kernels use internally — avoids the known
 # Zygote/StaticArrays tangent-projection mismatch at exactly this seam
