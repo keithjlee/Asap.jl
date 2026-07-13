@@ -5,10 +5,13 @@
 using Test
 using Asap            # legacy module — compatibility oracles (fixDict etc.)
 using StaticArrays
+using LinearAlgebra
 
 include("harness.jl")
+include(joinpath(@__DIR__, "..", "characterization", "fixtures.jl"))  # pinned oracles
 
 @testset "New core (Phase 1)" begin
     include("test_materials.jl")
     include("test_nodes_ends.jl")
+    include("test_kernels.jl")
 end
