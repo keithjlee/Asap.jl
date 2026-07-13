@@ -25,8 +25,8 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] `Node{T}` (SVector position, 6-DOF fixity; TrussNode absorbed)
 - [x] `EndSprings{T}`/`EndConditions{T}` + release symbol map
 - [x] Element kernels: `local_frame` (transformation), fixity-factor stiffness (Monforton–Wu), validated against pinned `local_K`/`R` oracles at release limits
-- [ ] Element structs: `FrameElement{T,S}`, `TrussElement{T,S}` + element interface (`dof_signature`, `ndofs`, …)
-- [ ] `NodalSpring{T}` (applicative spring supports)
+- [x] Element structs: `FrameElement{T,S}`, `TrussElement{T,S}` + element interface (`dof_signature`, `ndofs`, …)
+- [x] `NodalSpring{T}` (applicative spring supports)
 - [ ] DOF layer: activity accumulation, free/fixed/inactive partition, internal-DOF blocks
 - [ ] Symbolic assembly (element groups, frozen pattern, nzmap + scatter)
 - [ ] In-place numeric assembly + solve pipeline (`process!`/`solve!`, cached factorization)

@@ -18,6 +18,9 @@ include(joinpath(SRC, "Nodes", "node.jl"))
 include(joinpath(SRC, "Elements", "end_conditions.jl"))
 include(joinpath(SRC, "Elements", "kernels", "transformation.jl"))
 include(joinpath(SRC, "Elements", "kernels", "stiffness.jl"))
+include(joinpath(SRC, "Elements", "interface.jl"))
+include(joinpath(SRC, "Elements", "frame.jl"))
+include(joinpath(SRC, "Springs", "nodal_springs.jl"))
 include(joinpath(SRC, "ShowMethods.jl"))
 
 end # module AsapNext

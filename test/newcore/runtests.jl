@@ -14,4 +14,5 @@ include(joinpath(@__DIR__, "..", "characterization", "fixtures.jl"))  # pinned o
     include("test_materials.jl")
     include("test_nodes_ends.jl")
     include("test_kernels.jl")
+    include("test_elements.jl")
 end

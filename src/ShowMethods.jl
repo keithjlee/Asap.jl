@@ -108,3 +108,55 @@ Base.show(io::IO, ec::EndConditions) = begin
     sym = release_symbol(ec)
     sym === nothing ? print(io, "EndConditions($(ec.e1), $(ec.e2))") : print(io, "EndConditions(:$sym)")
 end
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Elements
+# ─────────────────────────────────────────────────────────────────────────────
+
+function Base.show(io::IO, ::MIME"text/plain", el::FrameElement)
+    sym = release_symbol(el.ends)
+    conn = sym === nothing ? "semi-rigid connections" : "connections :$sym"
+    println(io, "FrameElement :$(el.id)")
+    println(io, "  from $(collect(el.nodeStart.position)) to $(collect(el.nodeEnd.position))")
+    println(io, "  length = $(length(el))  [length]")
+    println(io, "  Ψ = $(el.Ψ)  [rad]  (section roll about the element axis)")
+    println(io, "  $conn")
+    println(io, "  section rigidities:")
+    println(io, "    EA  = $(EA(el.section)), EIx = $(EIx(el.section)),")
+    print(io,   "    EIy = $(EIy(el.section)), GJ = $(GJ(el.section))")
+end
+
+Base.show(io::IO, el::FrameElement) =
+    print(io, "FrameElement(:$(el.id), L=$(length(el)))")
+
+function Base.show(io::IO, ::MIME"text/plain", el::TrussElement)
+    println(io, "TrussElement :$(el.id)  (axial-only two-force member)")
+    println(io, "  from $(collect(el.nodeStart.position)) to $(collect(el.nodeEnd.position))")
+    println(io, "  length = $(length(el))  [length]")
+    print(io,   "  EA = $(EA(el.section))  [force]  (axial rigidity)")
+end
+
+Base.show(io::IO, el::TrussElement) =
+    print(io, "TrussElement(:$(el.id), L=$(length(el)))")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Springs
+# ─────────────────────────────────────────────────────────────────────────────
+
+function Base.show(io::IO, ::MIME"text/plain", sp::NodalSpring)
+    dofnames = ("Tx", "Ty", "Tz", "Rx", "Ry", "Rz")
+    active = [i for i in 1:6 if sp.stiffness[i] > 0]
+    println(io, "NodalSpring :$(sp.id)  (elastic support at node :$(sp.node.id))")
+    if isempty(active)
+        print(io, "  no nonzero stiffnesses")
+    else
+        for (n, i) in enumerate(active)
+            unit = i <= 3 ? "[force/length]" : "[force·length/rad]"
+            tail = n == length(active) ? "" : "\n"
+            print(io, "  k($(dofnames[i])) = $(sp.stiffness[i])  $unit$tail")
+        end
+    end
+end
+
+Base.show(io::IO, sp::NodalSpring) =
+    print(io, "NodalSpring(:$(sp.id) at :$(sp.node.id))")
