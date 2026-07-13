@@ -83,12 +83,30 @@ src/
              kernels/{transformation.jl, stiffness.jl, fixed_end_forces.jl, mass.jl}}
   Springs/nodal_springs.jl
   Loads/loads.jl
+  ShowMethods.jl               # REPL display for all user-facing types (FormaSlab pattern)
   Analysis/ {dofs.jl, symbolic.jl, assemble.jl, functional.jl, factorize.jl, solve.jl}
   Results/ {results.jl, postprocess.jl, queries.jl}
   Model/ {model.jl, utilities.jl}
   FDM/            # unchanged for now
 ext/AsapChainRulesExt.jl
 ```
+
+## Documentation standard (applies to every phase — modeled on FormaSlab.jl)
+
+Docstrings and show methods land **with each type/function as it is written**, never as a cleanup pass.
+
+**Docstrings** (every function and struct, exported or not):
+- Signature line first, then a one-sentence statement of what it does/returns.
+- State physical and mathematical conventions explicitly: coordinate system (LCS vs GCS), sign conventions (tension-positive, sagging-positive), units as dimensions (`[force/length²]` — Asap is units-agnostic, so never name a specific unit).
+- `# Arguments` (or `# Fields` for structs) with the physical meaning of every symbol in structural-engineering language — `E`: Young's (elastic) modulus; `ν`: Poisson's ratio; `Ψ`: roll angle about the element axis; `EIx`: flexural rigidity about the strong axis; etc.
+- Structs additionally document *why* the type exists, what it stores vs derives, who constructs it, and lifecycle/staleness rules (e.g. when an `AnalysisCache` is invalidated).
+- In-place variants documented relative to their pure counterparts; cross-reference related functions.
+
+**Show methods** (`src/ShowMethods.jl`, mirroring FormaSlab's):
+- `Base.show(io, ::MIME"text/plain", x)` for every user-facing type: type name header, then aligned fields as `symbol = value [dimension]  (plain-language explanation)` — e.g. `ν = 0.3  (Poisson's ratio — transverse strain ratio)`.
+- Include the most useful derived quantities inline (e.g. a `Section` shows its EA/EIx/EIy/GJ rigidities; an element shows its length and end releases in words).
+- Compact single-line `Base.show(io, x)` forms so vectors of objects print cleanly.
+- Organized by category with section separators, one file, so the vocabulary stays consistent.
 
 ## Phased roadmap
 

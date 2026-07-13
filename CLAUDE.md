@@ -35,6 +35,7 @@ Truss vs frame is duplicated everywhere (separate `create_S!`, `populate_DOF_ind
 - Global axes: `globalX/Y/Z` constants. Local coordinate system stored per element as `LCS`.
 - Results are mutated onto structs (`node.displacement`, `element.forces` = 12-vector of local end forces; axial force = `forces[7]` frame / `forces[2]` truss).
 - Style: explicit, readable, directory-per-concept, exported names in `src/Asap.jl`.
+- **Documentation standard** (all new/modernized code): extensive docstrings for every function AND data structure — structs explain what the type represents, what each field stores, and the engineering meaning of every symbol (E = elastic modulus, ν = Poisson's ratio, Ψ = roll angle), with units as dimensions (`[force/length²]`), never named units. Every user-facing type gets a `Base.show(io, ::MIME"text/plain", x)` method in `src/ShowMethods.jl` printing aligned `symbol = value (plain-language explanation)` lines. Model on `~/Documents/forma-dev/FormaSlab.jl` (see its `src/ShowMethods.jl`). Docs land with the code, never as a cleanup pass. Full spec in `docs/MODERNIZATION.md`.
 
 ## Known legacy bugs (documented, fixed in modernization — do not silently "fix" without updating characterization tests)
 
