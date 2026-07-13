@@ -252,3 +252,4 @@ using LinearAlgebra
 end
 
 include("characterization/characterization.jl")
+include("newcore/runtests.jl")
