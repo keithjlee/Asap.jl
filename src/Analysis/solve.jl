@@ -19,8 +19,13 @@ function process!(model::Model{T}) where {T}
     for (i, n) in enumerate(model.nodes)
         n.index = i
     end
+    offset = 6 * length(model.nodes)          # internal blocks follow nodal slots
     for (i, el) in enumerate(model.elements)
         el.index = i
+        if el isa VariableElement
+            el.internal_offset = offset
+            offset += n_internal_dofs(el)
+        end
     end
     model.cache = build_cache(model)
     return model
@@ -86,23 +91,7 @@ function _post_process(cache::AnalysisCache{T}, model::Model{T}, u::Vector{T},
 
     forces = Vector{Vector{T}}(undef, length(model.elements))
     for el in model.elements
-        x1 = el.nodeStart.position
-        x2 = el.nodeEnd.position
-        Ke = stiffness(el, x1, x2)
-        g = element_global_dofs(el)
-        u_el = SVector{12,T}(u[g[1]], u[g[2]], u[g[3]], u[g[4]], u[g[5]], u[g[6]],
-            u[g[7]], u[g[8]], u[g[9]], u[g[10]], u[g[11]], u[g[12]])
-
-        q̃ = cache.q_local[el.index]
-        Λ = local_frame(x1, x2, el isa FrameElement ? el.Ψ : zero(T))
-        Qg = _rotate12(Λ', SVector{12,T}(q̃))
-
-        f_global = Ke * u_el + Qg
-        forces[el.index] = Vector{T}(_rotate12(Λ, f_global))
-
-        @inbounds for i in 1:12
-            isfixed[g[i]] && (reactions[g[i]] += f_global[i])
-        end
+        forces[el.index] = _recover_forces!(reactions, isfixed, cache, el, u)
     end
 
     for sp in model.springs
@@ -115,4 +104,49 @@ function _post_process(cache::AnalysisCache{T}, model::Model{T}, u::Vector{T},
     end
 
     return LinearResults{T}(u, reactions, forces, compliance)
+end
+
+# primitive elements: one 12-vector of local end forces
+function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
+    el::Union{FrameElement,TrussElement}, u::Vector{T}) where {T}
+    x1 = el.nodeStart.position
+    x2 = el.nodeEnd.position
+    Ke = stiffness(el, x1, x2)
+    g = element_global_dofs(el)
+    u_el = SVector{12,T}(ntuple(i -> u[g[i]], 12))
+
+    Λ = local_frame(x1, x2, el isa FrameElement ? el.Ψ : zero(T))
+    Qg = _rotate12(Λ', SVector{12,T}(cache.q_local[el.index][1]))
+
+    f_global = Ke * u_el + Qg
+    @inbounds for i in 1:12
+        isfixed[g[i]] && (reactions[g[i]] += f_global[i])
+    end
+    return Vector{T}(_rotate12(Λ, f_global))
+end
+
+# VariableElement: per-segment recovery (each segment behaves like a
+# primitive element over its slice of the element's DOF layout); returns
+# the concatenated per-segment local end-force vectors (12 per segment)
+function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
+    el::VariableElement, u::Vector{T}) where {T}
+    g = element_global_dofs(el)
+    Λ = local_frame(el)
+    out = zeros(T, 12 * n_segments(el))
+
+    for s in 1:n_segments(el)
+        xa, xb = segment_positions(el, s)
+        Ks = frame_stiffness(el.sections[s], segment_ends(el, s), xa, xb, el.Ψ)
+        slots = segment_slots(el, s)
+        u_s = SVector{12,T}(ntuple(i -> u[g[slots[i]]], 12))
+        Qg = _rotate12(Λ', SVector{12,T}(cache.q_local[el.index][s]))
+
+        f_global = Ks * u_s + Qg
+        @inbounds for i in 1:12
+            gi = g[slots[i]]
+            isfixed[gi] && (reactions[gi] += f_global[i])
+        end
+        out[12*(s-1).+(1:12)] = Vector{T}(_rotate12(Λ, f_global))
+    end
+    return out
 end

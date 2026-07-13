@@ -64,10 +64,23 @@ component ordering). Requires the element's `index` (assigned by
 element_forces(res::LinearResults, el::AbstractElement) = res.element_forces[el.index]
 
 """
+    element_forces(res::LinearResults, el::VariableElement, s::Int) -> Vector{T}
+
+Local end-force 12-vector of segment `s` of a super-element (the stored
+vector concatenates one 12-block per segment, start → end).
+"""
+element_forces(res::LinearResults, el::VariableElement, s::Int) =
+    element_forces(res, el)[12*(s-1).+(1:12)]
+
+"""
     axial_force(res::LinearResults, el) -> T
 
 The element's axial force, tension-positive [force]. Uniform across element
 types (slot 7 of the local end-force vector — the axial action at the end
-node, which equals the member force for a two-node element).
+node, which equals the member force for a two-node element). For a
+`VariableElement`, the axial force of its LAST segment (constant along the
+member absent axial element loads).
 """
 axial_force(res::LinearResults, el::AbstractElement) = element_forces(res, el)[7]
+axial_force(res::LinearResults, el::VariableElement) =
+    element_forces(res, el, n_segments(el))[7]

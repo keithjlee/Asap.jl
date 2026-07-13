@@ -139,6 +139,26 @@ end
 Base.show(io::IO, el::TrussElement) =
     print(io, "TrussElement(:$(el.id), L=$(length(el)))")
 
+function Base.show(io::IO, ::MIME"text/plain", el::VariableElement)
+    nseg = n_segments(el)
+    sym = release_symbol(el.ends)
+    conn = sym === nothing ? "semi-rigid outer connections" : "outer connections :$sym"
+    println(io, "VariableElement :$(el.id)  ($nseg prismatic segments, one member)")
+    println(io, "  from $(collect(el.nodeStart.position)) to $(collect(el.nodeEnd.position))")
+    println(io, "  length = $(length(el))  [length];  Ψ = $(el.Ψ)  [rad]")
+    println(io, "  $conn; interior joints rigid ($(n_internal_dofs(el)) internal DOFs)")
+    ts = segment_fractions(el)
+    for s in 1:nseg
+        sec = el.sections[s]
+        tail = s == nseg ? "" : "\n"
+        print(io, "  [$s] t ∈ [$(round(ts[s]; digits=3)), $(round(ts[s+1]; digits=3))]:  " *
+                  "EA = $(EA(sec)), EIx = $(EIx(sec)), EIy = $(EIy(sec)), GJ = $(GJ(sec))$tail")
+    end
+end
+
+Base.show(io::IO, el::VariableElement) =
+    print(io, "VariableElement(:$(el.id), $(n_segments(el)) segments, L=$(length(el)))")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Springs
 # ─────────────────────────────────────────────────────────────────────────────

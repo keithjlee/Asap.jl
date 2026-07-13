@@ -35,7 +35,7 @@ end
 "first global DOF slot of a node (its Tx); the node owns 6 consecutive slots"
 node_dof_start(node::Node) = 6 * (node.index - 1)
 
-"global DOF indices of the element's nodal slots, signature-independent"
+"global DOF indices of the element's slots (nodal, then any internal blocks)"
 function element_global_dofs(el::AbstractElement)
     g = Vector{Int}(undef, 12)
     s1 = node_dof_start(el.nodeStart)
@@ -43,6 +43,22 @@ function element_global_dofs(el::AbstractElement)
     @inbounds for i in 1:6
         g[i] = s1 + i
         g[6+i] = s2 + i
+    end
+    return g
+end
+
+function element_global_dofs(el::VariableElement)
+    ni = n_internal_dofs(el)
+    @assert el.internal_offset > 0 "VariableElement internal DOFs not yet allocated — call process!"
+    g = Vector{Int}(undef, 12 + ni)
+    s1 = node_dof_start(el.nodeStart)
+    s2 = node_dof_start(el.nodeEnd)
+    @inbounds for i in 1:6
+        g[i] = s1 + i
+        g[6+i] = s2 + i
+    end
+    @inbounds for i in 1:ni
+        g[12+i] = el.internal_offset + i
     end
     return g
 end

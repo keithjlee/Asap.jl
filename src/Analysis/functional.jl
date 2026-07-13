@@ -38,7 +38,10 @@ The model's current geometry and sections as a differentiable state.
 """
 extract_state(model::Model{T}) where {T} =
     ModelState{T}(reduce(hcat, (collect(n.position) for n in model.nodes)),
-        AbstractSection{T}[el.section for el in model.elements])
+        Any[_state_sections(el) for el in model.elements])
+
+_state_sections(el::AbstractElement) = el.section
+_state_sections(el::VariableElement) = el.sections
 
 # column i of the position matrix as a static vector (pure expression —
 # Zygote differentiates the scalar getindex calls cleanly)

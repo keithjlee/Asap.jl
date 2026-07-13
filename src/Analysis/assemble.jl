@@ -64,7 +64,7 @@ recovery) and globally (blockwise Λᵀ rotation) into `Pf`.
 function assemble_loads!(cache::AnalysisCache{T}, model::Model{T}) where {T}
     fill!(cache.P, zero(T))
     fill!(cache.Pf, zero(T))
-    for q in cache.q_local
+    for qs in cache.q_local, q in qs
         fill!(q, zero(T))
     end
 
@@ -103,9 +103,15 @@ end
 
 function _apply_load!(cache::AnalysisCache{T}, load::ElementLoad{T}, inactive) where {T}
     el = load.element
-    el isa FrameElement || error("element loads require a FrameElement " *
-                                 "(a $(nameof(typeof(el))) cannot carry transverse load) — " *
-                                 "apply NodeForces or subdivide instead")
+    el isa Union{FrameElement,VariableElement} ||
+        error("element loads require a FrameElement or VariableElement " *
+              "(a $(nameof(typeof(el))) cannot carry transverse load) — " *
+              "apply NodeForces or subdivide instead")
+    _apply_element_load!(cache, load, el)
+end
+
+function _apply_element_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
+    el::FrameElement) where {T}
     x1 = el.nodeStart.position
     x2 = el.nodeEnd.position
     L = element_length(x1, x2)
@@ -113,7 +119,7 @@ function _apply_load!(cache::AnalysisCache{T}, load::ElementLoad{T}, inactive) w
     q = fixed_end_forces(load, el.section, el.ends, x1, x2, el.Ψ)
     q̃ = condense_fef(q, el.section, L, el.ends)
 
-    cache.q_local[el.index] .+= q̃
+    cache.q_local[el.index][1] .+= q̃
 
     Λ = local_frame(x1, x2, el.Ψ)
     Qg = _rotate12(Λ', q̃)                     # local → global, blockwise
@@ -121,6 +127,78 @@ function _apply_load!(cache::AnalysisCache{T}, load::ElementLoad{T}, inactive) w
     @inbounds for i in 1:12
         cache.Pf[g[i]] += Qg[i]
     end
+end
+
+"""
+Element loads on a VariableElement are split across its segments — each
+segment gets the load restricted to its span, in segment-local fractions —
+then lowered per segment exactly like a primitive element, scattering into
+the outer-node and internal-joint global DOFs.
+"""
+function _apply_element_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
+    el::VariableElement) where {T}
+    g = element_global_dofs(el)
+    ts = segment_fractions(el)
+    Λ = local_frame(el)
+
+    for s in 1:n_segments(el)
+        subload = _restrict_load(load, ts[s], ts[s+1], el)
+        subload === nothing && continue
+
+        xa, xb = segment_positions(el, s)
+        Ls = element_length(xa, xb)
+        ends_s = segment_ends(el, s)
+        sec = el.sections[s]
+
+        q = fixed_end_forces(subload, sec, ends_s, xa, xb, el.Ψ)
+        q̃ = condense_fef(q, sec, Ls, ends_s)
+
+        cache.q_local[el.index][s] .+= q̃
+
+        Qg = _rotate12(Λ', q̃)
+        slots = segment_slots(el, s)
+        @inbounds for i in 1:12
+            cache.Pf[g[slots[i]]] += Qg[i]
+        end
+    end
+end
+
+# restrict a whole-member load to segment [ta, tb], re-expressed in
+# segment-local fractions; nothing if the segment carries no load
+function _restrict_load(load::DistributedLoad{T}, ta::Real, tb::Real, el) where {T}
+    lo = max(ta, first(load.t))
+    hi = min(tb, last(load.t))
+    hi - lo <= eps(T) && return nothing
+
+    # breakpoints falling inside the overlap, plus the overlap bounds
+    inner = [t for t in load.t if lo < t < hi]
+    tsub = vcat(lo, inner, hi)
+    wsub = [_intensity_at(load, t) for t in tsub]
+    tloc = (tsub .- ta) ./ (tb - ta)
+    return DistributedLoad(el, tloc, wsub, load.direction;
+        coords=load.coords, id=load.id, case=load.case)
+end
+
+function _restrict_load(load::PointLoad{T}, ta::Real, tb::Real, el) where {T}
+    # boundary positions attach to the segment they open (last segment closes)
+    inseg = (ta <= load.position < tb) || (tb == 1 && load.position == 1)
+    inseg || return nothing
+    τ = clamp((load.position - ta) / (tb - ta), eps(T), 1 - eps(T))
+    return PointLoad(el, τ, load.value; coords=load.coords, id=load.id, case=load.case)
+end
+
+function _restrict_load(load::SelfWeight{T}, ta::Real, tb::Real, el) where {T}
+    return SelfWeight(el; g=load.g, factor=load.factor, id=load.id, case=load.case)
+end
+
+# piecewise-linear intensity of a DistributedLoad at whole-member fraction t
+function _intensity_at(load::DistributedLoad{T}, t::Real) where {T}
+    t <= first(load.t) && return t == first(load.t) ? first(load.w) : zero(T)
+    t >= last(load.t) && return t == last(load.t) ? last(load.w) : zero(T)
+    s = searchsortedlast(load.t, t)
+    s == length(load.t) && return last(load.w)
+    frac = (t - load.t[s]) / (load.t[s+1] - load.t[s])
+    return load.w[s] + (load.w[s+1] - load.w[s]) * frac
 end
 
 # blockwise rotation of a 12-vector by a 3×3 matrix (four 3-blocks)

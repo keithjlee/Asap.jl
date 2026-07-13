@@ -39,8 +39,9 @@ reused across solves:
 - `spring_nz::Vector{Tuple{Int,T}}`: (nzval position, stiffness) pairs for
   nodal springs on free DOFs
 - `P`, `Pf::Vector{T}`: full-space nodal-load and fixed-end-force vectors
-- `q_local::Vector{Vector{T}}`: per-element accumulated LOCAL condensed
-  fixed-end forces (needed for element force recovery)
+- `q_local::Vector{Vector{Vector{T}}}`: per element, per SEGMENT, the
+  accumulated LOCAL condensed fixed-end force 12-vector (primitive elements
+  have one segment) — needed for element force recovery
 - `factorization`: cached factorization of `K` (set on first solve; numeric
   refactorization reuses the symbolic analysis since the pattern is frozen)
 
@@ -55,7 +56,7 @@ mutable struct AnalysisCache{T}
     spring_nz::Vector{Tuple{Int,T}}
     P::Vector{T}
     Pf::Vector{T}
-    q_local::Vector{Vector{T}}
+    q_local::Vector{Vector{Vector{T}}}
     factorization::Any
     # pure-path structures (constant per topology):
     scatter::SparseMatrixCSC{T,Int}      # nnz(K) × Σnactive² — nzval = scatter·V + spring_nzvec
@@ -182,7 +183,7 @@ function build_cache(model::Model{T}) where {T}
 
     return AnalysisCache{T}(part, groups, K, spring_nz,
         zeros(T, part.n_global), zeros(T, part.n_global),
-        [zeros(T, 12) for _ in model.elements], nothing,
+        [[zeros(T, 12) for _ in 1:n_segments(el)] for el in model.elements], nothing,
         scatter, spring_nzvec, free_embed)
 end
 
