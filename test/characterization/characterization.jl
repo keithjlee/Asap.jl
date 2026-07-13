@@ -57,6 +57,29 @@ approx(a::Vector{<:Vector}, b::Vector{<:Vector}) = length(a) == length(b) && all
         end
     end
 
+    # DiffAnalysis_2024 publication structures (golden source of truth):
+    # rebuild each serialized model with plain Asap and verify forward results
+    # match the published values (generated under the pub's pinned Asap 0.2.1
+    # environment — a mismatch here means numerics drifted between versions).
+    # Gradient fixtures (x_init/objective_grad/constraint_jac) are Phase 5a
+    # oracles, consumed once the AD layer is testable here.
+    @testset "DiffAnalysis publication models" begin
+        include(joinpath(@__DIR__, "diffanalysis_models.jl"))
+        include(joinpath(@__DIR__, "fixtures_diffanalysis.jl"))
+        model_keys = filter(k -> endswith(k, "/model"), keys(DIFFANALYSIS_FIXTURES))
+        @test !isempty(model_keys)
+        @testset "$key" for key in sort!(collect(model_keys))
+            def = DIFFANALYSIS_FIXTURES[key]
+            model = rebuild_diffanalysis_model(def)
+            solve!(model)
+            @test approx(model.u, Vector{Float64}(def["u"]))
+            @test approx(model.reactions, Vector{Float64}(def["reactions"]))
+            @test approx(model.compliance, def["compliance"])
+            @test approx([e.forces for e in model.elements],
+                [Vector{Float64}(f) for f in def["element_forces"]])
+        end
+    end
+
     # The AsapToolkit InternalForces oracles (consumed in Phase 3) are
     # generated separately (generate_toolkit_fixtures.jl); just validate the
     # committed file parses and is populated.

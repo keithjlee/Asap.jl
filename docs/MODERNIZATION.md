@@ -146,6 +146,7 @@ Note DemandTransport2 also exercises the **FDM/Network path** (`solve_network`, 
 GravityLoad FEF (nonexistent `load.element.ρ`); dangling `release!` export; `copy(::TrussModel)` (`element.nodeIDs`); `shatterReleaseDict` duplicate key; stale `process_bridge!`; AsapOptim `SectionVariable.iglobal::Float64` and `f_axial_new` pullback early-return; AsapOptim missing `FreeFree` k method.
 
 ## Verification strategy
+0. **Publication golden source**: the DiffAnalysis_2024 repo (`~/Library/CloudStorage/OneDrive-.../Publications/DiffAnalysis_Structures_2024/DiffAnalysis_2024_CODE`, Lee/Huang/Mueller) is pinned in `test/characterization/fixtures_diffanalysis.jl` — full model definitions + forward results for all four paper structures (rebuildable and CI-tested with plain Asap; verified: Asap 0.2.1 ≡ 0.2.2 at rtol 1e-9), plus Zygote objective gradients and constraint jacobians at `x_init` for S4.1/S4.2 as the Phase 5a AD oracle. Full optimization runs deliberately not pinned (solver/version-sensitive).
 1. Phase 0 characterization suite is the master regression: every later phase must reproduce pinned numerics (displacements/reactions to 1e-12 where formulations are algebraically identical; documented tolerance where formulations legitimately improve, e.g. GravityLoad).
 2. Parity tests: `assemble_K(cache, extract_state(model)) ≈ assemble_K!(cache)`; `solve` pure ≡ `solve!` fast.
 3. AD: Zygote gradients vs FiniteDifferences on truss + frame + VariableElement problems; later DifferentiationInterface matrix (Enzyme/Mooncake) on the pure path.
