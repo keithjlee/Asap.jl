@@ -50,6 +50,14 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] SelfWeight from ρA(section) — GravityLoad bug structurally impossible
 - [x] `TrapezoidLoad` convenience constructor + `PointMoment` (derivative-Hermite kernel, classic-table verified)
 - [x] Trapezoid FEFs cross-checked against exact polynomial-integration oracles + classic triangle tables
-## Phase 3 — Force recovery (priority) 🔄 IN PROGRESS
+## Phase 3 — Force recovery (priority) ✅ COMPLETE
+
+- [x] `LoadTrace` (merged local loads, jump-exact doubled breakpoints, cumulative ∫w / ∫w·s)
+- [x] `ElementForceState` + zero-allocation scalar evaluators (`axial_force`/`shear_y`/`shear_z`/`torsion`/`moment_y`/`moment_z` at fraction t)
+- [x] `InternalForces` dense sampling (breakpoints + both sides of point actions) — axis-correct names
+- [x] Displacement recovery (`local_displacements`: exact double integration, classic deflection formulas verified)
+- [x] VariableElement composite dispatch (`moment_z(model, el, t)` unified queries; interior continuity)
+- [x] Validated against pinned AsapToolkit oracles across all portal releases under the documented rename map (tk.My→Mz, tk.Mz→−My, tk.P→N)
+- [x] Property tests: dMz/dx=Vy, dMy/dx=−Vz, dVy/dx=w, exact jumps at point forces/moments
 ## Phase 4 — Cases/combos/envelopes ⬜
 ## Phase 5 — Ecosystem migration (5a Optim / 5b Toolkit / 5c Harmonics / 5d DemandTransport2) ⬜

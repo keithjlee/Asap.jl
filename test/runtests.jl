@@ -30,11 +30,11 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_ad.jl")
     include("characterization/test_publication.jl")
 
-    # committed AsapToolkit oracles (consumed by Phase 3 force recovery):
-    # validate the file parses and is populated
+    # AsapToolkit oracles: consumed by the Phase 3 recovery tests
+    include(joinpath(@__DIR__, "characterization", "fixtures_toolkit.jl"))
     @testset "toolkit fixtures file" begin
-        include(joinpath(@__DIR__, "characterization", "fixtures_toolkit.jl"))
         @test TOOLKIT_FIXTURES isa Dict{String,Any}
         @test length(TOOLKIT_FIXTURES) >= 80
     end
+    include("newcore/test_recovery.jl")
 end
