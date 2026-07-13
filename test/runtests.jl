@@ -247,6 +247,8 @@ using LinearAlgebra
     
     d_textbook = [-0.072630472854641, -0.000605253940455]
     d = n2.displacement[[2,6]]
-    
+
     @test norm(d_textbook .- d) <= tol
 end
+
+include("characterization/characterization.jl")
