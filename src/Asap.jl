@@ -69,11 +69,13 @@ include("Results/results.jl")
 include("Analysis/solve.jl")
 include("Analysis/functional.jl")
 include("Results/recovery.jl")
+include("Analysis/cases.jl")
 export DofPartition, AnalysisCache
 export process!, solve!, assemble_K!, assemble_loads!
 export LinearResults, displacement, reaction, element_forces, axial_force
 export ElementForceState, LoadTrace, internal_forces, InternalForces
 export shear_y, shear_z, torsion, moment_y, moment_z, local_displacements
+export LoadCombination, CaseResults, load_cases, solve_cases!, combine, Envelope, envelope
 export ModelState, extract_state, solve, compliance, assemble_K
 
 # ── display ─────────────────────────────────────────────────────────────────

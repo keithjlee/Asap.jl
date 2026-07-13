@@ -275,22 +275,26 @@ below, which handle the mapping for you:
 
     axial_force(model, el, t), shear_y(model, el, t), moment_z(model, el, t), …
 """
-function internal_forces(model::Model{T}, el::Union{FrameElement,TrussElement}) where {T}
-    res = model.results::LinearResults{T}
+function internal_forces(model::Model{T}, el::Union{FrameElement,TrussElement};
+    results::Union{Nothing,LinearResults{T}}=nothing,
+    factors::Union{Nothing,Dict{Symbol,T}}=nothing) where {T}
+    res = results === nothing ? model.results::LinearResults{T} : results
     L = Base.length(el)
-    Λ = local_frame(el isa FrameElement ? el : el)
+    Λ = local_frame(el)
     f = element_forces(res, el)
     u_el = displacement(res, el.nodeStart)
     u0 = vcat(Λ * SVector{3,T}(u_el[1], u_el[2], u_el[3]),
         Λ * SVector{3,T}(u_el[4], u_el[5], u_el[6]))
     sec = el.section
-    trace = build_trace(model, el, Λ, L)
+    trace = build_trace(model, el, Λ, L; factors=factors)
     return ElementForceState{T}(L, SVector{6,T}(f[1:6]), SVector{6,T}(u0),
         EA(sec), EIx(sec), EIy(sec), GJ(sec), trace)
 end
 
-function internal_forces(model::Model{T}, el::VariableElement) where {T}
-    res = model.results::LinearResults{T}
+function internal_forces(model::Model{T}, el::VariableElement;
+    results::Union{Nothing,LinearResults{T}}=nothing,
+    factors::Union{Nothing,Dict{Symbol,T}}=nothing) where {T}
+    res = results === nothing ? model.results::LinearResults{T} : results
     Λ = local_frame(el)
     u = res.u
     g = element_global_dofs(el)
@@ -304,7 +308,7 @@ function internal_forces(model::Model{T}, el::VariableElement) where {T}
         u0 = vcat(Λ * SVector{3,T}(us[1], us[2], us[3]),
             Λ * SVector{3,T}(us[4], us[5], us[6]))
         sec = el.sections[s]
-        trace = build_trace(model, el, Λ, Ls; segment=s)
+        trace = build_trace(model, el, Λ, Ls; segment=s, factors=factors)
         ElementForceState{T}(Ls, SVector{6,T}(f[1:6]), SVector{6,T}(u0),
             EA(sec), EIx(sec), EIy(sec), GJ(sec), trace)
     end
@@ -317,7 +321,8 @@ Merge every element load targeting `el` (restricted to `segment` for
 super-elements) into one local [`LoadTrace`](@ref).
 """
 function build_trace(model::Model{T}, el::AbstractElement, Λ::SMatrix{3,3}, L::T;
-    segment::Union{Nothing,Int}=nothing) where {T}
+    segment::Union{Nothing,Int}=nothing,
+    factors::Union{Nothing,Dict{Symbol,T}}=nothing) where {T}
 
     breaks = T[0, 1]
     dists = Tuple{Vector{T},Vector{T},SVector{3,T}}[]   # (t, w, local dir)
@@ -332,7 +337,9 @@ function build_trace(model::Model{T}, el::AbstractElement, Λ::SMatrix{3,3}, L::
               _restrict_load(load, segment_fractions(el)[segment],
             segment_fractions(el)[segment+1], el)
         eff === nothing && continue
-        _trace_add!(breaks, dists, pst, pF, pM, eff, Λ, el, segment)
+        λ = factors === nothing ? one(T) : get(factors, load.case, zero(T))
+        iszero(λ) && continue
+        _trace_add!(breaks, dists, pst, pF, pM, eff, Λ, el, segment, λ)
     end
 
     sort!(unique!(breaks))
@@ -398,34 +405,34 @@ function _pw_linear_side(td, wd, t, side::Symbol)
     return wd[k] + (wd[k+1] - wd[k]) * (t - td[k]) / (td[k+1] - td[k])
 end
 
-function _trace_add!(breaks, dists, pst, pF, pM, load::DistributedLoad{T}, Λ, el, segment) where {T}
+function _trace_add!(breaks, dists, pst, pF, pM, load::DistributedLoad{T}, Λ, el, segment, λ) where {T}
     d = _local_direction(load.direction, load.coords, Λ)
     append!(breaks, load.t)
-    push!(dists, (load.t, load.w, d))
+    push!(dists, (load.t, λ .* load.w, d))
     return
 end
 
-function _trace_add!(breaks, dists, pst, pF, pM, load::PointLoad{T}, Λ, el, segment) where {T}
+function _trace_add!(breaks, dists, pst, pF, pM, load::PointLoad{T}, Λ, el, segment, λ) where {T}
     p = load.coords === :local ? load.value : Λ * load.value
     push!(pst, load.position)
-    push!(pF, p)
+    push!(pF, λ * p)
     push!(pM, zero(SVector{3,T}))
     return
 end
 
-function _trace_add!(breaks, dists, pst, pF, pM, load::PointMoment{T}, Λ, el, segment) where {T}
+function _trace_add!(breaks, dists, pst, pF, pM, load::PointMoment{T}, Λ, el, segment, λ) where {T}
     m = load.coords === :local ? load.value : Λ * load.value
     push!(pst, load.position)
     push!(pF, zero(SVector{3,T}))
-    push!(pM, m)
+    push!(pM, λ * m)
     return
 end
 
-function _trace_add!(breaks, dists, pst, pF, pM, load::SelfWeight{T}, Λ, el, segment) where {T}
+function _trace_add!(breaks, dists, pst, pF, pM, load::SelfWeight{T}, Λ, el, segment, λ) where {T}
     gmag = norm(load.g)
     iszero(gmag) && return
     sec = segment === nothing ? el.section : el.sections[segment]
-    wmag = ρA(sec) * gmag * load.factor
+    wmag = λ * ρA(sec) * gmag * load.factor
     d = Λ * (load.g ./ gmag)
     push!(dists, (T[0, 1], [wmag, wmag], d))
     return
@@ -496,11 +503,15 @@ function InternalForces(state::ElementForceState{T}; resolution::Int=20) where {
     )
 end
 
-InternalForces(model::Model, el::Union{FrameElement,TrussElement}; resolution::Int=20) =
-    InternalForces(internal_forces(model, el); resolution=resolution)
+InternalForces(model::Model{T}, el::Union{FrameElement,TrussElement}; resolution::Int=20,
+    results::Union{Nothing,LinearResults{T}}=nothing,
+    factors::Union{Nothing,Dict{Symbol,T}}=nothing) where {T} =
+    InternalForces(internal_forces(model, el; results=results, factors=factors); resolution=resolution)
 
-function InternalForces(model::Model{T}, el::VariableElement; resolution::Int=20) where {T}
-    states = internal_forces(model, el)
+function InternalForces(model::Model{T}, el::VariableElement; resolution::Int=20,
+    results::Union{Nothing,LinearResults{T}}=nothing,
+    factors::Union{Nothing,Dict{Symbol,T}}=nothing) where {T}
+    states = internal_forces(model, el; results=results, factors=factors)
     ts = segment_fractions(el)
     L = Base.length(el)
     per = max(2, ceil(Int, resolution / n_segments(el)))

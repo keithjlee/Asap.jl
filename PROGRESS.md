@@ -59,5 +59,11 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] VariableElement composite dispatch (`moment_z(model, el, t)` unified queries; interior continuity)
 - [x] Validated against pinned AsapToolkit oracles across all portal releases under the documented rename map (tk.My→Mz, tk.Mz→−My, tk.P→N)
 - [x] Property tests: dMz/dx=Vy, dMy/dx=−Vz, dVy/dx=w, exact jumps at point forces/moments
-## Phase 4 — Cases/combos/envelopes ⬜
+## Phase 4 — Cases/combos/envelopes ✅ COMPLETE
+
+- [x] `solve_cases!`: per-case solves against ONE assembly + ONE factorization (multi-RHS)
+- [x] `LoadCombination` + `combine`: factored results by pure superposition — verified ≡ brute-force factored solves (u, reactions, forces, compliance, recovery diagrams)
+- [x] Combination-aware recovery (`internal_forces(...; results, factors)`)
+- [x] `envelope`: station-wise extrema over combinations at common stations (all-cases-on station set so no combo's jumps are missed) — verified ≡ brute-force extrema
+- [x] Single-factorization reuse proven in tests
 ## Phase 5 — Ecosystem migration (5a Optim / 5b Toolkit / 5c Harmonics / 5d DemandTransport2) ⬜

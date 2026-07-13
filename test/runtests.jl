@@ -37,4 +37,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
         @test length(TOOLKIT_FIXTURES) >= 80
     end
     include("newcore/test_recovery.jl")
+    include("newcore/test_cases.jl")
 end

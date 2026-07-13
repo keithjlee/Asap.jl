@@ -61,7 +61,8 @@ Element loads run the generic lowering: clamped local FEFs from the load's
 ([`condense_fef`](@ref)) → accumulate locally in `cache.q_local` (for force
 recovery) and globally (blockwise Λᵀ rotation) into `Pf`.
 """
-function assemble_loads!(cache::AnalysisCache{T}, model::Model{T}) where {T}
+function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
+    case::Union{Nothing,Symbol}=nothing) where {T}
     fill!(cache.P, zero(T))
     fill!(cache.Pf, zero(T))
     for qs in cache.q_local, q in qs
@@ -71,6 +72,7 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T}) where {T}
     inactive = Set(cache.partition.inactive)
 
     for load in model.loads
+        case === nothing || load.case === case || continue
         _apply_load!(cache, load, inactive)
     end
     return cache.P, cache.Pf
