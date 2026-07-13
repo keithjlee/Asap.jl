@@ -76,6 +76,16 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Legacy preserved unloaded in `legacy_v0/`
 - [ ] Deferred: FDM network optimization path; SectionVariable (RigiditySection parameterization is the v1.0 idiom)
 
-### 5b AsapToolkit ⬜ (delete ForceAnalysis/, mechanical rename port)
-### 5c AsapHarmonics ⬜ (rename pass)
-### 5d DemandTransport2 ⬜ (port struct-field types + results API; U indexing 6/node)
+### 5b AsapToolkit ⏸ PREPARED — needs interactive verification
+Toolkit has NO test suite, uncommitted WIP (`AsapSections/Sections.jl`), and its exit criterion is visual (plots regenerate). Full mechanical mapping written: `docs/MIGRATION_v1.md`. Do the port together: apply the table, regenerate reference plots side by side.
+
+### 5c AsapHarmonics ⏸ PREPARED (no test suite; light coupling — see MIGRATION_v1.md)
+### 5d DemandTransport2 ⏸ PREPARED (active research repo; port notes in MIGRATION_v1.md; blocked on 5b viz + FDM-network optim path)
+
+## Deferred / follow-ups
+- FDM network optimization path in AsapOptim (legacy_v0/ reference)
+- SectionVariable → RigiditySection parameterization idiom
+- FDM subsystem parametrization in core
+- Geometric nonlinearity (`geometric_stiffness` hook ready), dynamics (`mass` hook ready)
+- Enzyme/Mooncake/DifferentiationInterface matrix on the pure path
+- Docs build (Documenter.jl) from the extensive docstrings
