@@ -14,18 +14,18 @@ that AD engines differentiate natively.
    the factorization already computed in the forward pass, with
    `K̄ = −λuᵀ` and `F̄ = λ`. K is symmetric, so no re-factorization.
 
-This file is loaded as a package extension when ChainRulesCore is present
-(and included directly by the dark-development test harness).
+Loaded automatically as a package extension whenever ChainRulesCore is in
+the environment (`[weakdeps]`/`[extensions]` in Project.toml) — zero cost
+for users who never differentiate.
 """
 module AsapChainRulesExt
 
+using Asap
 using ChainRulesCore
 using SparseArrays
 using LinearAlgebra
 
-# resolve the host module: the Asap package when loaded as an extension,
-# or the enclosing harness module during dark development
-const HOST = parentmodule(@__MODULE__)
+const HOST = Asap
 
 function ChainRulesCore.rrule(::typeof(HOST.sparse_from_pattern),
     pattern::SparseMatrixCSC, nzval::AbstractVector)

@@ -23,7 +23,7 @@
 - Legacy `planarize!(model, :XY)` also zeroes element Ψ — ported.
 - Legacy Asap 0.2.1 (publication) ≡ 0.2.2 forward results verified at rtol 1e-9.
 
-## Phase 1 — Core rework 🔄 IN PROGRESS
+## Phase 1 — Core rework ✅ COMPLETE
 
 Order is bottom-up; each layer validated against Phase 0 oracles before the next.
 
@@ -39,10 +39,17 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] `LinearResults{T}` + accessors + element-wise reactions
 - [x] Pure functional path (`ModelState`, `assemble_K`, `solve`) + `ext/AsapChainRulesExt.jl` (3 rrules)
 - [x] Parity tests (pure ≡ in-place) + Zygote-vs-FiniteDiff gradient checks
-- [ ] `VariableElement{T,S}` via internal DOFs; delete bridgeprocessing
-- [ ] Characterization suite green on new core
+- [x] `VariableElement{T}` via internal DOFs (bridgeprocessing deletion lands with the module flip)
+- [x] Characterization suite green on new core — **module flipped**: legacy deleted, Asap IS the v1.0 core, 2347 tests green, version 1.0.0-DEV
 
-## Phase 2 — Loads ⬜
+## Phase 2 — Loads 🔄 (largely landed during Phase 1)
+
+- [x] Gauss/Hermite FEF engine (exact for piecewise-linear intensities)
+- [x] Canonical `DistributedLoad` + `LineLoad`/`PointLoad`/`SelfWeight`; case tags on all loads
+- [x] Generic end-spring FEF condensation (replaces per-release q() catalog)
+- [x] SelfWeight from ρA(section) — GravityLoad bug structurally impossible
+- [ ] `TrapezoidLoad` convenience constructor + `PointMoment`
+- [ ] Trapezoid FEFs cross-checked against closed-form oracles
 ## Phase 3 — Force recovery (priority) ⬜
 ## Phase 4 — Cases/combos/envelopes ⬜
 ## Phase 5 — Ecosystem migration (5a Optim / 5b Toolkit / 5c Harmonics / 5d DemandTransport2) ⬜

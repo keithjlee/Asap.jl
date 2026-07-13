@@ -20,11 +20,23 @@
         @test_throws AssertionError N.Node([0.0, 0.0, 0.0], :notafixity)
     end
 
+    # legacy fixDict values, frozen here as the compatibility contract
+    LEGACY_FIXDICT = Dict(
+        :fixed => [false, false, false, false, false, false],
+        :free => [true, true, true, true, true, true],
+        :xfixed => [false, true, true, true, true, true],
+        :yfixed => [true, false, true, true, true, true],
+        :zfixed => [true, true, false, true, true, true],
+        :xfree => [true, false, false, false, false, false],
+        :yfree => [false, true, false, false, false, false],
+        :zfree => [false, false, true, false, false, false],
+        :pinned => [false, false, false, true, true, true])
+
     @testset "FIXITIES ≡ legacy fixDict" begin
-        for (sym, legacy) in Asap.fixDict
+        for (sym, legacy) in LEGACY_FIXDICT
             @test collect(N.FIXITIES[sym]) == legacy
         end
-        @test length(N.FIXITIES) == length(Asap.fixDict)
+        @test length(N.FIXITIES) == length(LEGACY_FIXDICT)
     end
 
     @testset "fixnode! / planarize!" begin
@@ -36,8 +48,8 @@
         N.planarize!(n)                     # default :XY — fixes Tz, Rx, Ry
         @test collect(n.fixity) == [true, true, false, false, false, true]
 
-        # matches legacy planeDict conventions
-        for (plane, idx) in Asap.planeDict
+        # matches legacy planeDict conventions (values frozen here)
+        for (plane, idx) in Dict(:XY => [3, 4, 5], :YZ => [1, 5, 6], :ZX => [2, 4, 6])
             n = N.Node([0.0, 0.0, 0.0], :free)
             N.planarize!(n, plane)
             expected = trues(6)

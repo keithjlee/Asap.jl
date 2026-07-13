@@ -1,16 +1,21 @@
 name = "Asap"
 uuid = "763a8c06-ba23-41fc-b385-b3b57b52403a"
-version = "0.2.2"
+version = "1.0.0-DEV"
 authors = ["Keith JL"]
 
 [deps]
-ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
+[weakdeps]
+ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+
+[extensions]
+AsapChainRulesExt = "ChainRulesCore"
+
 [compat]
-ChainRulesCore = "1.26.1"
+ChainRulesCore = "1"
 LinearAlgebra = "1"
 SparseArrays = "1"
 StaticArrays = "1.9.18"

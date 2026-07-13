@@ -1,71 +1,82 @@
+"""
+    Asap
+
+Structural analysis for trusses and frames — the v1.0 core.
+
+Three separated layers: definition (`Model`, `Node`, elements, loads,
+springs), analysis structure (`AnalysisCache`, built by `process!`), and
+results (`LinearResults`, returned by `solve!`). One set of pure element
+kernels feeds both an in-place zero-allocation assembly path and a pure
+functional path (`ModelState` → `solve`) that automatic differentiation
+engines traverse natively (see `ext/AsapChainRulesExt.jl`).
+
+See `docs/MODERNIZATION.md` for the architecture and roadmap.
+"""
 module Asap
 
-using LinearAlgebra, SparseArrays
+using LinearAlgebra, SparseArrays, StaticArrays
 
 # global axes
-const globalX::Vector{Float64} = [1., 0., 0.]
-const globalY::Vector{Float64} = [0., 1., 0.]
-const globalZ::Vector{Float64} = [0., 0., 1.]
+const globalX = SVector(1.0, 0.0, 0.0)
+const globalY = SVector(0.0, 1.0, 0.0)
+const globalZ = SVector(0.0, 0.0, 1.0)
 
-include("legacy/Materials_Sections/material.jl")
-include("legacy/Materials_Sections/section.jl")
-export Material
-export Section
-export TrussSection
-export Steel_Nmm
-export Steel_kNm
+# ── materials & sections ────────────────────────────────────────────────────
+include("Materials/materials.jl")
+include("Materials/sections.jl")
+export Material, Steel_Nmm, Steel_kNm
+export AbstractSection, Section, RigiditySection
+export EA, EIx, EIy, GJ, ρA
 
-include("legacy/Nodes/nodes.jl")
-include("legacy/Nodes/utilities.jl")
-export Node
-export TrussNode
-export planarize!
-export fixnode!
+# ── nodes ───────────────────────────────────────────────────────────────────
+include("Nodes/node.jl")
+export Node, FIXITIES, fixnode!, planarize!
 
-include("legacy/Elements/elements.jl")
-include("legacy/Elements/K.jl")
-include("legacy/Elements/R.jl")
-include("legacy/Elements/utilities.jl")
-export Element
-export BridgeElement
-export TrussElement
-export release!
-export endpoints
-export midpoint
-export axial_force
+# ── elements ────────────────────────────────────────────────────────────────
+include("Elements/end_conditions.jl")
+export EndSprings, EndConditions, rigid_end, pinned_end, RELEASES, release_symbol
 
-include("legacy/Loads/loads.jl")
-include("legacy/Loads/utilities.jl")
-include("legacy/Loads/fixedEndForces.jl")
-export NodeForce
-export NodeMoment
-export LineLoad
-export GravityLoad
-export PointLoad
+include("Elements/kernels/transformation.jl")
+include("Elements/kernels/stiffness.jl")
+include("Elements/interface.jl")
+include("Elements/frame.jl")
+include("Elements/variable.jl")
+export AbstractElement, FrameElement, TrussElement, VariableElement
+export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
+export endpoints, midpoint, local_frame
+export n_segments, segment_fractions, locate_segment
 
-include("legacy/Model/model.jl")
-include("legacy/Model/utilities.jl")
-export Model
-export TrussModel
-export update_DOF!
-export connectivity
-export node_positions
-export volume
+# ── springs ─────────────────────────────────────────────────────────────────
+include("Springs/nodal_springs.jl")
+export NodalSpring
 
+# ── loads ───────────────────────────────────────────────────────────────────
+include("Loads/loads.jl")
+include("Elements/kernels/fixed_end_forces.jl")
+export AbstractLoad, NodeLoad, ElementLoad
+export NodeForce, NodeMoment, DistributedLoad, LineLoad, PointLoad, SelfWeight
+export fixed_end_forces, condense_fef
 
-include("legacy/Model/preprocessing.jl")
-include("legacy/Model/bridgeprocessing.jl")
-include("legacy/Model/postprocessing.jl")
-include("legacy/Model/analysis.jl")
-export process!
-export solve!
-export solve
-export connectivity
-export node_positions
-export volume
+# ── model ───────────────────────────────────────────────────────────────────
+include("Model/model.jl")
+export Model, node_positions, connectivity, volume
 
-# FORCE DENSITY METHOD
+# ── analysis ────────────────────────────────────────────────────────────────
+include("Analysis/dofs.jl")
+include("Analysis/symbolic.jl")
+include("Analysis/assemble.jl")
+include("Results/results.jl")
+include("Analysis/solve.jl")
+include("Analysis/functional.jl")
+export DofPartition, AnalysisCache
+export process!, solve!, assemble_K!, assemble_loads!
+export LinearResults, displacement, reaction, element_forces, axial_force
+export ModelState, extract_state, solve, compliance, assemble_K
+
+# ── display ─────────────────────────────────────────────────────────────────
+include("ShowMethods.jl")
+
+# ── force density method (self-contained subsystem) ─────────────────────────
 include("FDM/FDM.jl")
 
-
-end 
+end # module Asap
