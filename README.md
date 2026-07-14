@@ -272,6 +272,46 @@ Gradients flow with respect to node positions, section properties, and semi-rigi
 
 A self-contained FDM subsystem for cable/tension networks ships in the same package: `FDMnode`, `FDMelement`, `FDMload`, `Network`, with its own `solve!`. Differentiable force-density optimization (`QVariable`, `solve_network`) lives in AsapOptim.
 
+`to_network(model)` converts a solved truss model into an equivalent FDM network, and `to_truss(network, section)` converts back.
+
+## Parametric structure generators
+
+A family of one-line generators (absorbed from AsapToolkit) builds, loads, and solves common structural typologies — handy for testing, benchmarking, and optimization studies:
+
+```julia
+sec = Section(Steel_kNm, 1e-3, 1e-6, 1e-6, 1e-6)
+
+truss = Warren2D(11, 1.5, 2.0, sec; load = [0.0, -20.0, 0.0])   # 2D Warren arch
+grid  = SpaceFrame(6, 1.2, 6, 1.2, 1.0, sec; support = :corner) # double-layer grid
+
+# variable-depth spaceframe: any callable surface(u, v) on [0,1]² sets the top layer
+vault = SpaceFrame(6, 1.2, 6, 1.2, 1.0, (u, v) -> 0.5 * sinpi(u) * sinpi(v), sec)
+
+# every generator returns a solved model plus its generation parameters
+maximum(abs, truss.model.results.u)
+
+# 3D building frame: columns, primary beams, joists (with releases), braces
+fsec = Section(Steel_kNm, 1e-2, 1e-4, 5e-5, 1e-6)
+bldg = Frame(2, 6.0, 2, 5.0, 2, 4.0, 2.0, fsec, fsec, fsec, fsec)
+
+# ground structures for layout optimization: dense candidate grids → models
+gs = XGroundStructure(6.0, 4, 4.0, 3)
+candidates = to_truss(gs, sec; load = [1.0, 0.0, 0.0])
+```
+
+The full set: `Warren2D`, `Pratt2D`, `BakerTruss`, `TrussFrame`, `SpaceFrame`, `SpaceFrameBeam`, `Frame`, `GridFrame`, `GridNetwork` (FDM), and the `XGroundStructure` / `DenseGroundStructure` / `BoundedGroundStructure` family with `to_truss` / `to_frame`.
+
+## Plot-ready geometry extraction
+
+`Geo(model)` (or `Geo(network)`) flattens a solved structure into plain arrays for plotting — node positions, displaced positions, element connectivity, and per-element force ranges with their maxima. `ElementDisplacements(element, model)` samples the exact deflected curve along a member:
+
+```julia
+geo = Geo(truss.model)          # geo.nodes, geo.disp, geo.indices, geo.P, …
+
+ed = ElementDisplacements(bldg.model.elements[1], bldg.model; resolution = 20)
+ed.basepositions .+ 100 .* ed.uglobal   # 3×20 displaced curve, scaled ×100
+```
+
 # Documentation map
 
 - `docs/MODERNIZATION.md` — architecture and roadmap of the v1.0 core

@@ -215,3 +215,101 @@ end
 
 Base.show(io::IO, r::LinearResults) =
     print(io, "LinearResults(compliance=$(r.compliance))")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Parametric structure generators
+# ─────────────────────────────────────────────────────────────────────────────
+
+#=
+Generators share one field-introspecting show: the solved model/network is
+summarized, scalar generation parameters are listed by name (they mirror the
+constructor arguments — see each generator's docstring for meanings), and
+bulky index bookkeeping arrays are summarized by size only.
+=#
+function _show_generator_fields(io::IO, g)
+    for f in fieldnames(typeof(g))
+        v = getfield(g, f)
+        pad = rpad(String(f), 14)
+        if v isa Model
+            println(io, "  $pad = Model: $(length(v.nodes)) nodes, $(length(v.elements)) elements" *
+                        (v.results === nothing ? "" : " (solved)"))
+        elseif v isa Network
+            println(io, "  $pad = Network: $(length(v.nodes)) nodes, $(length(v.elements)) elements")
+        elseif v isa AbstractSection
+            println(io, "  $pad = $(nameof(typeof(v))) (EA = $(EA(v)))")
+        elseif v isa Real || v isa Symbol
+            println(io, "  $pad = $v")
+        elseif v isa AbstractVector{<:Real} && length(v) <= 3
+            println(io, "  $pad = $v")
+        elseif v isa AbstractArray
+            println(io, "  $pad = $(join(size(v), "×")) array (index bookkeeping)")
+        end
+    end
+end
+
+function Base.show(io::IO, ::MIME"text/plain", g::AbstractGenerator)
+    println(io, nameof(typeof(g)), "  (parametric structure generator)")
+    _show_generator_fields(io, g)
+    print(io, "  access the solved structure via the model/network field")
+end
+
+Base.show(io::IO, g::AbstractGenerator) =
+    print(io, nameof(typeof(g)), "(", join(["$f=$(getfield(g, f))"
+        for f in fieldnames(typeof(g)) if getfield(g, f) isa Union{Real,Symbol}], ", "), ")")
+
+function Base.show(io::IO, ::MIME"text/plain", g::GroundStructure)
+    println(io, nameof(typeof(g)), "  (ground structure — candidate member grid for layout optimization)")
+    _show_generator_fields(io, g)
+    print(io, "  materialize with to_truss(gs, section) or to_frame(gs, section)")
+end
+
+Base.show(io::IO, g::GroundStructure) =
+    print(io, nameof(typeof(g)), "(", join(["$f=$(getfield(g, f))"
+        for f in fieldnames(typeof(g)) if getfield(g, f) isa Union{Real,Symbol}], ", "), ")")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plot-ready geometry extraction
+# ─────────────────────────────────────────────────────────────────────────────
+
+function Base.show(io::IO, ::MIME"text/plain", g::ModelGeo)
+    println(io, "ModelGeo  (plot-ready arrays from a solved frame model)")
+    println(io, "  $(length(g.nodes)) nodes, $(length(g.indices)) elements")
+    println(io, "  max |u|  = $(maximum(norm.(g.disp)))  [length]         (largest nodal displacement)")
+    println(io, "  max |N|  = $(g.max_abs_P)  [force]          (largest axial end force)")
+    println(io, "  max |M|  = $(max(g.max_abs_My, g.max_abs_Mz))  [force·length]   (largest bending end moment)")
+    print(io,   "  fields: nodes, disp, indices, P, Vy, Vz, Tx, My, Mz, areas, lengths, …")
+end
+
+Base.show(io::IO, g::ModelGeo) =
+    print(io, "ModelGeo($(length(g.nodes)) nodes, $(length(g.indices)) elements)")
+
+function Base.show(io::IO, ::MIME"text/plain", g::TrussGeo)
+    println(io, "TrussGeo  (plot-ready arrays from a solved truss model)")
+    println(io, "  $(length(g.nodes)) nodes, $(length(g.indices)) elements")
+    println(io, "  max |u| = $(maximum(norm.(g.disp)))  [length]  (largest nodal displacement)")
+    println(io, "  max |N| = $(g.max_abs_force)  [force]   (largest axial force)")
+    print(io,   "  fields: nodes, disp, indices, forces, areas, lengths, …")
+end
+
+Base.show(io::IO, g::TrussGeo) =
+    print(io, "TrussGeo($(length(g.nodes)) nodes, $(length(g.indices)) elements)")
+
+function Base.show(io::IO, ::MIME"text/plain", g::NetworkGeo)
+    println(io, "NetworkGeo  (plot-ready arrays from a solved FDM network)")
+    println(io, "  $(length(g.nodes)) nodes, $(length(g.indices)) elements")
+    print(io,   "  fields: nodes, indices, forces, lengths, …")
+end
+
+Base.show(io::IO, g::NetworkGeo) =
+    print(io, "NetworkGeo($(length(g.nodes)) nodes, $(length(g.indices)) elements)")
+
+function Base.show(io::IO, ::MIME"text/plain", d::ElementDisplacements)
+    println(io, "ElementDisplacements  (displaced shape sampled along one member)")
+    println(io, "  element    = :$(d.element.id) ($(nameof(typeof(d.element))))")
+    println(io, "  resolution = $(d.resolution) stations")
+    println(io, "  max |u|    = $(maximum(norm.(eachcol(d.uglobal))))  [length]  (largest sampled displacement)")
+    print(io,   "  fields: x [station], ulocal [3×n, LCS], uglobal [3×n, GCS], basepositions [3×n]")
+end
+
+Base.show(io::IO, d::ElementDisplacements) =
+    print(io, "ElementDisplacements(:$(d.element.id), $(d.resolution) stations)")

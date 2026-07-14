@@ -38,4 +38,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     end
     include("newcore/test_recovery.jl")
     include("newcore/test_cases.jl")
+    include("newcore/test_generation.jl")
 end

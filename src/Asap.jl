@@ -78,10 +78,27 @@ export shear_y, shear_z, torsion, moment_y, moment_z, local_displacements
 export LoadCombination, CaseResults, load_cases, solve_cases!, combine, Envelope, envelope
 export ModelState, extract_state, solve, compliance, assemble_K
 
-# ── display ─────────────────────────────────────────────────────────────────
-include("ShowMethods.jl")
+# ── model utilities ─────────────────────────────────────────────────────────
+include("Model/utilities.jl")
+export clear_supports!, element_connectivity
 
 # ── force density method (self-contained subsystem) ─────────────────────────
 include("FDM/FDM.jl")
+
+# ── parametric structure generators (absorbed from AsapToolkit) ──────────────
+include("Generation/Generators.jl")
+export Frame, SpaceFrame, Warren2D, Pratt2D, SpaceFrameBeam, BakerTruss,
+    TrussFrame, GridNetwork, GridFrame
+export XGroundStructure, DenseGroundStructure, BoundedGroundStructure
+export to_truss, to_frame
+
+# ── plot-ready geometry extraction (absorbed from AsapToolkit) ───────────────
+include("Geometry/Displacements.jl")
+include("Geometry/Geometry.jl")
+export Geo, ModelGeo, TrussGeo, NetworkGeo
+export ElementDisplacements, displacements
+
+# ── display (last: defines Base.show for every user-facing type above) ──────
+include("ShowMethods.jl")
 
 end # module Asap

@@ -77,12 +77,20 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] FDM network optimization path (QVariable/NetworkOptParams/solve_network — forward parity 1e-10, gradcheck green; 32 AsapOptim tests)
 - [ ] Deferred: SectionVariable (RigiditySection parameterization is the v1.0 idiom)
 
-### 5b AsapToolkit ✅ PORTED (branch `asap-v1`) — visual verification pending
+### 5b AsapToolkit ✅ PORTED (branch `asap-v1`) — visual verification done (2026-07-14)
 - [x] ForceAnalysis/ deleted (absorbed into core); generators/Geometry/IO/SteelSections/FDM-translations ported
 - [x] Frame generator: BridgeElement joists → explicit interior nodes; releases now actually applied (legacy passed them as the id positional — silently ignored!)
 - [x] ElementDisplacements reimplemented on core displacement recovery
 - [x] First test suite: 58 tests (generator smoke + equilibrium, displaced shape vs core, section bridges)
-- [ ] Keith: regenerate a few reference plots side-by-side (visual check); AsapSections WIP left uncommitted
+- [x] Side-by-side plot verification vs legacy stack (Warren2D, beam diagrams, Frame generator, SpaceFrame): all numerics identical to 7+ significant digits; comparison page published as a Claude artifact ("Asap v1.0 — visual verification vs legacy"). Frame case confirms the release-as-id legacy bug numerically: v1.0 forced to all-fixedfixed reproduces legacy to 8+ digits; with the requested releases, peak displacement differs ~17%. Also confirmed legacy Toolkit main's `InternalForces(element, model)` and `ElementDisplacements` are dead code vs Asap 0.2.2 (read `element.release` / deleted `release2DOF`/`DLineLoad`/`DPointLoad` tables); only the `etype2DOF`-keyed methods work.
+- [x] Keith eyeballed the comparison plots (2026-07-14): approved, 5b closed.
+
+### AsapToolkit → Asap absorption (2026-07-14, Keith-approved clean break) ✅
+- [x] Moved into Asap core (zero new dependencies): `Generation/` (all generators + ground structures; Statistics `mean` inlined; Interpolations requirement removed — variable-depth `SpaceFrame`/`CornerDome` now take any callable `surface(u, v)` on [0,1]²), `Geometry/` (`Geo`/`ModelGeo`/`TrussGeo`/`NetworkGeo` + `ElementDisplacements`/`displacements`), `to_network` (FDM translation), `clear_supports!`/`element_connectivity` (`Model/utilities.jl`)
+- [x] Documentation standard: struct docstrings for all moved types; `Base.show` methods (generic generator/ground-structure display + Geo/ElementDisplacements) in `ShowMethods.jl` (now included last)
+- [x] Tests moved with the code: `test/newcore/test_generation.jl` (Asap suite now 2635) + generators/geo example block in README (tested via `test/readme_examples.jl`)
+- [x] AsapToolkit slimmed to `SteelSections` + `AsapSections` + IO (`topologize`, `GHsave`); deps down to Asap/JSON/LinearAlgebra/Reexport/XLSX; no re-exports (clean break); suite 14 tests green; Keith's AsapSections WIP untouched
+- [x] DemandTransport2 dropped its AsapToolkit dependency entirely (`TrussGeo` now from Asap); 108 tests green
 
 ### 5c AsapHarmonics ✅ PORTED (branch `asap-v1`)
 - [x] Rename pass complete; first test suite (3D spherical + planar 2D signatures, finite feature vectors)

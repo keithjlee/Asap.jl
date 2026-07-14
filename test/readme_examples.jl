@@ -137,4 +137,26 @@ end[1]
 @assert size(g) == size(state.X) && any(!iszero, g)
 println("differentiable OK")
 
+# generators + geometry extraction -----------------------------------------------------
+sec = Section(Steel_kNm, 1e-3, 1e-6, 1e-6, 1e-6)
+
+truss = Warren2D(11, 1.5, 2.0, sec; load = [0.0, -20.0, 0.0])
+grid = SpaceFrame(6, 1.2, 6, 1.2, 1.0, sec; support = :corner)
+vault = SpaceFrame(6, 1.2, 6, 1.2, 1.0, (u, v) -> 0.5 * sinpi(u) * sinpi(v), sec)
+@assert maximum(abs, truss.model.results.u) > 0
+
+fsec = Section(Steel_kNm, 1e-2, 1e-4, 5e-5, 1e-6)
+bldg = Frame(2, 6.0, 2, 5.0, 2, 4.0, 2.0, fsec, fsec, fsec, fsec)
+
+gs = XGroundStructure(6.0, 4, 4.0, 3)
+candidates = to_truss(gs, sec; load = [1.0, 0.0, 0.0])
+@assert candidates isa Model
+
+geo = Geo(truss.model)
+@assert length(geo.nodes) == length(truss.model.nodes)
+
+ed = ElementDisplacements(bldg.model.elements[1], bldg.model; resolution = 20)
+@assert size(ed.basepositions .+ 100 .* ed.uglobal) == (3, 20)
+println("generators OK")
+
 println("ALL README EXAMPLES PASS")

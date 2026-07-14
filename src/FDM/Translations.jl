@@ -1,0 +1,101 @@
+"""
+    to_network(model::Model)
+
+Convert a solved (truss) model into an equivalent FDM Network.
+"""
+function to_network(model::Model)
+    if isnothing(model.results)
+        error("Analyze truss model before conversion")
+    end
+
+    # convert nodes
+    nodeset = Vector{FDMnode}()
+
+    for node in model.nodes
+        pos = Vector(node.position)
+        id = node.id
+
+        dof = all(node.fixity[1:3])
+
+        fdmn = FDMnode(pos, dof)
+        fdmn.id = id
+
+        push!(nodeset, fdmn)
+    end
+
+    #convert loads
+    loadset = Vector{FDMload}()
+
+    for load in model.loads
+        i = load.node.index
+
+        push!(loadset, FDMload(nodeset, i, Vector(load.value)))
+    end
+
+    #convert elements
+    elset = Vector{FDMelement}()
+
+    for element in model.elements
+        istart, iend = element.nodeStart.index, element.nodeEnd.index
+        id = element.id
+        q = axial_force(model.results, element) / length(element)
+
+        el = FDMelement(nodeset[[istart, iend]]..., q)
+        el.id = id
+
+        push!(elset, el)
+    end
+
+    network = Network(nodeset, elset, loadset)
+    solve!(network)
+
+    return network
+end
+
+"""
+    to_truss(network::Network, section::AbstractSection)
+
+Convert a solved FDM Network into an equivalent truss model with a given section. All fixed nodes are converted into pinned boundary conditions.
+"""
+function to_truss(network::Network, section::AbstractSection)
+    if !network.processed
+        error("Analyze network before conversion")
+    end
+
+    nodeset = Vector{Node{Float64}}()
+    elset = Vector{AbstractElement{Float64}}()
+    loadset = Vector{NodeForce{Float64}}()
+
+    #convert nodes
+    for node in network.nodes
+        pos = Vector(node.position)
+        id = node.id
+
+        dof = node.dof ? :free : :pinned
+
+        tn = Node(pos, dof)
+        tn.id = id
+
+        push!(nodeset, tn)
+    end
+
+    #convert elements
+    for element in network.elements
+        te = TrussElement(nodeset[[element.iStart, element.iEnd]]..., section)
+
+        te.id = element.id
+
+        push!(elset, te)
+    end
+
+    #convert loads
+    for load in network.loads
+        push!(loadset, NodeForce(nodeset[load.point.nodeID], Vector(load.force)))
+    end
+
+    truss = Model(nodeset, elset, loadset)
+    solve!(truss)
+
+    return truss
+
+end

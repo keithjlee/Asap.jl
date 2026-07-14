@@ -99,7 +99,26 @@ Deflected shapes: `local_displacements(internal_forces(model, el), t)`.
   still works.
 - Release-type dicts (`Asap.FixedFixed` etc. as keys): release types no longer
   exist as types — key on `release_symbol(el.ends)` instead.
-- VERIFY: regenerate a few plots side-by-side (visual check).
+- VERIFY: regenerate a few plots side-by-side (visual check). ✅ DONE
+  2026-07-14 — all four comparison cases identical to 7+ significant digits.
+
+### AsapToolkit → Asap absorption (2026-07-14, clean break)
+Most of AsapToolkit moved INTO Asap — `using Asap` now provides:
+- All parametric generators (`Warren2D`, `Pratt2D`, `BakerTruss`, `TrussFrame`,
+  `SpaceFrame`, `SpaceFrameBeam`, `Frame`, `GridFrame`, `GridNetwork`,
+  ground structures + `to_truss`/`to_frame`). The variable-depth `SpaceFrame`
+  and (unexported) `CornerDome` now take ANY callable `surface(u, v)` on
+  `[0,1]²` — no Interpolations.jl requirement (but its interpolators still
+  work as-is).
+- `Geo`/`ModelGeo`/`TrussGeo`/`NetworkGeo`, `ElementDisplacements`,
+  `displacements`.
+- `to_network(model)` (FDM translation).
+- `clear_supports!`, `element_connectivity`.
+
+AsapToolkit v1.0 retains ONLY: `SteelSections` (AISC database, `toASAPframe`/
+`toASAPtruss`), `AsapSections` (polygon geometry), and IO (`topologize`,
+`GHsave`). No re-exports of the moved names — scripts that used them via
+AsapToolkit should load Asap (most already do).
 
 ### AsapHarmonics (Phase 5c)
 - `node.reaction` → `reaction(model.results, node)`; `TrussNode`/`TrussModel`
