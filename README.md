@@ -3,27 +3,288 @@
 ![](READMEassets/forces-axo.png)
 
 # Asap.jl
+
 Asap is...
 - the anti-SAP (2000)
 - results as Soon As Possible
 - another Structural Analysis Package
 
-Designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
+**Fast, differentiable structural analysis for trusses and frames in Julia** — designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
 
-See also: [AsapToolkit](https://github.com/keithjlee/AsapToolkit), [AsapOptim](https://github.com/keithjlee/AsapOptim), [AsapHarmonics](https://github.com/keithjlee/AsapHarmonics).
+Asap solves linear elastic truss and frame structures with the direct stiffness method, recovers exact internal force and displacement fields along members, handles load cases and combinations from a single factorization, and exposes a pure functional analysis path that automatic differentiation engines traverse natively — the same engine that powers gradient-based structural optimization through [AsapOptim](https://github.com/keithjlee/AsapOptim).
+
+See also: [AsapToolkit](https://github.com/keithjlee/AsapToolkit), [AsapHarmonics](https://github.com/keithjlee/AsapHarmonics).
 
 # Installation
-Asap.jl is now a registered Julia package. Install through package mode in the REPL:
+
 ```julia
 pkg> add Asap
 ```
-or
+
+# Quick start
+
 ```julia
-using Pkg
-Pkg.Add("Asap")
+using Asap
+
+steel = Material(200e6, 80.0, 0.3)                # E [kN/m²], ρ [kg/m³], ν
+column = Section(steel, 1e-2, 8e-5, 3e-5, 5e-7)   # A, Ix, Iy, J
+
+n1 = Node([0.0, 0.0, 0.0], :fixed)
+n2 = Node([0.0, 0.0, 3.0], :free)
+el = FrameElement(n1, n2, column)
+
+model = Model([n1, n2], [el], [NodeForce(n2, [10.0, 0.0, 0.0])])
+solve!(model)
+
+displacement(model.results, n2)    # SVector{6}: (ux, uy, uz, θx, θy, θz)
+moment_z(model, el, 0.0)           # bending moment at the base
 ```
 
-## Citing
+# Design
+
+Three separated layers, so each does one job:
+
+1. **Definition** — `Model`, `Node`, elements, loads, springs: what you build. Pure data; nothing analysis-related is cached on it.
+2. **Analysis structure** — built once per topology by `process!`: DOF classification, a *frozen* sparsity pattern, scatter maps, a cached factorization. Repeated solves reuse everything.
+3. **Results** — returned by `solve!`, queried through accessor functions. Results never live on nodes or elements — which is also what lets dual numbers flow through the differentiable path.
+
+Asap is **units-agnostic**: pick any consistent system (kN–m, N–mm, kip–in) and use it everywhere. Docstrings state dimensions in bracket notation (`[force/length²]`).
+
+Every type prints an engineer-readable summary in the REPL — try typing `steel` or `el` from the example above.
+
+# Features, by example
+
+## Materials and sections
+
+A `Material` carries `E` (Young's modulus), `G` (shear modulus), `ρ` (density), and `ν` (Poisson's ratio):
+
+```julia
+steel  = Material(200e6, 77e6, 8.0, 0.3)   # explicit G
+timber = Material(13.1e6, 560.0, 0.35)     # isotropic: G derived as E / 2(1+ν)
+```
+
+Sections implement a five-accessor contract — `EA`, `EIx`, `EIy`, `GJ`, `ρA` — and the analysis never reads anything else. Two implementations:
+
+**`Section`** — geometry plus material, the standard workflow:
+
+```julia
+wshape = Section(steel, 1e-2, 8e-5, 3e-5, 5e-7)   # A, Ix (strong), Iy (weak), J
+bar    = Section(steel, 5e-3)                     # axial-only: for truss members
+EA(wshape), EIx(wshape)                           # derived rigidity products
+```
+
+**`RigiditySection`** — stores the rigidity *products* directly. This is the natural type for cracked/effective concrete stiffness: linear analysis only ever consumes `EA`, `EIx`, `EIy`, `GJ`, so an equivalent-stiffness section loses nothing.
+
+```julia
+Ec, Ig, Ag = 30e6, 8e-4, 0.12
+cracked_beam = RigiditySection(
+    Ec * Ag,                          # EA
+    0.35 * Ec * Ig, 0.35 * Ec * Ig,   # EIx, EIy — ACI 318 cracked-beam modifier
+    0.10 * Ec * Ig,                   # GJ
+    2.4 * Ag)                         # ρA: mass per length, stored explicitly
+```
+
+Any element accepts either type interchangeably.
+
+## Nodes and supports
+
+Every node has six DOFs — three translations, three rotations — with a fixity per DOF (`true` = free). Common supports have symbols; anything else is an explicit 6-vector:
+
+```julia
+base   = Node([0.0, 0.0, 0.0], :fixed)      # clamped
+pin    = Node([5.0, 0.0, 0.0], :pinned)     # translations fixed, rotations free
+roller = Node([10.0, 0.0, 0.0], [true, true, false, true, true, true])  # z-roller
+fixnode!(roller, :zfixed)                   # change a support later
+```
+
+`planarize!(model)` constrains a model to 2D behavior (fixes out-of-plane DOFs and zeroes roll angles for the `:XY` plane).
+
+Rotational DOFs that nothing stiffens — a node connected only to truss members, or only to fully released member ends — are classified **inactive** and excluded from the solve automatically. No singular stiffness matrices, no manual bookkeeping: an all-truss model solves a translations-only system by construction.
+
+## Frame elements
+
+3D Euler-Bernoulli beam-columns carrying axial force, biaxial bending, shear, and torsion. `Ψ` is the section roll angle about the member axis (default `π/2`).
+
+```julia
+girder = FrameElement(n1, n2, wshape, :girder)
+rolled = FrameElement(n1, n2, wshape; Ψ = 0.0)
+```
+
+### End releases and semi-rigid connections
+
+Connections are **end springs** in the element's local axes. The classical releases are exact limits (`Inf` = rigid, `0` = released), and any finite value is a semi-rigid connection:
+
+```julia
+hinged = FrameElement(n1, n2, wshape; release = :fixedfree)   # hinge at far end
+# available: :fixedfixed (default), :fixedfree, :freefixed, :freefree, :joist
+
+# semi-rigid: e.g. a bolted end plate with finite rotational stiffness
+semi = FrameElement(n1, n2, wshape,
+    EndConditions(EndSprings(Inf, Inf, 5e4, 5e4), rigid_end()), :connection)
+```
+
+Connection stiffness is ordinary data — it can be a design variable in gradient-based optimization, and everything downstream (fixed-end forces, force recovery) handles it with no special cases.
+
+## Truss elements — and mixing them with frames
+
+Axial-only two-force members. They coexist freely with frame elements in one model; a truss element simply never touches rotational DOFs:
+
+```julia
+beam = FrameElement(n1, n2, wshape, :beam)
+tie  = TrussElement(n2, n3, bar, :tie)          # n3: an anchor above
+
+model = Model([n1, n2, n3],
+    AbstractElement{Float64}[beam, tie],        # mixed vector: type it explicitly
+    AbstractLoad{Float64}[NodeForce(n2, [0.0, 0.0, -100.0])])
+solve!(model)
+axial_force(model.results, tie)                 # tension-positive
+```
+
+## Variable elements (varying cross-section)
+
+One user-facing member whose section varies along its length as a chain of prismatic segments — for haunched girders, stepped columns, or optimization results. Interior joints become internal DOFs: the model is never mutated, no phantom nodes appear, and you query the member as a single piece:
+
+```julia
+haunched = VariableElement(n1, n2,
+    AbstractSection{Float64}[deep, mid, shallow],   # one section per segment
+    [0.25, 0.6])                                    # interior break fractions
+
+solve!(model)
+moment_z(model, haunched, 0.5)                  # resolves to the right segment
+element_forces(model.results, haunched, 2)      # or reach a specific segment
+```
+
+`SelfWeight` on a `VariableElement` automatically varies with each segment's `ρA`.
+
+## Spring supports
+
+Elastic supports are **applicative**: a `NodalSpring` references its node (the way a load does) and lives on the model — nodes don't know about their springs, and several springs on one node add up.
+
+```julia
+soil = NodalSpring(base, [0.0, 0.0, 5e4, 0.0, 0.0, 0.0], :soil)   # vertical only
+pad  = NodalSpring(base, 1e5)                                     # uniform translational
+model = Model(nodes, elements, loads; springs = [soil])
+```
+
+Spring reactions are recovered as `−k·u` in post-processing.
+
+## Loads
+
+All loads take an `id` and a `case` tag (default `:LC1`):
+
+```julia
+NodeForce(n2, [0.0, 0.0, -50.0]; case = :live)
+NodeMoment(n2, [0.0, 1e3, 0.0])
+
+LineLoad(beam, [0.0, 0.0, -2.0])                            # uniform, full span
+TrapezoidLoad(beam, 0.2, 0.8, 1.0, 3.0, [0.0, 0.0, -1.0])   # partial-span, varying
+DistributedLoad(beam, [0.0, 0.3, 0.5], [0.0, 4.0, 0.0],     # arbitrary piecewise-linear
+    [0.0, 0.0, -1.0])
+PointLoad(beam, 0.4, [0.0, 0.0, -10.0])                     # at 40% of the span
+PointMoment(beam, 0.5, [0.0, 0.0, 800.0])                   # concentrated moment
+
+SelfWeight(beam; g = [0.0, 0.0, -9.81])                     # from ρA(section)
+```
+
+Every distributed shape lowers to one canonical piecewise-linear type with one exact integration (3-point Gauss against the element shape functions — exact, not approximate, for these loads). Adding a custom element load type means implementing a single method, `fixed_end_forces`.
+
+## Analysis and results
+
+```julia
+model = Model(nodes, elements, loads)
+solve!(model)                     # process! runs automatically the first time
+
+res = model.results
+displacement(res, node)           # SVector{6} at a node
+reaction(res, node)               # support reactions (incl. moment reactions)
+element_forces(res, el)           # local end-force 12-vector
+axial_force(res, el)              # tension-positive scalar
+res.compliance                    # external work Fᵀu
+```
+
+Repeated solves — geometry or section *values* changed, topology unchanged — reuse the frozen sparsity pattern and refactorize numerically: just call `solve!(model)` again. After topology changes (elements added, releases toggled, supports changed): `solve!(model; reprocess = true)`.
+
+## Internal forces and deflected shapes
+
+Recovery is **equilibrium-based**: starting from the exact member end actions, the applied loads are integrated analytically along the member — the recovered fields are exact for any end condition (releases, semi-rigid springs) with no per-case formulas.
+
+```julia
+# scalar queries at any fraction of the length (zero allocation):
+moment_z(model, beam, 0.5)     # bending about local z — pairs with Vy, sagging+ for +y loads
+shear_y(model, beam, 0.25)
+axial_force(model, beam, 0.0)
+torsion(model, beam, 0.5)
+
+# dense sampling for plotting — stations include every load breakpoint and
+# BOTH sides of each point action, so shear jumps render as true jumps:
+f = InternalForces(model, beam; resolution = 40)
+f.x; f.N; f.Vy; f.Mz; f.Vz; f.My; f.Mx
+
+# deflected shape: exact local displacements at any fraction
+st = internal_forces(model, beam)
+local_displacements(st, 0.5)   # (u, v, w) in local axes
+```
+
+Names are axis-correct: `Mz` is the moment about local z and pairs with `Vy` (`dMz/dx = Vy`); `My` pairs with `Vz` (`dMy/dx = −Vz`).
+
+## Load cases, combinations, envelopes
+
+Tag loads with cases; solve every case against **one** factorization; get any factored combination by superposition — no re-solves, ever:
+
+```julia
+loads = AbstractLoad{Float64}[
+    LineLoad(beam, [0.0, 0.0, -2.0]; case = :dead),
+    PointLoad(beam, 0.4, [0.0, 0.0, -10.0]; case = :live),
+    NodeForce(n2, [5.0, 0.0, 0.0]; case = :wind),
+]
+model = Model(nodes, elements, loads)
+
+cr = solve_cases!(model)                    # one assembly, one factorization
+strength = LoadCombination(:LRFD, [:dead => 1.2, :live => 1.6, :wind => 0.5])
+res = combine(cr, strength)                 # exact, by superposition
+displacement(res, n2)
+
+# station-wise min/max over a combination set — what design checks consume:
+env = envelope(model, beam, cr,
+    [strength, LoadCombination(:service, [:dead => 1.0, :live => 1.0])])
+env.x; env.lo; env.hi                       # rows: N, Vy, Mz, Vz, My, Mx
+```
+
+## Differentiable analysis
+
+The entire pipeline has a **pure functional path**: extract a `ModelState` (positions and sections as plain data), evaluate, differentiate. Loading Zygote (or anything ChainRules-aware) activates Asap's rule extension automatically; a handful of small rules cover the sparse construction and the linear solve, and everything else differentiates natively.
+
+```julia
+using Zygote
+
+solve!(model)                               # builds the analysis cache
+state = extract_state(model)
+
+# gradient of compliance w.r.t. every node coordinate — a 3 × n sensitivity field:
+g = Zygote.gradient(state.X) do X
+    compliance(model, ModelState{Float64}(X, state.sections))
+end[1]
+```
+
+Gradients flow with respect to node positions, section properties, and semi-rigid connection stiffnesses. For design-variable bookkeeping (areas, coupled symmetric geometry, bounds) and optimization-ready objectives, use [AsapOptim](https://github.com/keithjlee/AsapOptim) — a thin layer over this path, verified against the original published implementation to 13 digits (see its `docs/AD_VERIFICATION_AND_BENCHMARKS.md`).
+
+## Force density method (form-finding)
+
+A self-contained FDM subsystem for cable/tension networks ships in the same package: `FDMnode`, `FDMelement`, `FDMload`, `Network`, with its own `solve!`. Differentiable force-density optimization (`QVariable`, `solve_network`) lives in AsapOptim.
+
+# Documentation map
+
+- `docs/MODERNIZATION.md` — architecture and roadmap of the v1.0 core
+- `docs/MIGRATION_v1.md` — complete v0.2.x → v1.0 API mapping
+- `PROGRESS.md` — build-out record
+- Every exported function and type carries a full docstring (`?Section`, `?dof_signature`, …), and every type has an engineer-readable REPL display.
+
+# Verification
+
+The test suite (2,500+ tests) pins: textbook solutions (Kassimali), the exact numerics of the legacy v0.2.x implementation (characterization fixtures), the DiffAnalysis_2024 publication structures and gradients, classic closed-form beam formulas, calculus identities of the recovered force fields, AD-vs-finite-difference gradient checks, and zero-allocation guarantees on the hot paths.
+
+# Citing
+
 When using or extending this software for research purposes, please cite using the following:
 
 ### Bibtex
@@ -38,297 +299,4 @@ When using or extending this software for research purposes, please cite using t
   doi          = {10.5281/zenodo.10581560},
   url          = {https://doi.org/10.5281/zenodo.10581560}
 }
-```
-
-### Other styles
-Or find a pre-written citation in the style of your choice [here](https://zenodo.org/records/10724610) (see the Citation box on the right side). E.g., for APA:
-```
-Lee, K. J. (2024). Asap.jl (v0.1). Zenodo. https://doi.org/10.5281/zenodo.10581560
-```
-
-# Extensions, Related packages
-See [AsapToolkit.jl](https://github.com/keithjlee/AsapToolkit) for even more utility and post-processing functions.
-
-# Usage
-A structural model is defined by:
-```julia
-model = Model(nodes, elements, loads)
-```
-and solved via:
-```julia
-solve!(model)
-```
-Which finds the unknown nodal displacement field, $u = S^{-1}(P-P_f)$ where:
-- $S$ is the global stiffness matrix (often called $K$)
-- $P$ is the global external load vector
-- $P_f$ is the fixed end forces induced by element loads (such as a line load on an element)
-
-## `Node`
-```julia
-mutable struct Node <: AbstractNode
-    position::Vector{Float64}
-    dof::Vector{Bool}
-    nodeID::Int64
-    globalID::Vector{Int64}
-    reaction::Vector{Float64}
-    displacement::Vector{Float64}
-    id::Symbol
-end
-```
-We begin with the primary information carrier for structural analysis: nodes with *n* independent degrees of freedom (DOF). They are defined by a spatial position in $\mathbb{R}^3$ as well as a vector of booleans that indicate which DOFs are free to move under load, in order: $T_x, T_y, T_z, R_x, R_y, R_z$ where $T$ is a translational DOF and $R$ is a rotational DOF. E.g.:
-```julia
-node = Node([0, 15.5, 12.0], [false, false, false, true, true, true])
-```
-This defines a node at $x = 0; y = 15.5; z = 12$ with a *pinned* support (i.e., translational DOFs are fixed, but rotational DOFs are not).
-
-Some common boundary conditions are provided to you as symbols to use in the constructor:
-```julia
-node = Node([0.,0.,0.], :free) # all free DOFs
-node = Node([0.,0.,0.], :fixed) # all fixed DOFs
-node = Node([0.,0.,0.], :xfree) # all DOFs are fixed except Tx. You can also do :yfree or :zfree
-node = Node([0.,0.,0.], :xfixed) # all DOFs are free except Tx. You can also do :yfixed or :zfixed
-```
-
-Nodes can also include an optional identifier represented as a symbol:
-```julia
-pin_support = Node(zeros(3), :pinned, :pinsupport)
-roller_support = Node([15.1, 0, 0], :xfree, :rollersupport)
-free_nodes = [Node(rand(3), :free, :freenodes) for _ = 1:10]
-
-nodes = [pin_support; roller_support; free_nodes]
-```
-
-This allows you to index into a vector of nodes using the identifier:
-```julia
-all_free_nodes = nodes[:freenodes] #returns a vector of nodes with the :freenode identifier
-```
-
-Or find the indices of nodes in a vector of nodes that have a given id:
-```
-i_free_nodes = findall(nodes, :freenodes)
-```
-
-## `Element`
-```julia
-mutable struct Element{R<:Release} <: FrameElement{R}
-    section::Section #cross section
-    nodeStart::Node #start node
-    nodeEnd::Node #end position
-    elementID::Int64
-    globalID::Vector{Int64} #element global DOFs
-    length::Float64 #length of element
-    K::Matrix{Float64} # stiffness matrix in GCS
-    Q::Vector{Float64} # fixed end forces in GCS
-    R::Matrix{Float64} # transformation matrix
-    Ψ::Float64 #roll angle
-    LCS::Vector{Vector{Float64}} #local coordinate frame (X, y, z)
-    forces::Vector{Float64} #elemental forces in LCS
-    id::Symbol #optional identifier
-end
-```
-Elements are defined by their start and end nodes, a cross-section, and an optional identifier.
-
-### `Section`
-A section defines the mechanical and material properties of an element:
-```julia
-ibeam_section = Section(A, E, G, Ix, Iy, J)
-```
-where:
-- `A`: area
-- `E`: Young's Modulus
-- `G`: Shear Modulus
-- `Ix`: Moment of inertia in strong axis (often denoted as `Iz` in other FEA programs)
-- `Iy`: Moment of inertia in weak axis
-- `J`: Torsional constant
-
-**It is up to you to ensure unit consistency**.
-
-You can then define an element via:
-```julia
-element = Element(pin_support, roller_support, ibeam_section)
-element_with_id = Element(pin_support, rand(free_nodes), ibeam_section, :randomelement)
-```
-
-### `Element` roll axis
-Elements have a default roll angle with respect to its longitudinal axis of $\pi/2$, which corresponds to keeping the strong bending axis flat against the XY plane. If you wish to change this, you can change it by accessing the Ψ parameter:
-```julia
-element.Ψ = pi
-```
-
-### `Element` release
-Elements can have partial DOF releases to decouple nodal displacements from element end displacements. This is the process of adding hinges to one or both ends of the beam. You can do this in the construction of an element through the optional argument `release`:
-```julia
-released_element = Element(pin_support, roller_support, ibeam_section; release = :freefixed)
-```
-
-By default, no releases are performed (i.e., `release = :fixedfixed`). You can choose between:
-- `:freefixed` create a hinge in the beginning node of the element
-- `:fixedfree` create a hinge in the ending node of the element
-- `:freefree` create hinges on both ends of the element
-- `:joist` create hinges on both ends of the element with the exception of torsional DOFs.
-
-# Loads
-Loads can be applied to nodes and elements.
-
-## `NodeForce`
-A `NodeForce` is defined on a node with a force vector:
-```julia
-load1 = NodeForce(free_nodes[1], [0., 0., -150.0])
-```
-
-## `NodeMoment`
-A `NodeMoment` is defined on a node with a moment vector ($M_x, M_y, M_z$):
-```julia
-load2 = NodeForce(free_nodes[5], [40., 0., 0.])
-```
-
-## `LineLoad`
-A `LineLoad` is defined on an element with a force vector, whose magnitude indicates the length-normalized force value, $\text{force}/\text{distance}$. E.g. a downwards load of $10\text{kN}/\text{m}$ is defined as (assuming we are working in kN, m):
-```julia
-snow_load = LineLoad(element, [0., 0., -10.])
-```
-
-## `PointLoad`
-A `PointLoad` is defined on an element with a normalized position $0<x<1$ where the load is applied and the load value. E.g., a load of $20$ in the X axis direction applied at the quarter point of an element is defined as:
-```julia
-sideways_load = PointLoad(element, 0.25, [20.0, 0., 0.])
-```
-
-## `Model`
-```julia
-mutable struct Model{E,L} <: AbstractModel
-    nodes::Vector{Node}
-    elements::Vector{E}
-    loads::Vector{L}
-    nNodes::Int64
-    nElements::Int64
-    DOFs::Vector{Bool} #vector of DOFs
-    nDOFs::Int64
-    freeDOFs::Vector{Int64} #free DOF indices
-    fixedDOFs::Vector{Int64}
-    S::SparseMatrixCSC{Float64,Int64} # global stiffness
-    P::Vector{Float64} # external loads
-    Pf::Vector{Float64} # element end forces
-    u::Vector{Float64} # nodal displacements
-    reactions::Vector{Float64} # reaction forces
-    compliance::Float64 #structural compliance
-    tol::Float64
-    processed::Bool
-end
-```
-
-A model is assembled from a collection of nodes, elements, and loads:
-```julia
-nodes = [pin_support; roller_support; free_nodes]
-elements = [element, released_element]
-loads = [load1, load2, snow_load, sideways_load]
-
-model = Model(nodes, elements, loads)
-```
-
-## Solving
-The primary unknown field we are trying to find is `u`, the vector of all nodal DOFs (in order of assembly) in which equilibrium holds. We can find this via:
-```julia
-solve!(model)
-```
-(Note that in this nonsensical example, this will result in a singular error).
-
-You can access the solved field via:
-```julia
-u = model.u
-```
-
-Or directly from the populated fields in the nodes:
-```julia
-node2_displacement = model.nodes[2].displacement
-```
-
-If a node has a restrained DOF, you can find its reaction from:
-```julia
-roller_reaction_forces = roller_support.reaction
-```
-
-You can also find the end forces acting on an element via:
-```julia
-element_forces = model.elements[2].forces
-```
-Which gives a vector: $F_{x1}, F_{y1}, F_{z1}, M_{x1}, M_{y1}, M_{z1}, F_{x2}, F_{y2}, F_{z2}, M_{x2}, M_{y2}, M_{z2}$ where $1$ is the starting node and $2$ is the ending node, with all values defined in the *local coordinate system* of the beam.
-
-## New loads
-If you have a new set of loads, directly get the corresponding displacement via:
-```julia
-u_new = solve!(model, new_loads)
-```
-Or replace the vector of loads associated with the model and solve in place via:
-```julia
-solve!(model, new_loads)
-```
-
-## Updating values
-If you change a value, such as the position of a node, reprocess the fields before solving by:
-```julia
-#change 1
-model.nodes[2].position .+= [5, 0, 0]
-solve!(model;reprocess = true)
-```
-
-# Trusses
-For truss structures, with only 3 translational DOFs per node, there are separate data structures for `TrussNode`, `TrussElement`, `TrussSection`, and `TrussModel`, which can be defined similarily as above except:
-
-1. `TrussNode`s are constructed using only a length 3 vector of booleans if you are explicitly defining the DOF restrictions: `TrussNode(rand(3), [true, true, false])`.
-2. `TrussSection`s only require the area and length, `TrussSection(A, E)`. You can use a regular `Section` to define a `TrussElement`.
-3. `TrussElement`s do not have releases or roll angles. By definition they are equivalent to `Element(...; release = :freefree)`
-4. Only `NodeForce`s can be applied as loads for `TrussModel`s.
-
-## `TrussNode`
-```julia
-mutable struct TrussNode <: AbstractNode
-    position::Vector{Float64}
-    dof::Vector{Bool}
-    nodeID::Int64
-    globalID::Vector{Int64}
-    reaction::Vector{Float64}
-    displacement::Vector{Float64}
-    id::Symbol
-end
-```
-
-## `TrussElement`
-```julia
-mutable struct TrussElement <: AbstractElement
-    section::Union{TrussSection,Section} #cross section
-    nodeStart::TrussNode #start position
-    nodeEnd::TrussNode #end position
-    elementID::Int64
-    globalID::Vector{Int64} #element global DOFs
-    length::Float64 #length of element
-    K::Matrix{Float64} # stiffness matrix in GCS
-    R::Matrix{Float64} # transformation matrix
-    forces::Vector{Float64} #elemental forces in LCS
-    Ψ::Float64
-    LCS::Vector{Vector{Float64}}
-    id::Union{Symbol, Nothing} #optional identifier
-end
-```
-
-## `TrussModel`
-```julia
-mutable struct TrussModel <: AbstractModel
-    nodes::Vector{TrussNode}
-    elements::Vector{TrussElement}
-    loads::Vector{NodeForce}
-    nNodes::Int64
-    nElements::Int64
-    DOFs::Vector{Bool} #vector of DOFs
-    nDOFs::Int64
-    freeDOFs::Vector{Int64} #free DOF indices
-    fixedDOFs::Vector{Int64}
-    S::SparseMatrixCSC{Float64,Int64} # global stiffness
-    P::Vector{Float64} # external loads
-    u::Vector{Float64} # nodal displacements
-    reactions::Vector{Float64} # reaction forces
-    compliance::Float64 #structural compliance
-    tol::Float64
-    processed::Bool
-end
 ```
