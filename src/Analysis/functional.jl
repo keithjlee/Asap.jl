@@ -29,16 +29,26 @@ struct ModelState{T}
     sections::AbstractVector   # per-element AbstractSections; loosely typed so
     # AD-constructed section vectors (e.g. from map over a design vector)
     # pass through without conversion (conversion mutates — Zygote-hostile)
+    EA::Any                    # optional plain per-element axial-rigidity vector:
+    # when provided, batched paths index THIS instead of mapping EA(section)
+    # over the section structs — per-element struct-getfield pullbacks are
+    # the single most expensive pattern under reverse AD
 end
+
+ModelState{T}(X::Matrix, sections::AbstractVector) where {T} =
+    ModelState{T}(X, sections, nothing)
 
 """
     extract_state(model) -> ModelState
 
 The model's current geometry and sections as a differentiable state.
 """
-extract_state(model::Model{T}) where {T} =
-    ModelState{T}(reduce(hcat, (collect(n.position) for n in model.nodes)),
-        Any[_state_sections(el) for el in model.elements])
+function extract_state(model::Model{T}) where {T}
+    sections = Any[_state_sections(el) for el in model.elements]
+    ea = [s isa AbstractVector ? zero(T) : T(EA(s)) for s in sections]   # (super-elements: unused)
+    return ModelState{T}(reduce(hcat, (collect(n.position) for n in model.nodes)),
+        sections, ea)
+end
 
 _state_sections(el::AbstractElement) = el.section
 _state_sections(el::VariableElement) = el.sections
@@ -57,14 +67,61 @@ Zygote.
 """
 function stiffness_entries(cache::AnalysisCache, state::ModelState)
     parts = map(cache.groups) do g
-        reduce(vcat, map(eachindex(g.elements)) do e
-            el = g.elements[e]
-            Ke = stiffness(el, state.sections[g.model_indices[e]],
-                _position(state.X, el.nodeStart.index), _position(state.X, el.nodeEnd.index))
-            vec(Ke[g.slots[e], g.slots[e]])
-        end)
+        _group_entries_all(g, state)
     end
     return reduce(vcat, parts)
+end
+
+# default: per-element kernel evaluation
+function _group_entries_all(g::ElementGroup, state::ModelState)
+    reduce(vcat, map(eachindex(g.elements)) do e
+        _group_entries(g, e, state.sections[g.model_indices[e]],
+            _position(state.X, g.i1[e]), _position(state.X, g.i2[e]))
+    end)
+end
+
+"""
+Truss groups assemble BATCHED: one incidence matmul gives every element
+vector, and the 36 stiffness entries per element are broadcasted array
+expressions — no per-element closures, so reverse-mode AD pulls back
+through a handful of dense array operations instead of thousands of
+scalar-graph nodes. (Entry r = (b−1)·6 + a of column e is
+±(EA/L)·n_{ia}·n_{ib} — exactly `vec` of the 6×6 kernel, in scatter order.)
+"""
+function _group_entries_all(g::ElementGroup{<:TrussElement}, state::ModelState)
+    V = state.X * g.Cinc'                             # 3 × nel element vectors
+    L = sqrt.(sum(abs2, V; dims=1))                   # 1 × nel
+    N = V ./ L                                        # unit vectors
+    ea = state.EA === nothing ? map(i -> EA(state.sections[i]), g.model_indices) :
+         state.EA[g.model_indices]
+    c = reshape(ea, 1, :) ./ L                        # 1 × nel  (EA/L)
+
+    comps = (N[1:1, :], N[2:2, :], N[3:3, :])         # three row slices, once
+    rows = map(1:36) do r
+        a = (r - 1) % 6 + 1
+        b = (r - 1) ÷ 6 + 1
+        σ = (a <= 3) == (b <= 3) ? 1.0 : -1.0
+        σ .* c .* comps[(a-1)%3+1] .* comps[(b-1)%3+1]
+    end
+    return vec(reduce(vcat, rows))
+end
+
+# Per-element active stiffness entries (scatter order), consuming ONLY plain
+# data — no mutable struct reads inside the differentiated closure. Full
+# frames skip slicing entirely, avoiding the expensive generic getindex
+# pullback on SMatrix under Zygote.
+_group_entries(::ElementGroup{<:TrussElement}, e::Int, section, x1, x2) =
+    vec(truss_stiffness(section, x1, x2))
+
+function _group_entries(g::ElementGroup{<:FrameElement}, e::Int, section, x1, x2)
+    Ke = frame_stiffness(section, g.endss[e]::EndConditions, x1, x2, g.Ψs[e])
+    slots = g.slots[e]
+    return Base.length(slots) == 12 ? vec(Ke) : vec(Ke[slots, slots])
+end
+
+function _group_entries(g::ElementGroup{<:VariableElement}, e::Int, sections, x1, x2)
+    Ke = stiffness(g.elements[e], sections, x1, x2)   # super-elements keep the struct path
+    return vec(Ke[g.slots[e], g.slots[e]])
 end
 
 """

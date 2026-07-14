@@ -21,6 +21,15 @@ struct ElementGroup{E<:AbstractElement}
     slots::Vector{Vector{Int}}
     gdofs::Vector{Vector{Int}}
     nzmap::Vector{Vector{Int}}
+    # plain-data mirrors for the differentiable path: reading MUTABLE struct
+    # fields inside an AD closure makes Zygote build/accumulate tangents for
+    # the entire object graph per access (catastrophic at scale) — the pure
+    # path must consume only these
+    i1::Vector{Int}                  # start-node indices
+    i2::Vector{Int}                  # end-node indices
+    Ψs::Vector{Float64}              # roll angles (0 for truss)
+    endss::Vector{Any}               # EndConditions per element (immutable; unused for truss)
+    Cinc::SparseMatrixCSC{Float64,Int}   # group incidence (nel × nnodes): −1 at i1, +1 at i2
 end
 
 """
@@ -143,7 +152,15 @@ function build_cache(model::Model{T}) where {T}
             push!(nzmaps, m)
         end
         els = Vector{E}([model.elements[i] for i in idxs])
-        push!(groups, ElementGroup{E}(els, idxs, slots_all, gdofs_all, nzmaps))
+        i1 = [el.nodeStart.index for el in els]
+        i2 = [el.nodeEnd.index for el in els]
+        Ψs = [el isa FrameElement || el isa VariableElement ? Float64(el.Ψ) : 0.0 for el in els]
+        endss = Any[el isa FrameElement || el isa VariableElement ? el.ends :
+                    EndConditions(:fixedfixed) for el in els]
+        ne = Base.length(els)
+        Cinc = sparse([1:ne; 1:ne], [i1; i2], [fill(-1.0, ne); fill(1.0, ne)],
+            ne, Base.length(model.nodes))
+        push!(groups, ElementGroup{E}(els, idxs, slots_all, gdofs_all, nzmaps, i1, i2, Ψs, endss, Cinc))
     end
 
     spring_nz = Tuple{Int,T}[]

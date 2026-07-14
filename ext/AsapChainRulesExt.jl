@@ -24,6 +24,7 @@ using Asap
 using ChainRulesCore
 using SparseArrays
 using LinearAlgebra
+using StaticArrays
 
 const HOST = Asap
 
@@ -66,6 +67,48 @@ function ChainRulesCore.rrule(::Type{<:Asap.Material}, E::Real, G::Real, ρ::Rea
     end
     return m, Material_pullback
 end
+
+# PERFORMANCE rule (correctness needs nothing here — Zygote traverses the
+# kernel natively, verified by tests — but the analytic pullback is ~50×
+# cheaper and truss kernels dominate large sizing problems):
+#   B(section, x1, x2) = (EA/L)·[nnᵀ −nnᵀ; −nnᵀ nnᵀ],  v = x2−x1, n = v/L
+# Given block-combined symmetrized cotangent G = sym(ΔB₁₁ − ΔB₁₂ − ΔB₂₁ + ΔB₂₂):
+#   ΔEA = (nᵀGn)/L,   Δv = (2c/L)·G·n − (3c/L)·(nᵀGn)·n   with c = EA/L
+function ChainRulesCore.rrule(::typeof(Asap.truss_stiffness),
+    section::Asap.AbstractSection, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real})
+
+    v = SVector{3}(x2) - SVector{3}(x1)
+    L = norm(v)
+    n = v / L
+    ea = Asap.EA(section)
+    c = ea / L
+    B = Asap.truss_stiffness(section, x1, x2)
+
+    function truss_stiffness_pullback(ΔB)
+        Δ = unthunk(ΔB)
+        G11 = SMatrix{3,3}(ntuple(k -> Δ[(k-1)%3+1, (k-1)÷3+1], 9))
+        G12 = SMatrix{3,3}(ntuple(k -> Δ[(k-1)%3+1, (k-1)÷3+4], 9))
+        G21 = SMatrix{3,3}(ntuple(k -> Δ[(k-1)%3+4, (k-1)÷3+1], 9))
+        G22 = SMatrix{3,3}(ntuple(k -> Δ[(k-1)%3+4, (k-1)÷3+4], 9))
+        G = G11 - G12 - G21 + G22
+        Gs = (G + G') / 2
+
+        nGn = dot(n, Gs, n)
+        ΔEA = nGn / L
+        Δv = (2c / L) * (Gs * n) - (3c / L) * nGn * n
+
+        return (NoTangent(), _section_ea_tangent(section, ΔEA), -Δv, Δv)
+    end
+
+    return B, truss_stiffness_pullback
+end
+
+_section_ea_tangent(s::Asap.Section, ΔEA) =
+    ChainRulesCore.Tangent{typeof(s)}(
+        material=ChainRulesCore.Tangent{typeof(s.material)}(E=ΔEA * s.A),
+        A=ΔEA * s.material.E)
+_section_ea_tangent(s::Asap.RigiditySection, ΔEA) =
+    ChainRulesCore.Tangent{typeof(s)}(EA=ΔEA)
 
 # boundary rule between the plain position matrix (AD input container) and
 # the static vectors the kernels use internally — avoids the known
