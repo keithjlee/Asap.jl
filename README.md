@@ -5,9 +5,10 @@
 # Asap.jl
 
 Asap is...
-- the anti-SAP (2000)
-- results as Soon As Possible
-- another Structural Analysis Package
+- Another Structural Analysis Package
+- results As Soon As Possible
+- Analysis of Structures Avec Programming
+- A Simple Analysis Please
 
 **Fast, differentiable structural analysis for trusses and frames in Julia** — designed first-and-foremost for information-rich data structures and ease of querying, but always with performance in mind.
 
@@ -339,4 +340,10 @@ When using or extending this software for research purposes, please cite using t
   doi          = {10.5281/zenodo.10581560},
   url          = {https://doi.org/10.5281/zenodo.10581560}
 }
+```
+
+### Other styles
+Or find a pre-written citation in the style of your choice [here](https://zenodo.org/records/10724610) (see the Citation box on the right side). E.g., for APA:
+```
+Lee, K. J. (2024). Asap.jl (v0.1). Zenodo. https://doi.org/10.5281/zenodo.10581560
 ```
