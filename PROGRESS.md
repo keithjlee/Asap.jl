@@ -117,10 +117,17 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] NEW core capability: `ModelState.ends` override + `JointVariable` — connection stiffness as a differentiable design variable (FEF-consistency guard for element loads on jointed members)
 - [x] AsapOptim examples ported + expanded, ALL executed before commit: truss-optimization1/2 (v1.0 port), vierendeel-geometry (frame-action C·V optimization), joint-stiffness (precast frame, pinned bases — drift lands exactly on H/400 at 1.1% of the uniform stiffness budget), ad_backends/ (Zygote/Mooncake/Enzyme, one file each, identical gradients)
 
+## :joist soundness audit (2026-07-14, Keith-requested) ✅
+- [x] Verified k(:joist) == axial ⊕ torsion exactly (rank 2; Monforton–Wu k→0 limit to 2.7e-15; k→∞ → fixedfixed to 8.6e-13)
+- [x] Statics: UDL joist delivers wL/2 end shears, zero end/reaction moments; internal recovery gives wL²/8 midspan moment, zero end moments; torsion path exact (TL/GJ)
+- [x] FOUND + FIXED: displaced-shape recovery used NODE rotations for u0 — wrong at released/semi-rigid START ends (joist midspan recovered wL⁴/128EI instead of 5wL⁴/384EI). Fixed via far-end-compatibility start rotations; applies to frame/truss/VariableElement states; +6 regression tests (suite 2641)
+- [x] Documented modeling caveat: :joist keeps the whole rotation block ACTIVE (torsion rigid ⇒ block can't be retired since Λ mixes torsion+bending in global DOFs) — bending rotations and transverse translations at joist-ONLY nodes are mechanisms; solver raises ZeroPivotException/PosDefException. User must restrain rotations at nodes held only by joists.
+
 ## Deferred / follow-ups
 - SectionVariable → RigiditySection parameterization idiom
 - FDM subsystem parametrization in core
+- Parametrize the generators (`{T}` structs, concrete fields) — internals are still legacy-style Float64; API-ported and verified, so this is polish, not correctness
 - Geometric nonlinearity (`geometric_stiffness` hook ready), dynamics (`mass` hook ready)
-- Enzyme/Mooncake/DifferentiationInterface matrix on the pure path
+- ✅ ~~Enzyme/Mooncake/DifferentiationInterface matrix on the pure path~~ (done 2026-07-13 — see AD backend liberation above)
 - Batch _element_lengths / frame-group assembly for further gradient speed (notes in AsapOptim/docs/AD_VERIFICATION_AND_BENCHMARKS.md)
 - Docs build (Documenter.jl) from the extensive docstrings
