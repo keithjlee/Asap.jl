@@ -105,6 +105,10 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Core rules representation-flexible; solve_free cotangent projected onto the frozen pattern (dense outer product eliminated for all backends)
 - [x] Report: `AsapOptim/docs/AD_BACKENDS.md` (usage snippets, gotchas, reproduce script)
 
+## Examples & JointVariable (2026-07-13)
+- [x] NEW core capability: `ModelState.ends` override + `JointVariable` — connection stiffness as a differentiable design variable (FEF-consistency guard for element loads on jointed members)
+- [x] AsapOptim examples ported + expanded, ALL executed before commit: truss-optimization1/2 (v1.0 port), vierendeel-geometry (frame-action C·V optimization), joint-stiffness (precast frame, pinned bases — drift lands exactly on H/400 at 1.1% of the uniform stiffness budget), ad_backends/ (Zygote/Mooncake/Enzyme, one file each, identical gradients)
+
 ## Deferred / follow-ups
 - SectionVariable → RigiditySection parameterization idiom
 - FDM subsystem parametrization in core
