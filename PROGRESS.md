@@ -99,6 +99,12 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Differentiable-path optimization: batched truss assembly, plain-data mirrors, analytic truss_stiffness rule (6631 ms → 2.8 ms)
 - [x] README rewritten in depth with a TESTED example per feature (`test/readme_examples.jl`)
 
+## AD backend liberation (2026-07-13) — escape from Zygote ✅
+- [x] Mooncake works (AsapMooncakeExt: @from_rrule bridge + sparse-cotangent adapter + CHOLMOD Factor tangent-free) — Zygote-accuracy, 3× less memory at scale
+- [x] Enzyme works (AsapEnzymeExt: @import_rrule in __init__; needs runtime-activity + Const function annotation) — **fastest backend, beats the legacy hand-differentiated stack** (1.04 vs 1.41 ms, 512 vars)
+- [x] Core rules representation-flexible; solve_free cotangent projected onto the frozen pattern (dense outer product eliminated for all backends)
+- [x] Report: `AsapOptim/docs/AD_BACKENDS.md` (usage snippets, gotchas, reproduce script)
+
 ## Deferred / follow-ups
 - SectionVariable → RigiditySection parameterization idiom
 - FDM subsystem parametrization in core
