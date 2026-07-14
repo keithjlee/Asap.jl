@@ -86,9 +86,11 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 ### 5c AsapHarmonics ✅ PORTED (branch `asap-v1`)
 - [x] Rename pass complete; first test suite (3D spherical + planar 2D signatures, finite feature vectors)
 
-### 5d DemandTransport2 🔄 IN PROGRESS (branch `asap-v1`; package src only)
-- Package src port + first test suite (agent running); example scripts (highrise/vault) ported interactively later
-- Vault example blocked on the deferred AsapOptim network-optimization path
+### 5d DemandTransport2 ✅ PORTED (branch `asap-v1`; package src) — examples pending
+- [x] Package src ported (generators, ElementDemand, objectives, ResponsiveGeo); first test suite: 108 tests incl. gradient checks (Julia 1.11 — pinned Makie stack)
+- [x] Latent bugs fixed: restore! @lift parsing; Asap/Nonconvex Model export ambiguity
+- [ ] Example scripts (highrise_to_bridge, ot_example) — port interactively with Keith
+- [ ] spaceframe_to_vault — additionally awaits the AsapOptim network-optimization path
 
 ## Deferred / follow-ups
 - FDM network optimization path in AsapOptim (legacy_v0/ reference)
