@@ -102,7 +102,10 @@ Build with [`internal_forces`](@ref); evaluate with [`axial_force`](@ref),
 struct ElementForceState{T}
     L::T
     f0::SVector{6,T}      # local end actions at the start node (on the element)
-    u0::SVector{6,T}      # local displacements/rotations at the start node
+    u0::SVector{6,T}      # MEMBER-side local state at x = 0: start translations,
+                          # nodal twist, and bending rotations from far-end
+                          # compatibility (≠ node rotations at released/semi-rigid
+                          # start ends — see _member_start_u0)
     EA::T
     EIx::T
     EIy::T
@@ -265,6 +268,33 @@ end
 # ── construction ─────────────────────────────────────────────────────────────
 
 """
+    _member_start_u0(s0, u0t, θx0, uLt) -> SVector{6}
+
+Member-side local state at x = 0: start translations `u0t`, nodal twist
+`θx0`, and start bending rotations θy₀/θz₀ derived from FAR-END
+COMPATIBILITY — the transverse elastic curve is fully determined by the
+internal moment field plus the two end translations, which are always
+shared with the nodes (end springs act only on rotations and axial):
+
+    v(L) = v₀ + θz₀·L + ∫₀ᴸ∫₀^ξ Mz/EIx  ⇒  θz₀ = (v_L − v₀ − Dz)/L
+
+For rigid ends this reproduces the nodal rotations exactly. For released
+or semi-rigid ends it includes the hinge/spring rotation jump that the
+NODAL rotations do not carry — using the node rotations directly would
+reconstruct the wrong deflected shape for any member whose start end is
+released (e.g. `:joist`, `:freefixed`) or has finite rotational springs.
+"""
+function _member_start_u0(s0::ElementForceState{T}, u0t::SVector{3,T}, θx0::T,
+    uLt::SVector{3,T}) where {T}
+    L = s0.L
+    Dz = _gauss_integral(ξ -> _gauss_integral(η -> moment_z(s0, η / L) / s0.EIx, s0, ξ), s0, L)
+    Dy = _gauss_integral(ξ -> _gauss_integral(η -> moment_y(s0, η / L) / s0.EIy, s0, ξ), s0, L)
+    θz0 = (uLt[2] - u0t[2] - Dz) / L
+    θy0 = (u0t[3] - uLt[3] - Dy) / L
+    return SVector{6,T}(u0t[1], u0t[2], u0t[3], θx0, θy0, θz0)
+end
+
+"""
     internal_forces(model, el) -> ElementForceState
     internal_forces(model, el::VariableElement) -> Vector{ElementForceState}
 
@@ -282,12 +312,17 @@ function internal_forces(model::Model{T}, el::Union{FrameElement,TrussElement};
     L = Base.length(el)
     Λ = local_frame(el)
     f = element_forces(res, el)
-    u_el = displacement(res, el.nodeStart)
-    u0 = vcat(Λ * SVector{3,T}(u_el[1], u_el[2], u_el[3]),
-        Λ * SVector{3,T}(u_el[4], u_el[5], u_el[6]))
+    u_s = displacement(res, el.nodeStart)
+    u_e = displacement(res, el.nodeEnd)
+    u0t = Λ * SVector{3,T}(u_s[1], u_s[2], u_s[3])
+    θx0 = (Λ * SVector{3,T}(u_s[4], u_s[5], u_s[6]))[1]
+    uLt = Λ * SVector{3,T}(u_e[1], u_e[2], u_e[3])
     sec = el.section
     trace = build_trace(model, el, Λ, L; factors=factors)
-    return ElementForceState{T}(L, SVector{6,T}(f[1:6]), SVector{6,T}(u0),
+    s0 = ElementForceState{T}(L, SVector{6,T}(f[1:6]), zero(SVector{6,T}),
+        EA(sec), EIx(sec), EIy(sec), GJ(sec), trace)
+    return ElementForceState{T}(L, SVector{6,T}(f[1:6]),
+        _member_start_u0(s0, u0t, θx0, uLt),
         EA(sec), EIx(sec), EIy(sec), GJ(sec), trace)
 end
 
@@ -305,11 +340,16 @@ function internal_forces(model::Model{T}, el::VariableElement;
         slots = segment_slots(el, s)
         f = element_forces(res, el, s)
         us = SVector{6,T}(ntuple(i -> u[g[slots[i]]], 6))
-        u0 = vcat(Λ * SVector{3,T}(us[1], us[2], us[3]),
-            Λ * SVector{3,T}(us[4], us[5], us[6]))
+        ue = SVector{3,T}(ntuple(i -> u[g[slots[6+i]]], 3))
+        u0t = Λ * SVector{3,T}(us[1], us[2], us[3])
+        θx0 = (Λ * SVector{3,T}(us[4], us[5], us[6]))[1]
+        uLt = Λ * ue
         sec = el.sections[s]
         trace = build_trace(model, el, Λ, Ls; segment=s, factors=factors)
-        ElementForceState{T}(Ls, SVector{6,T}(f[1:6]), SVector{6,T}(u0),
+        s0 = ElementForceState{T}(Ls, SVector{6,T}(f[1:6]), zero(SVector{6,T}),
+            EA(sec), EIx(sec), EIy(sec), GJ(sec), trace)
+        ElementForceState{T}(Ls, SVector{6,T}(f[1:6]),
+            _member_start_u0(s0, u0t, θx0, uLt),
             EA(sec), EIx(sec), EIy(sec), GJ(sec), trace)
     end
 end

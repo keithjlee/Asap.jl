@@ -163,6 +163,57 @@
         @test N.local_displacements(st2, 0.5)[2] ≈ -5w * L^4 / (384EIx) rtol = 1e-8
     end
 
+    @testset "displacement recovery at RELEASED/semi-rigid start ends" begin
+        #=
+        The member-side start rotation differs from the NODE rotation by the
+        hinge/spring jump — the recovery derives it from far-end
+        compatibility. Regression for the :joist case: node rotations fixed,
+        member internally simply supported.
+        =#
+        w = 3.0
+        EIx = N.EIx(sec)
+
+        # :joist between rotation-restrained nodes = simply supported inside
+        j1 = N.Node([0.0, 0.0, 0.0], :fixed)
+        j2 = N.Node([L, 0.0, 0.0], :fixed)
+        ej = N.FrameElement(j1, j2, sec, N.EndConditions(:joist), :beam; Ψ=0.0)
+        mj = N.Model([j1, j2], N.AbstractElement{Float64}[ej],
+            N.AbstractLoad{Float64}[N.LineLoad(ej, [0.0, -w, 0.0])])
+        N.solve!(mj)
+        stj = N.internal_forces(mj, ej)
+        @test N.local_displacements(stj, 0.5)[2] ≈ -5w * L^4 / (384EIx) rtol = 1e-8
+        # far-end compatibility: recovered curve lands on the end node
+        @test abs(N.local_displacements(stj, 1.0)[2]) < 1e-10
+
+        # :freefixed (hinge at the START): propped cantilever,
+        # midspan v = −wL⁴/192EI
+        p1 = N.Node([0.0, 0.0, 0.0], :fixed)
+        p2 = N.Node([L, 0.0, 0.0], :fixed)
+        ep = N.FrameElement(p1, p2, sec, N.EndConditions(:freefixed), :beam; Ψ=0.0)
+        mp = N.Model([p1, p2], N.AbstractElement{Float64}[ep],
+            N.AbstractLoad{Float64}[N.LineLoad(ep, [0.0, -w, 0.0])])
+        N.solve!(mp)
+        stp = N.internal_forces(mp, ep)
+        @test N.local_displacements(stp, 0.5)[2] ≈ -w * L^4 / (192EIx) rtol = 1e-8
+
+        # semi-rigid springs sweep: deflection decreases monotonically with k
+        # and spans the released → rigid limits
+        function δmid(k)
+            s1 = N.Node([0.0, 0.0, 0.0], :fixed)
+            s2 = N.Node([L, 0.0, 0.0], :fixed)
+            ends = N.EndConditions(N.EndSprings(Inf, Inf, k, k), N.EndSprings(Inf, Inf, k, k))
+            es = N.FrameElement(s1, s2, sec, ends, :beam; Ψ=0.0)
+            ms = N.Model([s1, s2], N.AbstractElement{Float64}[es],
+                N.AbstractLoad{Float64}[N.LineLoad(es, [0.0, -w, 0.0])])
+            N.solve!(ms)
+            abs(N.local_displacements(N.internal_forces(ms, es), 0.5)[2])
+        end
+        δs = δmid.([1e2, 1e4, 1e6, 1e8])
+        @test issorted(δs; rev=true)
+        @test δs[1] < 5w * L^4 / (384EIx) * (1 + 1e-6)
+        @test δs[end] > w * L^4 / (384EIx) * (1 - 1e-6)
+    end
+
     @testset "VariableElement: unified queries + interior continuity" begin
         n1 = N.Node([0.0, 0.0, 0.0], :fixed)
         n2 = N.Node([L, 0.0, 0.0], :free)
