@@ -33,10 +33,16 @@ struct ModelState{T}
     # when provided, batched paths index THIS instead of mapping EA(section)
     # over the section structs — per-element struct-getfield pullbacks are
     # the single most expensive pattern under reverse AD
+    ends::Any                  # optional per-element EndConditions override:
+    # when provided, frame kernels take end springs from HERE instead of the
+    # cache — this is what makes CONNECTION STIFFNESS a differentiable
+    # design variable (semi-rigid joint optimization)
 end
 
 ModelState{T}(X::Matrix, sections::AbstractVector) where {T} =
-    ModelState{T}(X, sections, nothing)
+    ModelState{T}(X, sections, nothing, nothing)
+ModelState{T}(X::Matrix, sections::AbstractVector, EA) where {T} =
+    ModelState{T}(X, sections, EA, nothing)
 
 """
     extract_state(model) -> ModelState
@@ -47,7 +53,7 @@ function extract_state(model::Model{T}) where {T}
     sections = Any[_state_sections(el) for el in model.elements]
     ea = [s isa AbstractVector ? zero(T) : T(EA(s)) for s in sections]   # (super-elements: unused)
     return ModelState{T}(reduce(hcat, (collect(n.position) for n in model.nodes)),
-        sections, ea)
+        sections, ea, nothing)
 end
 
 _state_sections(el::AbstractElement) = el.section
@@ -76,7 +82,8 @@ end
 function _group_entries_all(g::ElementGroup, state::ModelState)
     reduce(vcat, map(eachindex(g.elements)) do e
         _group_entries(g, e, state.sections[g.model_indices[e]],
-            _position(state.X, g.i1[e]), _position(state.X, g.i2[e]))
+            _position(state.X, g.i1[e]), _position(state.X, g.i2[e]),
+            state.ends === nothing ? nothing : state.ends[g.model_indices[e]])
     end)
 end
 
@@ -110,16 +117,17 @@ end
 # data — no mutable struct reads inside the differentiated closure. Full
 # frames skip slicing entirely, avoiding the expensive generic getindex
 # pullback on SMatrix under Zygote.
-_group_entries(::ElementGroup{<:TrussElement}, e::Int, section, x1, x2) =
+_group_entries(::ElementGroup{<:TrussElement}, e::Int, section, x1, x2, ends) =
     vec(truss_stiffness(section, x1, x2))
 
-function _group_entries(g::ElementGroup{<:FrameElement}, e::Int, section, x1, x2)
-    Ke = frame_stiffness(section, g.endss[e]::EndConditions, x1, x2, g.Ψs[e])
+function _group_entries(g::ElementGroup{<:FrameElement}, e::Int, section, x1, x2, ends)
+    ec = ends === nothing ? g.endss[e]::EndConditions : ends
+    Ke = frame_stiffness(section, ec, x1, x2, g.Ψs[e])
     slots = g.slots[e]
     return Base.length(slots) == 12 ? vec(Ke) : vec(Ke[slots, slots])
 end
 
-function _group_entries(g::ElementGroup{<:VariableElement}, e::Int, sections, x1, x2)
+function _group_entries(g::ElementGroup{<:VariableElement}, e::Int, sections, x1, x2, ends)
     Ke = stiffness(g.elements[e], sections, x1, x2)   # super-elements keep the struct path
     return vec(Ke[g.slots[e], g.slots[e]])
 end

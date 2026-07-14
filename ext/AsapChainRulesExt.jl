@@ -81,6 +81,27 @@ function ChainRulesCore.rrule(::Type{<:Asap.Material}, E::Real, G::Real, ρ::Rea
     return m, Material_pullback
 end
 
+# constructor rules for the end-condition types (custom inner constructors
+# with promotion/assertions block Zygote's automatic struct adjoint) —
+# needed when connection stiffness is a design variable
+function ChainRulesCore.rrule(::Type{<:Asap.EndSprings}, kx::Real, kt::Real, ky::Real, kz::Real)
+    e = Asap.EndSprings(kx, kt, ky, kz)
+    function EndSprings_pullback(Δ)
+        Δe = unthunk(Δ)
+        return (NoTangent(), Δe.kx, Δe.kt, Δe.ky, Δe.kz)
+    end
+    return e, EndSprings_pullback
+end
+
+function ChainRulesCore.rrule(::Type{<:Asap.EndConditions}, e1::Asap.EndSprings, e2::Asap.EndSprings)
+    ec = Asap.EndConditions(e1, e2)
+    function EndConditions_pullback(Δ)
+        Δc = unthunk(Δ)
+        return (NoTangent(), Δc.e1, Δc.e2)
+    end
+    return ec, EndConditions_pullback
+end
+
 # PERFORMANCE rule (correctness needs nothing here — Zygote traverses the
 # kernel natively, verified by tests — but the analytic pullback is ~50×
 # cheaper and truss kernels dominate large sizing problems):
