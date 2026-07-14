@@ -95,13 +95,13 @@ _flatten3(Δ::ChainRulesCore.Tangent) = _flatten3(ChainRulesCore.backing(Δ))
 _flatten3(Δ::NamedTuple) = _flatten3(first(values(Δ)))
 
 function ChainRulesCore.rrule(::typeof(HOST.solve_free),
-    K::SparseMatrixCSC, F::AbstractVector)
+    K::SparseMatrixCSC, F::AbstractVecOrMat)
 
     fact = HOST._factorize(K)
     u = fact \ F
 
     function solve_free_pullback(Δu)
-        λ = fact \ unthunk(Δu)          # K symmetric: Kᵀ = K, reuse the factorization
+        λ = fact \ collect(unthunk(Δu))  # K symmetric: Kᵀ = K, reuse the factorization
         ΔK = @thunk(-λ * u')
         return (NoTangent(), ΔK, λ)
     end

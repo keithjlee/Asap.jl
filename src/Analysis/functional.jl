@@ -100,6 +100,7 @@ Solve the reduced linear system. The AD extension supplies the adjoint
 adjoint method).
 """
 solve_free(K::SparseMatrixCSC, F::AbstractVector) = _factorize(K) \ F
+solve_free(K::SparseMatrixCSC, F::AbstractMatrix) = _factorize(K) \ F   # multi-RHS
 
 """
     solve(model, state; loads = :cached) -> Vector
