@@ -74,7 +74,8 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] `solve_structure`/`axial_force`/`axial_stress`/`compliance`/`GeometricProperties`/`updatemodel`
 - [x] First-ever AsapOptim test suite: 28 tests, gradcheck vs FiniteDifferences, design-eval ≡ direct solve
 - [x] Legacy preserved unloaded in `legacy_v0/`
-- [ ] Deferred: FDM network optimization path; SectionVariable (RigiditySection parameterization is the v1.0 idiom)
+- [x] FDM network optimization path (QVariable/NetworkOptParams/solve_network — forward parity 1e-10, gradcheck green; 32 AsapOptim tests)
+- [ ] Deferred: SectionVariable (RigiditySection parameterization is the v1.0 idiom)
 
 ### 5b AsapToolkit ✅ PORTED (branch `asap-v1`) — visual verification pending
 - [x] ForceAnalysis/ deleted (absorbed into core); generators/Geometry/IO/SteelSections/FDM-translations ported
@@ -90,10 +91,9 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [x] Package src ported (generators, ElementDemand, objectives, ResponsiveGeo); first test suite: 108 tests incl. gradient checks (Julia 1.11 — pinned Makie stack)
 - [x] Latent bugs fixed: restore! @lift parsing; Asap/Nonconvex Model export ambiguity
 - [ ] Example scripts (highrise_to_bridge, ot_example) — port interactively with Keith
-- [ ] spaceframe_to_vault — additionally awaits the AsapOptim network-optimization path
+- [ ] spaceframe_to_vault — network path now available; script port is interactive work
 
 ## Deferred / follow-ups
-- FDM network optimization path in AsapOptim (legacy_v0/ reference)
 - SectionVariable → RigiditySection parameterization idiom
 - FDM subsystem parametrization in core
 - Geometric nonlinearity (`geometric_stiffness` hook ready), dynamics (`mass` hook ready)
