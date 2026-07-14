@@ -93,9 +93,16 @@ Order is bottom-up; each layer validated against Phase 0 oracles before the next
 - [ ] Example scripts (highrise_to_bridge, ot_example) — port interactively with Keith
 - [ ] spaceframe_to_vault — network path now available; script port is interactive work
 
+## AD verification & benchmarks (2026-07-13)
+- [x] Cross-stack verification on the publication S4.2 spaceframe: new-stack gradients ≡ legacy publication stack (compliance 3.6e-13, volume bit-identical); displacements ≡ publication at 1.1e-13
+- [x] Performance: solve 1.2× faster, assembly 1.5× faster, differentiable forward 2× faster; ∇compliance 2.8 ms (within 2× of the fully hand-differentiated legacy layer, fully generic); full report + reproducible scripts in `AsapOptim/docs/`
+- [x] Differentiable-path optimization: batched truss assembly, plain-data mirrors, analytic truss_stiffness rule (6631 ms → 2.8 ms)
+- [x] README rewritten in depth with a TESTED example per feature (`test/readme_examples.jl`)
+
 ## Deferred / follow-ups
 - SectionVariable → RigiditySection parameterization idiom
 - FDM subsystem parametrization in core
 - Geometric nonlinearity (`geometric_stiffness` hook ready), dynamics (`mass` hook ready)
 - Enzyme/Mooncake/DifferentiationInterface matrix on the pure path
+- Batch _element_lengths / frame-group assembly for further gradient speed (notes in AsapOptim/docs/AD_VERIFICATION_AND_BENCHMARKS.md)
 - Docs build (Documenter.jl) from the extensive docstrings
