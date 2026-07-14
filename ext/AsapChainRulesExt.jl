@@ -35,15 +35,28 @@ function ChainRulesCore.rrule(::typeof(HOST.sparse_from_pattern),
     rows = rowvals(pattern)
 
     function sparse_from_pattern_pullback(ΔK)
-        ΔKd = unthunk(ΔK)
-        Δnz = similar(nzval)
-        @inbounds for j in 1:size(pattern, 2), p in nzrange(pattern, j)
-            Δnz[p] = ΔKd[rows[p], j]
-        end
-        return (NoTangent(), NoTangent(), Δnz)
+        return (NoTangent(), NoTangent(), _pattern_values(unthunk(ΔK), pattern, rows))
     end
 
     return K, sparse_from_pattern_pullback
+end
+
+# extract the pattern-entry cotangents from whichever representation the AD
+# engine hands back: a dense/sparse matrix, or a structural Tangent of the
+# SparseMatrixCSC (Mooncake's ChainRules bridge) whose nzval matches the
+# frozen pattern by construction
+function _pattern_values(Δ::AbstractMatrix, pattern::SparseMatrixCSC, rows)
+    Δnz = Vector{eltype(pattern)}(undef, nnz(pattern))
+    @inbounds for j in 1:size(pattern, 2), p in nzrange(pattern, j)
+        Δnz[p] = Δ[rows[p], j]
+    end
+    return Δnz
+end
+function _pattern_values(Δ::ChainRulesCore.Tangent, pattern::SparseMatrixCSC, rows)
+    nz = Δ.nzval
+    nz isa ChainRulesCore.AbstractZero && return zeros(eltype(pattern), nnz(pattern))
+    @assert length(nz) == nnz(pattern) "structural sparse cotangent pattern mismatch"
+    return collect(nz)
 end
 
 # constructor rules: Section/Material have custom inner constructors
@@ -143,13 +156,30 @@ function ChainRulesCore.rrule(::typeof(HOST.solve_free),
     fact = HOST._factorize(K)
     u = fact \ F
 
+    # The K-cotangent is returned PROJECTED onto K's sparsity pattern (the
+    # nonzero entries of −λuᵀ that K actually stores). In Asap's pipeline K
+    # always comes from sparse_from_pattern, whose pullback reads exactly
+    # those entries — so this loses nothing, avoids materializing the dense
+    # n×n outer product, and keeps the cotangent structurally compatible
+    # with sparse-tangent AD engines (Mooncake).
     function solve_free_pullback(Δu)
         λ = fact \ collect(unthunk(Δu))  # K symmetric: Kᵀ = K, reuse the factorization
-        ΔK = @thunk(-λ * u')
+        ΔK = @thunk begin
+            rows = rowvals(K)
+            vals = Vector{eltype(K)}(undef, nnz(K))
+            @inbounds for j in 1:size(K, 2), p in nzrange(K, j)
+                vals[p] = -_rowdot(λ, u, rows[p], j)
+            end
+            SparseMatrixCSC(size(K, 1), size(K, 2), copy(K.colptr), copy(K.rowval), vals)
+        end
         return (NoTangent(), ΔK, λ)
     end
 
     return u, solve_free_pullback
 end
+
+@inline _rowdot(λ::AbstractVector, u::AbstractVector, i::Int, j::Int) = λ[i] * u[j]
+@inline _rowdot(λ::AbstractMatrix, u::AbstractMatrix, i::Int, j::Int) =
+    dot(view(λ, i, :), view(u, j, :))
 
 end # module
