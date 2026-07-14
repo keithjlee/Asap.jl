@@ -1,6 +1,6 @@
 name = "Asap"
 uuid = "763a8c06-ba23-41fc-b385-b3b57b52403a"
-version = "1.0.0-DEV"
+version = "1.0.0"
 authors = ["Keith JL"]
 
 [deps]
