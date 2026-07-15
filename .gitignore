@@ -17,3 +17,9 @@ scratch.jl
 # Claude Code personal settings
 .claude/settings.local.json
 .DS_Store
+
+# personal working docs — local only
+CLAUDE.md
+PROGRESS.md
+docs/MIGRATION_v1.md
+docs/MODERNIZATION.md

@@ -315,9 +315,7 @@ ed.basepositions .+ 100 .* ed.uglobal   # 3×20 displaced curve, scaled ×100
 
 # Documentation map
 
-- `docs/MODERNIZATION.md` — architecture and roadmap of the v1.0 core
-- `docs/MIGRATION_v1.md` — complete v0.2.x → v1.0 API mapping
-- `PROGRESS.md` — build-out record
+- `docs/releases/` — release notes, including the v0.2.x → v1.0 breaking-change summary
 - Every exported function and type carries a full docstring (`?Section`, `?dof_signature`, …), and every type has an engineer-readable REPL display.
 
 # Verification
