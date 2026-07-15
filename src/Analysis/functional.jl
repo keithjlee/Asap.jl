@@ -122,7 +122,7 @@ _group_entries(::ElementGroup{<:TrussElement}, e::Int, section, x1, x2, ends) =
 
 function _group_entries(g::ElementGroup{<:FrameElement}, e::Int, section, x1, x2, ends)
     ec = ends === nothing ? g.endss[e]::EndConditions : ends
-    Ke = frame_stiffness(section, ec, x1, x2, g.Ψs[e])
+    Ke = frame_stiffness(section, ec, x1, x2, g.rollangles[e])
     slots = g.slots[e]
     return Base.length(slots) == 12 ? vec(Ke) : vec(Ke[slots, slots])
 end

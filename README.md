@@ -74,6 +74,8 @@ bar    = Section(steel, 5e-3)                     # axial-only: for truss member
 EA(wshape), EIx(wshape)                           # derived rigidity products
 ```
 
+Mismatches are caught early: assigning an axial-only section to a frame element that has moment connections raises a descriptive error at `process!` time, instead of a singular factorization (or a member that silently carries no bending).
+
 **`RigiditySection`** — stores the rigidity *products* directly. This is the natural type for cracked/effective concrete stiffness: linear analysis only ever consumes `EA`, `EIx`, `EIy`, `GJ`, so an equivalent-stiffness section loses nothing.
 
 ```julia
@@ -104,11 +106,11 @@ Rotational DOFs that nothing stiffens — a node connected only to truss members
 
 ## Frame elements
 
-3D Euler-Bernoulli beam-columns carrying axial force, biaxial bending, shear, and torsion. `Ψ` is the section roll angle about the member axis (default `π/2`).
+3D Euler-Bernoulli beam-columns carrying axial force, biaxial bending, shear, and torsion. `rollangle` is the section roll angle about the member axis (default `π/2`).
 
 ```julia
 girder = FrameElement(n1, n2, wshape, :girder)
-rolled = FrameElement(n1, n2, wshape; Ψ = 0.0)
+rolled = FrameElement(n1, n2, wshape; rollangle = 0.0)
 ```
 
 ### End releases and semi-rigid connections

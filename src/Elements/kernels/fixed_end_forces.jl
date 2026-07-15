@@ -67,23 +67,23 @@ end
     coords === :local ? direction : Λ * direction
 
 """
-    fixed_end_forces(load, section, ends, x1, x2, Ψ) -> SVector{12}
+    fixed_end_forces(load, section, ends, x1, x2, rollangle) -> SVector{12}
 
 Clamped-clamped fixed-end force vector in element LOCAL coordinates for an
 element load. THE extension point for new element load types: implement
 exactly this method; condensation for releases/semi-rigid ends and rotation
 to global coordinates are applied generically by the load assembler.
 
-`section`, `x1`, `x2`, `Ψ` describe the element (positions passed explicitly
+`section`, `x1`, `x2`, `rollangle` describe the element (positions passed explicitly
 so the pure AD path can differentiate through geometry); `ends` is accepted
 for interface uniformity but the returned vector is always the CLAMPED one.
 """
 function fixed_end_forces(load::DistributedLoad{T}, section::AbstractSection,
     ends::EndConditions, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real},
-    Ψ::Real) where {T}
+    rollangle::Real) where {T}
 
     L = element_length(x1, x2)
-    Λ = local_frame(x1, x2, Ψ)
+    Λ = local_frame(x1, x2, rollangle)
     d = _local_direction(load.direction, load.coords, Λ)
 
     TQ = promote_type(T, eltype(L))
@@ -108,10 +108,10 @@ end
 
 function fixed_end_forces(load::PointLoad{T}, section::AbstractSection,
     ends::EndConditions, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real},
-    Ψ::Real) where {T}
+    rollangle::Real) where {T}
 
     L = element_length(x1, x2)
-    Λ = local_frame(x1, x2, Ψ)
+    Λ = local_frame(x1, x2, rollangle)
     p = load.coords === :local ? load.value : Λ * load.value
 
     TQ = promote_type(T, eltype(L))
@@ -141,10 +141,10 @@ end
 
 function fixed_end_forces(load::PointMoment{T}, section::AbstractSection,
     ends::EndConditions, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real},
-    Ψ::Real) where {T}
+    rollangle::Real) where {T}
 
     L = element_length(x1, x2)
-    Λ = local_frame(x1, x2, Ψ)
+    Λ = local_frame(x1, x2, rollangle)
     m = load.coords === :local ? load.value : Λ * load.value
     x = load.position * L
 
@@ -173,14 +173,14 @@ end
 
 function fixed_end_forces(load::SelfWeight{T}, section::AbstractSection,
     ends::EndConditions, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real},
-    Ψ::Real) where {T}
+    rollangle::Real) where {T}
 
     gmag = norm(load.g)
     iszero(gmag) && return zero(SVector{12,T})
     w = ρA(section) * gmag * load.factor
     lowered = DistributedLoad(load.element, T[0, 1], [w, w], load.g ./ gmag;
         coords=:global, id=load.id, case=load.case)
-    return fixed_end_forces(lowered, section, ends, x1, x2, Ψ)
+    return fixed_end_forces(lowered, section, ends, x1, x2, rollangle)
 end
 
 # mutable 12-vector scratch, mirroring _mutable12

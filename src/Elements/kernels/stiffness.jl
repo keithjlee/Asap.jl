@@ -187,7 +187,7 @@ function truss_stiffness(section::AbstractSection, x1::AbstractVector{<:Real}, x
 end
 
 """
-    frame_stiffness(section, ends, x1, x2, Ψ) -> SMatrix{12,12}
+    frame_stiffness(section, ends, x1, x2, rollangle) -> SMatrix{12,12}
 
 GLOBAL-coordinate stiffness of a 3D frame element: the local
 [`local_stiffness`](@ref) rotated through [`local_frame`](@ref) via
@@ -195,8 +195,8 @@ GLOBAL-coordinate stiffness of a 3D frame element: the local
 the single kernel shared by the in-place and AD assembly paths.
 """
 function frame_stiffness(section::AbstractSection, ends::EndConditions,
-    x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, Ψ::Real)
+    x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
     L = element_length(x1, x2)
-    Λ = local_frame(x1, x2, Ψ)
+    Λ = local_frame(x1, x2, rollangle)
     return transform_to_global(local_stiffness(section, L, ends), Λ)
 end

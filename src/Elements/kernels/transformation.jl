@@ -6,21 +6,21 @@ code serves the in-place fast path, the pure AD path, and any scalar type.
 =#
 
 """
-    local_frame(x1, x2, Ψ; tol = 1e-6) -> SMatrix{3,3}
+    local_frame(x1, x2, rollangle; tol = 1e-6) -> SMatrix{3,3}
 
 Rotation matrix `Λ` from global to element-local coordinates for a line
-element from position `x1` to `x2` with roll angle `Ψ`.
+element from position `x1` to `x2` with roll angle `rollangle`.
 
 The rows of `Λ` are the element's local unit axes expressed in global
 coordinates:
 
 - row 1: local x — along the element, from start to end
-- row 2: local y — a transverse axis; with `Ψ = π/2` (the constructor
+- row 2: local y — a transverse axis; with `rollangle = π/2` (the constructor
   default) it aligns with "strong-axis bending carries vertical load" for
   typical members
 - row 3: local z — completes the right-handed triad
 
-`Ψ` [rad] rotates the local y–z pair about the element axis — the "roll" of
+`rollangle` [rad] rotates the local y–z pair about the element axis — the "roll" of
 the section. `tol` triggers the special-case frame for members parallel to
 the global Y axis, where the general formula degenerates (its denominator
 `√(CXx² + CZx²)` → 0).
@@ -29,29 +29,29 @@ The math reproduces the legacy `R!` exactly (same branch tolerance, same
 special case), so transformation matrices match the pinned characterization
 oracles to machine precision.
 """
-function local_frame(x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, Ψ::Real; tol::Real=1e-6)
+function local_frame(x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real; tol::Real=1e-6)
     v = SVector{3}(x2) - SVector{3}(x1)
     x = v / norm(v)
     CXx, CYx, CZx = x
 
-    cΨ = cos(Ψ)
-    sΨ = sin(Ψ)
+    cosroll = cos(rollangle)
+    sinroll = sin(rollangle)
 
     # cross(x, globalY) = (−CZx, 0, CXx); small norm ⇒ member parallel to global Y
     if sqrt(CZx^2 + CXx^2) < tol
         return SMatrix{3,3}(
-            0.0, -CYx * cΨ, CYx * sΨ,   # column 1
+            0.0, -CYx * cosroll, CYx * sinroll,   # column 1
             CYx, 0.0, 0.0,               # column 2
-            0.0, sΨ, cΨ,                 # column 3
+            0.0, sinroll, cosroll,                 # column 3
         )
     else
         d = sqrt(CXx^2 + CZx^2)
-        b1 = (-CXx * CYx * cΨ - CZx * sΨ) / d
-        b2 = d * cΨ
-        b3 = (-CYx * CZx * cΨ + CXx * sΨ) / d
-        c1 = (CXx * CYx * sΨ - CZx * cΨ) / d
-        c2 = -d * sΨ
-        c3 = (CYx * CZx * sΨ + CXx * cΨ) / d
+        b1 = (-CXx * CYx * cosroll - CZx * sinroll) / d
+        b2 = d * cosroll
+        b3 = (-CYx * CZx * cosroll + CXx * sinroll) / d
+        c1 = (CXx * CYx * sinroll - CZx * cosroll) / d
+        c2 = -d * sinroll
+        c3 = (CYx * CZx * sinroll + CXx * cosroll) / d
 
         return SMatrix{3,3}(
             CXx, b1, c1,   # column 1

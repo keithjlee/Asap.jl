@@ -105,7 +105,7 @@ Base.findall(els::Vector{<:AbstractElement}, id::Symbol) = [i for (i, e) in enum
     planarize!(model, plane = :XY)
 
 Constrain the model to 2D behavior: planarize all nodes (fix out-of-plane
-DOFs) and, for the `:XY` plane, zero every frame element's roll angle `Ψ`
+DOFs) and, for the `:XY` plane, zero every frame element's roll angle `rollangle`
 so local bending axes align with the working plane (legacy behavior,
 preserved).
 """
@@ -113,7 +113,7 @@ function planarize!(model::Model, plane::Symbol=:XY)
     planarize!(model.nodes, plane)
     if plane == :XY
         for el in model.elements
-            el isa FrameElement && (el.Ψ = zero(el.Ψ))
+            el isa FrameElement && (el.rollangle = zero(el.rollangle))
         end
     end
     return model

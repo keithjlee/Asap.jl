@@ -15,10 +15,10 @@
     sec = N.Section(mat, 1e4, 8e7, 3e7, 5e6)
     L = 4000.0
 
-    function cantilever(loads_of; Ψ=0.0)
+    function cantilever(loads_of; rollangle=0.0)
         n1 = N.Node([0.0, 0.0, 0.0], :fixed)
         n2 = N.Node([L, 0.0, 0.0], :free)
-        el = N.FrameElement(n1, n2, sec; Ψ=Ψ)
+        el = N.FrameElement(n1, n2, sec; rollangle=rollangle)
         model = N.Model([n1, n2], N.AbstractElement{Float64}[el], loads_of(el, n2))
         N.solve!(model)
         return model, el
@@ -52,7 +52,7 @@
         w = 3.0
         n1 = N.Node([0.0, 0.0, 0.0], :pinned)
         n2 = N.Node([L, 0.0, 0.0], [true, false, false, true, true, true])
-        el = N.FrameElement(n1, n2, sec; Ψ=0.0)
+        el = N.FrameElement(n1, n2, sec; rollangle=0.0)
         model = N.Model([n1, n2], N.AbstractElement{Float64}[el],
             N.AbstractLoad{Float64}[N.LineLoad(el, [0.0, -w, 0.0])])
         N.planarize!(model)
@@ -154,7 +154,7 @@
         w = 3.0
         n1 = N.Node([0.0, 0.0, 0.0], :pinned)
         n2 = N.Node([L, 0.0, 0.0], [true, false, false, true, true, true])
-        e2 = N.FrameElement(n1, n2, sec; Ψ=0.0)
+        e2 = N.FrameElement(n1, n2, sec; rollangle=0.0)
         m2 = N.Model([n1, n2], N.AbstractElement{Float64}[e2],
             N.AbstractLoad{Float64}[N.LineLoad(e2, [0.0, -w, 0.0])])
         N.planarize!(m2)
@@ -176,7 +176,7 @@
         # :joist between rotation-restrained nodes = simply supported inside
         j1 = N.Node([0.0, 0.0, 0.0], :fixed)
         j2 = N.Node([L, 0.0, 0.0], :fixed)
-        ej = N.FrameElement(j1, j2, sec, N.EndConditions(:joist), :beam; Ψ=0.0)
+        ej = N.FrameElement(j1, j2, sec, N.EndConditions(:joist), :beam; rollangle=0.0)
         mj = N.Model([j1, j2], N.AbstractElement{Float64}[ej],
             N.AbstractLoad{Float64}[N.LineLoad(ej, [0.0, -w, 0.0])])
         N.solve!(mj)
@@ -189,7 +189,7 @@
         # midspan v = −wL⁴/192EI
         p1 = N.Node([0.0, 0.0, 0.0], :fixed)
         p2 = N.Node([L, 0.0, 0.0], :fixed)
-        ep = N.FrameElement(p1, p2, sec, N.EndConditions(:freefixed), :beam; Ψ=0.0)
+        ep = N.FrameElement(p1, p2, sec, N.EndConditions(:freefixed), :beam; rollangle=0.0)
         mp = N.Model([p1, p2], N.AbstractElement{Float64}[ep],
             N.AbstractLoad{Float64}[N.LineLoad(ep, [0.0, -w, 0.0])])
         N.solve!(mp)
@@ -202,7 +202,7 @@
             s1 = N.Node([0.0, 0.0, 0.0], :fixed)
             s2 = N.Node([L, 0.0, 0.0], :fixed)
             ends = N.EndConditions(N.EndSprings(Inf, Inf, k, k), N.EndSprings(Inf, Inf, k, k))
-            es = N.FrameElement(s1, s2, sec, ends, :beam; Ψ=0.0)
+            es = N.FrameElement(s1, s2, sec, ends, :beam; rollangle=0.0)
             ms = N.Model([s1, s2], N.AbstractElement{Float64}[es],
                 N.AbstractLoad{Float64}[N.LineLoad(es, [0.0, -w, 0.0])])
             N.solve!(ms)
@@ -218,7 +218,7 @@
         n1 = N.Node([0.0, 0.0, 0.0], :fixed)
         n2 = N.Node([L, 0.0, 0.0], :free)
         big = N.Section(mat, 2e4, 4e8, 1e8, 2e7)
-        vel = N.VariableElement(n1, n2, N.AbstractSection{Float64}[big, sec], [0.4]; Ψ=0.0)
+        vel = N.VariableElement(n1, n2, N.AbstractSection{Float64}[big, sec], [0.4]; rollangle=0.0)
         model = N.Model([n1, n2], N.AbstractElement{Float64}[vel],
             N.AbstractLoad{Float64}[
                 N.LineLoad(vel, [0.0, -2.0, 0.0]),

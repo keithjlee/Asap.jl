@@ -93,9 +93,9 @@ Generate a 3D frame model.
 - `primaryRelease::Symbol = :fixedfixed` DOF end release for primary elements
 - `joistRelease::Symbol = :joist` DOF end release for joist elements
 - `braceRelease::Symbol = :freefree` DOF end release for braces
-- `columnPsi::Real = 0` Angle of roll Ψ for column LCS
-- `primaryPsi::Real = π/2` Angle of roll Ψ for primary beam LCS
-- `joistPsi::Real = π/2` Angle of roll Ψ for secondary beam LCS
+- `columnPsi::Real = 0` Roll angle for column LCS
+- `primaryPsi::Real = π/2` Roll angle for primary beam LCS
+- `joistPsi::Real = π/2` Roll angle for secondary beam LCS
 - `base::Vector{Real} = [0, 0, 0]` base point for frame grid generation
 """
 function Frame(nx::Integer,
@@ -149,7 +149,7 @@ function Frame(nx::Integer,
         for j in 1:ny+1
             for k in 1:nz
                 el = FrameElement(nodes[i,j,k], nodes[i,j,k+1], columnSection; release = columnRelease)
-                el.Ψ = columnPsi
+                el.rollangle = columnPsi
                 el.id = :column
                 push!(columns, el)
             end
@@ -190,7 +190,7 @@ function Frame(nx::Integer,
                 #primary segments
                 chain = [nstart; interiors; nend]
                 for s = 1:nsegments
-                    el = FrameElement(chain[s], chain[s+1], primarySection, segmentreleases[s], :primary; Ψ = primaryPsi)
+                    el = FrameElement(chain[s], chain[s+1], primarySection, segmentreleases[s], :primary; rollangle = primaryPsi)
                     push!(primaries, el)
                 end
             end
@@ -210,7 +210,7 @@ function Frame(nx::Integer,
                 for f in eachindex(joistfractions)
                     bridge = FrameElement(joistnodes[i,j,k][f], joistnodes[i+1,j,k][f], joistSection; release = joistRelease)
                     bridge.id = :joist
-                    bridge.Ψ = joistPsi
+                    bridge.rollangle = joistPsi
                     push!(secondaries, bridge)
                 end
             end
@@ -223,7 +223,7 @@ function Frame(nx::Integer,
             for k in 2:nz+1
                 bridge = FrameElement(nodes[i,j,k], nodes[i,j+1,k], joistSection; release = joistRelease)
                 bridge.id = :joist
-                bridge.Ψ = joistPsi
+                bridge.rollangle = joistPsi
                 push!(secondaries, bridge)
             end
         end

@@ -146,7 +146,7 @@
         n1 = N.Node([0.0, 0.0, 0.0], :fixed)
         n2 = N.Node([L, 0.0, 0.0], :pinned)
         vel = N.VariableElement(n1, n2, N.AbstractSection{Float64}[secbig, sec], [0.5];
-            release=:fixedfree, Ψ=0.0)
+            release=:fixedfree, rollangle=0.0)
         model = N.Model([n1, n2], N.AbstractElement{Float64}[vel],
             N.AbstractLoad{Float64}[N.LineLoad(vel, [0.0, -2.0, 0.0])])
         N.solve!(model)

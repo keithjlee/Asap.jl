@@ -30,7 +30,12 @@ Topology:
 Physics (pure kernels of positions and properties — shared by the in-place
 and AD assembly paths):
 - `stiffness(el, x1, x2)` — element stiffness in GLOBAL coordinates as an
-  `SMatrix{n,n}`, `n = ndofs(el)`, with positions passed explicitly
+  `SMatrix{n,n}`, `n = ndofs(el)`. `x1`, `x2` are the global position
+  vectors of the element's endpoints — for everyday use,
+  `stiffness(el, el.nodeStart.position, el.nodeEnd.position)`. Positions
+  are explicit arguments (rather than read from the nodes) so the kernel is
+  a pure function: in the differentiable path they come from `ModelState.X`
+  and gradients flow through the same implementation.
 
 Future hooks (declared now so dynamics/nonlinearity reuse the assembly
 machinery; implementations arrive with those analyses):

@@ -13,7 +13,7 @@
         @test N.nodes(el) === (n1, n2)
         @test N.ndofs(el) == 12
         @test N.n_internal_dofs(el) == 0
-        @test el.Ψ ≈ pi / 2                    # legacy default
+        @test el.rollangle ≈ pi / 2                    # legacy default
         @test N.release_symbol(el.ends) == :fixedfixed
         @test Base.length(el) ≈ FIXTURES["fef_fixedfixed/length"]
 

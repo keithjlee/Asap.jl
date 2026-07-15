@@ -38,7 +38,7 @@ end
     L = 4000.0
     n1 = N.Node([0.0, 0.0, 0.0], :fixed)
     n2 = N.Node([L, 0.0, 0.0], :fixed)
-    el = N.FrameElement(n1, n2, sec; Ψ=0.0)   # local y = global Y
+    el = N.FrameElement(n1, n2, sec; rollangle=0.0)   # local y = global Y
     ends = N.EndConditions(:fixedfixed)
     x1, x2 = n1.position, n2.position
 
@@ -64,7 +64,7 @@ end
         d = normalize([0.3, -0.8, 0.5])
         for (t1, t2, w1, w2) in cases
             q = fef(N.TrapezoidLoad(el, t1, t2, w1, w2, d))
-            # direction is global; Ψ=0 element along X ⇒ local ≡ global here
+            # direction is global; rollangle=0 element along X ⇒ local ≡ global here
             @test Vector(q) ≈ exact_trapezoid_fef(t1, t2, w1, w2, d, L) rtol = 1e-11
         end
     end
@@ -95,7 +95,7 @@ end
         # symmetry instead — the two end moment reactions equal M0/4
         nn1 = N.Node([0.0, 0.0, 0.0], :fixed)
         nn2 = N.Node([L, 0.0, 0.0], :fixed)
-        e = N.FrameElement(nn1, nn2, sec; Ψ=0.0)
+        e = N.FrameElement(nn1, nn2, sec; rollangle=0.0)
         M0 = 1000.0
         model = N.Model([nn1, nn2], N.AbstractElement{Float64}[e],
             N.AbstractLoad{Float64}[N.PointMoment(e, 0.5, [0.0, 0.0, M0])])
@@ -118,11 +118,11 @@ end
     @testset "TrapezoidLoad + PointMoment on a VariableElement" begin
         v1 = N.Node([0.0, 0.0, 0.0], :fixed)
         v2 = N.Node([L, 0.0, 0.0], :free)
-        vel = N.VariableElement(v1, v2, N.AbstractSection{Float64}[sec, sec], [0.5]; Ψ=0.0)
+        vel = N.VariableElement(v1, v2, N.AbstractSection{Float64}[sec, sec], [0.5]; rollangle=0.0)
         # equivalent prismatic model
         p1 = N.Node([0.0, 0.0, 0.0], :fixed)
         p2 = N.Node([L, 0.0, 0.0], :free)
-        pel = N.FrameElement(p1, p2, sec; Ψ=0.0)
+        pel = N.FrameElement(p1, p2, sec; rollangle=0.0)
 
         for (mkv, mkp) in [
             (N.TrapezoidLoad(vel, 0.2, 0.8, 1.0, 3.0, [0.0, -1.0, 0.0]),

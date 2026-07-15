@@ -91,7 +91,7 @@ function serialize_model(model)
             d["section"] = [s.A, s.E, s.ρ]
         else
             d["section"] = [s.A, s.E, s.G, s.Ix, s.Iy, s.J, s.ρ]
-            d["psi"] = e.Ψ
+            d["psi"] = e.rollangle
             d["release"] = release_string(e)
         end
         d

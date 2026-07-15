@@ -11,7 +11,7 @@ Two families:
   equivalent (fixed-end) nodal forces during load assembly
 
 The single extension point for new element load types is
-[`fixed_end_forces`](@ref)`(load, section, ends, x1, x2, Ψ)` returning the
+[`fixed_end_forces`](@ref)`(load, section, ends, x1, x2, rollangle)` returning the
 clamped-clamped local 12-vector — end-condition condensation and rotation to
 global coordinates are applied generically afterwards.
 """

@@ -33,7 +33,7 @@ function rebuild_publication_model(def::Dict)
             mat = Material(s[2], s[3], s[7], 0.3)          # E, G, ρ
             sec = Section(mat, s[1], s[4], s[5], s[6])     # A, Ix, Iy, J
             el = FrameElement(nodes[e["i"]], nodes[e["j"]], sec;
-                release=Symbol(e["release"]), Ψ=e["psi"])
+                release=Symbol(e["release"]), rollangle=e["psi"])
             el
         end
     end

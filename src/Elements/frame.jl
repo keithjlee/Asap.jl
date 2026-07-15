@@ -21,7 +21,7 @@ global system.
   section swaps in design iteration don't rebuild the element
 - `ends::EndConditions{T}`: connection stiffnesses at both ends, in local
   coordinates
-- `Ψ::T`: roll angle [rad] — rotation of the section about the element axis.
+- `rollangle::T`: roll angle [rad] — rotation of the section about the element axis.
   Default `π/2` (legacy convention: local strong axis resists vertical load
   for typical horizontal members)
 - `id::Symbol`: user tag for group queries
@@ -29,8 +29,8 @@ global system.
 
 # Constructors
     FrameElement(nodeStart, nodeEnd, section, id = :element;
-                 release = :fixedfixed, Ψ = π/2)
-    FrameElement(nodeStart, nodeEnd, section, ends::EndConditions, id; Ψ = π/2)
+                 release = :fixedfixed, rollangle = π/2)
+    FrameElement(nodeStart, nodeEnd, section, ends::EndConditions, id; rollangle = π/2)
 
 # Examples
 ```julia-repl
@@ -47,21 +47,21 @@ mutable struct FrameElement{T,S<:AbstractSection{T}} <: AbstractElement{T}
     nodeEnd::Node{T}
     section::S
     ends::EndConditions{T}
-    Ψ::T
+    rollangle::T
     id::Symbol
     index::Int
 
     function FrameElement(nodeStart::Node{T}, nodeEnd::Node{T}, section::S,
-        ends::EndConditions, id::Symbol=:element; Ψ::Real=pi / 2) where {T,S<:AbstractSection{T}}
+        ends::EndConditions, id::Symbol=:element; rollangle::Real=pi / 2) where {T,S<:AbstractSection{T}}
         e = EndConditions(EndSprings(T(ends.e1.kx), T(ends.e1.kt), T(ends.e1.ky), T(ends.e1.kz)),
             EndSprings(T(ends.e2.kx), T(ends.e2.kt), T(ends.e2.ky), T(ends.e2.kz)))
-        return new{T,S}(nodeStart, nodeEnd, section, e, T(Ψ), id, 0)
+        return new{T,S}(nodeStart, nodeEnd, section, e, T(rollangle), id, 0)
     end
 end
 
 FrameElement(nodeStart::Node{T}, nodeEnd::Node{T}, section::AbstractSection{T},
-    id::Symbol=:element; release::Symbol=:fixedfixed, Ψ::Real=pi / 2) where {T} =
-    FrameElement(nodeStart, nodeEnd, section, EndConditions(release; T=T), id; Ψ=Ψ)
+    id::Symbol=:element; release::Symbol=:fixedfixed, rollangle::Real=pi / 2) where {T} =
+    FrameElement(nodeStart, nodeEnd, section, EndConditions(release; T=T), id; rollangle=rollangle)
 
 nodes(el::FrameElement) = (el.nodeStart, el.nodeEnd)
 
@@ -105,13 +105,13 @@ entries of a differentiable state). Delegates to the pure
 [`frame_stiffness`](@ref) kernel.
 """
 stiffness(el::FrameElement, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}) =
-    frame_stiffness(el.section, el.ends, x1, x2, el.Ψ)
+    frame_stiffness(el.section, el.ends, x1, x2, el.rollangle)
 
 # pure-path variant: the section comes from a differentiable ModelState
 # rather than the element (positions likewise) — same kernel underneath
 stiffness(el::FrameElement, section::AbstractSection,
     x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}) =
-    frame_stiffness(section, el.ends, x1, x2, el.Ψ)
+    frame_stiffness(section, el.ends, x1, x2, el.rollangle)
 
 """
     TrussElement{T, S<:AbstractSection{T}} <: AbstractElement{T}
@@ -201,10 +201,10 @@ Base.length(el::AbstractElement) = element_length(el.nodeStart.position, el.node
     local_frame(el; tol = 1e-6) -> SMatrix{3,3}
 
 The element's local coordinate frame (rows = local x, y, z in global
-coordinates). Frame elements use their roll angle `Ψ`; truss elements have
-no roll (Ψ = 0).
+coordinates). Frame elements use their roll angle `rollangle`; truss elements have
+no roll (rollangle = 0).
 """
 local_frame(el::FrameElement; tol::Real=1e-6) =
-    local_frame(el.nodeStart.position, el.nodeEnd.position, el.Ψ; tol=tol)
+    local_frame(el.nodeStart.position, el.nodeEnd.position, el.rollangle; tol=tol)
 local_frame(el::TrussElement; tol::Real=1e-6) =
     local_frame(el.nodeStart.position, el.nodeEnd.position, 0.0; tol=tol)

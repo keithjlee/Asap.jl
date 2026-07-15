@@ -22,14 +22,14 @@ element is queried as a single piece.
   fractions ∈ (0, 1) of the member length; `length(breaks) == length(sections) - 1`
 - `ends::EndConditions{T}`: end conditions at the OUTER ends only (interior
   joints are rigid by construction)
-- `Ψ::T`: roll angle, shared by all segments [rad]
+- `rollangle::T`: roll angle, shared by all segments [rad]
 - `id::Symbol`, `index::Int`: as for other elements
 - `internal_offset::Int`: first global DOF slot of the interior-joint block
   (assigned by `process!`; internal bookkeeping)
 
 # Constructors
     VariableElement(nodeStart, nodeEnd, sections, breaks, id = :variable;
-                    release = :fixedfixed, Ψ = π/2)
+                    release = :fixedfixed, rollangle = π/2)
     VariableElement(nodeStart, nodeEnd, sections, id; ...)   # equal segments
 
 # Element-DOF layout
@@ -49,19 +49,19 @@ mutable struct VariableElement{T} <: AbstractElement{T}
     sections::Vector{AbstractSection{T}}
     breaks::Vector{T}
     ends::EndConditions{T}
-    Ψ::T
+    rollangle::T
     id::Symbol
     index::Int
     internal_offset::Int
 
     function VariableElement(nodeStart::Node{T}, nodeEnd::Node{T},
         sections::Vector{<:AbstractSection{T}}, breaks::Vector{<:Real},
-        id::Symbol=:variable; release::Symbol=:fixedfixed, Ψ::Real=pi / 2) where {T}
+        id::Symbol=:variable; release::Symbol=:fixedfixed, rollangle::Real=pi / 2) where {T}
         @assert length(sections) >= 2 "a VariableElement needs ≥ 2 segments (use FrameElement for prismatic members)"
         @assert length(breaks) == length(sections) - 1 "need one interior break per segment boundary"
         @assert issorted(breaks) && first(breaks) > 0 && last(breaks) < 1 "breaks must be strictly increasing in (0, 1)"
         return new{T}(nodeStart, nodeEnd, collect(AbstractSection{T}, sections),
-            Vector{T}(breaks), EndConditions(release; T=T), T(Ψ), id, 0, 0)
+            Vector{T}(breaks), EndConditions(release; T=T), T(rollangle), id, 0, 0)
     end
 end
 
@@ -156,7 +156,7 @@ function stiffness(el::VariableElement, sections::AbstractVector,
     parts = map(1:n_segments(el)) do s
         xa = v1 + ts[s] * (v2 - v1)
         xb = v1 + ts[s+1] * (v2 - v1)
-        Ks = frame_stiffness(sections[s], segment_ends(el, s), xa, xb, el.Ψ)
+        Ks = frame_stiffness(sections[s], segment_ends(el, s), xa, xb, el.rollangle)
         P = _segment_selector(n, segment_slots(el, s))
         P * Ks * P'
     end
@@ -204,4 +204,4 @@ function locate_segment(el::VariableElement, t::Real)
 end
 
 local_frame(el::VariableElement; tol::Real=1e-6) =
-    local_frame(el.nodeStart.position, el.nodeEnd.position, el.Ψ; tol=tol)
+    local_frame(el.nodeStart.position, el.nodeEnd.position, el.rollangle; tol=tol)

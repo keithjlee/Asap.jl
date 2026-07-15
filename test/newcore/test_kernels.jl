@@ -13,21 +13,21 @@ fef_section() = AsapNext.Section(
     FEF_SECTION_LEGACY.A, FEF_SECTION_LEGACY.Ix, FEF_SECTION_LEGACY.Iy, FEF_SECTION_LEGACY.J)
 
 # function barrier so @allocated measures the kernel, not global boxing
-function _frame_kernel_allocs(sec, ends, x1, x2, Ψ)
-    AsapNext.frame_stiffness(sec, ends, x1, x2, Ψ)  # warm-up/compile
-    return @allocated AsapNext.frame_stiffness(sec, ends, x1, x2, Ψ)
+function _frame_kernel_allocs(sec, ends, x1, x2, rollangle)
+    AsapNext.frame_stiffness(sec, ends, x1, x2, rollangle)  # warm-up/compile
+    return @allocated AsapNext.frame_stiffness(sec, ends, x1, x2, rollangle)
 end
 
 @testset "Element kernels vs oracles" begin
     N = AsapNext
     sec = fef_section()
     L = N.element_length(FEF_X1, FEF_X2)
-    Ψ = pi / 2   # legacy constructor default
+    rollangle = pi / 2   # legacy constructor default
 
     @testset "geometry & transformation" begin
         @test L ≈ FIXTURES["fef_fixedfixed/length"]
 
-        Λ = N.local_frame(FEF_X1, FEF_X2, Ψ)
+        Λ = N.local_frame(FEF_X1, FEF_X2, rollangle)
         R_legacy = FIXTURES["fef_fixedfixed/R"]
         @test Matrix(Λ) ≈ R_legacy[1:3, 1:3] rtol = 1e-12
 
@@ -54,7 +54,7 @@ end
 
         # global stiffness through the blockwise transform matches the pinned
         # legacy R' * k * R
-        Kg = N.frame_stiffness(sec, N.EndConditions(sym), FEF_X1, FEF_X2, Ψ)
+        Kg = N.frame_stiffness(sec, N.EndConditions(sym), FEF_X1, FEF_X2, rollangle)
         @test Matrix(Kg) ≈ FIXTURES["fef_$sym/global_K"] rtol = 1e-10
 
         # symmetry of both
@@ -99,7 +99,7 @@ end
     @testset "kernels are allocation-free and generic" begin
         ends = N.EndConditions(:fixedfixed)
         x1s, x2s = SVector{3}(FEF_X1), SVector{3}(FEF_X2)
-        @test _frame_kernel_allocs(sec, ends, x1s, x2s, Ψ) == 0
+        @test _frame_kernel_allocs(sec, ends, x1s, x2s, rollangle) == 0
 
         # scalar-generic: BigFloat flows through the whole kernel
         mb = N.Material(big"200.0", big"77.0", big"1.0", big"0.3")

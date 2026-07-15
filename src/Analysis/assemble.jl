@@ -118,12 +118,12 @@ function _apply_element_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
     x2 = el.nodeEnd.position
     L = element_length(x1, x2)
 
-    q = fixed_end_forces(load, el.section, el.ends, x1, x2, el.Ψ)
+    q = fixed_end_forces(load, el.section, el.ends, x1, x2, el.rollangle)
     q̃ = condense_fef(q, el.section, L, el.ends)
 
     cache.q_local[el.index][1] .+= q̃
 
-    Λ = local_frame(x1, x2, el.Ψ)
+    Λ = local_frame(x1, x2, el.rollangle)
     Qg = _rotate12(Λ', q̃)                     # local → global, blockwise
     g = element_global_dofs(el)
     @inbounds for i in 1:12
@@ -152,7 +152,7 @@ function _apply_element_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
         ends_s = segment_ends(el, s)
         sec = el.sections[s]
 
-        q = fixed_end_forces(subload, sec, ends_s, xa, xb, el.Ψ)
+        q = fixed_end_forces(subload, sec, ends_s, xa, xb, el.rollangle)
         q̃ = condense_fef(q, sec, Ls, ends_s)
 
         cache.q_local[el.index][s] .+= q̃

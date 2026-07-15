@@ -22,6 +22,7 @@ function process!(model::Model{T}) where {T}
     offset = 6 * length(model.nodes)          # internal blocks follow nodal slots
     for (i, el) in enumerate(model.elements)
         el.index = i
+        validate_rigidities(el)
         if el isa VariableElement
             el.internal_offset = offset
             offset += n_internal_dofs(el)
@@ -30,6 +31,65 @@ function process!(model::Model{T}) where {T}
     model.cache = build_cache(model)
     return model
 end
+
+"""
+    validate_rigidities(el)
+
+Catch zero-rigidity/connection mismatches at `process!` time, before they
+become an opaque singular factorization — or worse, a model that solves but
+silently carries no bending in a member you meant to be a beam.
+
+The check is exact: a rigidity may be zero ONLY if the matching end
+connection is fully released at both ends (spring stiffness 0), so the
+element never promises stiffness it cannot deliver:
+
+- `EA == 0` is always an error (a member with no axial rigidity does nothing).
+- `EIx == 0` requires both `kz` springs = 0 (local x–y bending released).
+- `EIy == 0` requires both `ky` springs = 0 (local x–z bending released).
+- `GJ == 0` requires both `kt` springs = 0 (torsion released).
+
+The legitimate axial-only patterns pass untouched: `Section(mat, A)` on a
+`TrussElement`, or on a fully released (`:freefree`) frame brace. A
+`VariableElement` must have all rigidities positive in every segment —
+its interior joints are rigid, so a zero-rigidity segment always creates
+an unstiffened internal DOF.
+"""
+function validate_rigidities(el::FrameElement)
+    s = el.section
+    EA(s) > 0 || throw(ArgumentError(
+        "element $(el.index) (:$(el.id)) has EA = 0 — a member with no axial rigidity carries nothing"))
+    e1, e2 = el.ends.e1, el.ends.e2
+    _plane_ok(EIx(s), e1.kz, e2.kz) || throw(ArgumentError(
+        "element $(el.index) (:$(el.id)) has EIx = 0 but a moment connection in the local x–y plane " *
+        "(kz ≠ 0 at an end) — use a TrussElement, release the ends, or give the section Ix"))
+    _plane_ok(EIy(s), e1.ky, e2.ky) || throw(ArgumentError(
+        "element $(el.index) (:$(el.id)) has EIy = 0 but a moment connection in the local x–z plane " *
+        "(ky ≠ 0 at an end) — use a TrussElement, release the ends, or give the section Iy"))
+    _plane_ok(GJ(s), e1.kt, e2.kt) || throw(ArgumentError(
+        "element $(el.index) (:$(el.id)) has GJ = 0 but a torsional connection (kt ≠ 0 at an end) — " *
+        "release torsion or give the section J"))
+    return nothing
+end
+
+function validate_rigidities(el::TrussElement)
+    EA(el.section) > 0 || throw(ArgumentError(
+        "element $(el.index) (:$(el.id)) has EA = 0 — a member with no axial rigidity carries nothing"))
+    return nothing
+end
+
+function validate_rigidities(el::VariableElement)
+    for (i, s) in enumerate(el.sections)
+        (EA(s) > 0 && EIx(s) > 0 && EIy(s) > 0 && GJ(s) > 0) || throw(ArgumentError(
+            "VariableElement $(el.index) (:$(el.id)) segment $i has a zero rigidity — " *
+            "interior joints are rigid, so every segment needs EA, EIx, EIy, GJ > 0"))
+    end
+    return nothing
+end
+
+validate_rigidities(::AbstractElement) = nothing
+
+# a zero rigidity is acceptable only when the matching plane is fully released
+_plane_ok(rigidity, k1, k2) = rigidity > 0 || (iszero(k1) && iszero(k2))
 
 """
     solve!(model; reprocess = false) -> model
@@ -115,7 +175,7 @@ function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
     g = element_global_dofs(el)
     u_el = SVector{12,T}(ntuple(i -> u[g[i]], 12))
 
-    Λ = local_frame(x1, x2, el isa FrameElement ? el.Ψ : zero(T))
+    Λ = local_frame(x1, x2, el isa FrameElement ? el.rollangle : zero(T))
     Qg = _rotate12(Λ', SVector{12,T}(cache.q_local[el.index][1]))
 
     f_global = Ke * u_el + Qg
@@ -136,7 +196,7 @@ function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
 
     for s in 1:n_segments(el)
         xa, xb = segment_positions(el, s)
-        Ks = frame_stiffness(el.sections[s], segment_ends(el, s), xa, xb, el.Ψ)
+        Ks = frame_stiffness(el.sections[s], segment_ends(el, s), xa, xb, el.rollangle)
         slots = segment_slots(el, s)
         u_s = SVector{12,T}(ntuple(i -> u[g[slots[i]]], 12))
         Qg = _rotate12(Λ', SVector{12,T}(cache.q_local[el.index][s]))

@@ -40,8 +40,8 @@ function nc_frame_2d()
     n1 = N.Node([0.0, 0.0, 0.0], :fixed)
     n2 = N.Node([120.0, 240.0, 0.0], :free)
     n3 = N.Node([360.0, 240.0, 0.0], :fixed)
-    e1 = N.FrameElement(n1, n2, sec; Ψ=0.0)
-    e2 = N.FrameElement(n2, n3, sec; Ψ=0.0)
+    e1 = N.FrameElement(n1, n2, sec; rollangle=0.0)
+    e2 = N.FrameElement(n2, n3, sec; rollangle=0.0)
     model = N.Model([n1, n2, n3], N.AbstractElement{Float64}[e1, e2],
         N.AbstractLoad{Float64}[
             N.PointLoad(e1, 0.5, [0.0, -90.0, 0.0]),
@@ -75,9 +75,9 @@ function nc_frame_3d()
     n2 = N.Node([-240.0, 0.0, 0.0], :fixed)
     n3 = N.Node([0.0, -240.0, 0.0], :fixed)
     n4 = N.Node([0.0, 0.0, -240.0], :fixed)
-    e1 = N.FrameElement(n2, n1, sec; Ψ=0.0)
-    e2 = N.FrameElement(n3, n1, sec; Ψ=pi / 2)
-    e3 = N.FrameElement(n4, n1, sec; Ψ=pi / 6)
+    e1 = N.FrameElement(n2, n1, sec; rollangle=0.0)
+    e2 = N.FrameElement(n3, n1, sec; rollangle=pi / 2)
+    e3 = N.FrameElement(n4, n1, sec; rollangle=pi / 6)
     return N.Model([n1, n2, n3, n4], N.AbstractElement{Float64}[e1, e2, e3],
         N.AbstractLoad{Float64}[
             N.LineLoad(e1, [0.0, -3.0 / 12, 0.0]),
@@ -167,7 +167,7 @@ end
         ends = N.EndConditions(r)
         x1, x2 = FEF_X1, FEF_X2
         L = N.element_length(x1, x2)
-        Ψ = pi / 2
+        rollangle = pi / 2
 
         dummy = N.Node(x1, :fixed)
         dummy2 = N.Node(x2, :fixed)
@@ -177,7 +177,7 @@ end
         point = N.PointLoad(el, 0.3, [110.0, -70.0, 25.0])
 
         for (load, kind) in ((line, "lineload"), (point, "pointload"))
-            q = N.fixed_end_forces(load, sec, ends, x1, x2, Ψ)
+            q = N.fixed_end_forces(load, sec, ends, x1, x2, rollangle)
             q̃ = N.condense_fef(q, sec, L, ends)
 
             # DELIBERATE DEVIATION (documented in docs/MODERNIZATION.md):
@@ -190,7 +190,7 @@ end
                 @test Vector(qq)[nonaxial] ≈ FIXTURES["fef_$r/$key/$kind"][nonaxial] rtol = 1e-10 atol = 1e-10
             end
             if kind == "pointload"
-                Λ = N.local_frame(x1, x2, Ψ)
+                Λ = N.local_frame(x1, x2, rollangle)
                 Pax = (Λ*load.value)[1]
                 ξ = load.position
                 @test q[1] ≈ -Pax * (1 - ξ) rtol = 1e-12
@@ -302,4 +302,49 @@ end
         @test err isa ErrorException
         @test occursin("inactive", err.msg) && occursin("truss", err.msg)
     end
+end
+
+@testset "zero-rigidity guard (process!-time validation)" begin
+    N = AsapNext
+    mat = N.Material(200e6, 77e6, 8.0, 0.3)
+    axial_only = N.Section(mat, 1e-3)                 # Ix = Iy = J = 0
+    full = N.Section(mat, 1e-3, 1e-5, 1e-5, 1e-6)
+    n1 = N.Node([0.0, 0.0, 0.0], :fixed)
+    n2 = N.Node([2.0, 0.0, 0.0], :fixed)
+
+    # axial-only section on a rigid-ended frame element: caught with a clear error
+    bad = N.FrameElement(n1, n2, axial_only)
+    m = N.Model([n1, n2], N.AbstractElement{Float64}[bad],
+        N.AbstractLoad{Float64}[N.NodeForce(n2, [0.0, 0.0, -1.0])])
+    @test_throws ArgumentError N.process!(m)
+
+    # ...but fully released (:freefree brace pattern) is legitimate
+    a1 = N.Node([0.0, 0.0, 0.0], :fixed); a2 = N.Node([2.0, 0.0, 0.0], :fixed)
+    brace = N.FrameElement(a1, a2, axial_only; release = :freefree)
+    m2 = N.Model([a1, a2], N.AbstractElement{Float64}[brace],
+        N.AbstractLoad{Float64}[N.NodeForce(a2, [0.0, 0.0, -1.0])])
+    @test N.process!(m2) isa N.Model
+
+    # :joist keeps torsion engaged, so J = 0 is caught
+    b1 = N.Node([0.0, 0.0, 0.0], :fixed); b2 = N.Node([2.0, 0.0, 0.0], :fixed)
+    joist_noJ = N.FrameElement(b1, b2, N.Section(mat, 1e-3, 1e-5, 1e-5, 0.0);
+        release = :joist)
+    m3 = N.Model([b1, b2], N.AbstractElement{Float64}[joist_noJ],
+        N.AbstractLoad{Float64}[N.NodeForce(b2, [0.0, 0.0, -1.0])])
+    @test_throws ArgumentError N.process!(m3)
+
+    # truss with EA = 0 is caught; with EA > 0 passes
+    c1 = N.Node([0.0, 0.0, 0.0], :pinned); c2 = N.Node([2.0, 0.0, 0.0], :pinned)
+    dead_bar = N.TrussElement(c1, c2, N.Section(mat, 0.0))
+    m4 = N.Model([c1, c2], N.AbstractElement{Float64}[dead_bar],
+        N.AbstractLoad{Float64}[N.NodeForce(c2, [1.0, 0.0, 0.0])])
+    @test_throws ArgumentError N.process!(m4)
+
+    # VariableElement: every segment needs full rigidities
+    d1 = N.Node([0.0, 0.0, 0.0], :fixed); d2 = N.Node([4.0, 0.0, 0.0], :fixed)
+    varbad = N.VariableElement(d1, d2,
+        N.AbstractSection{Float64}[full, axial_only], [0.5])
+    m5 = N.Model([d1, d2], N.AbstractElement{Float64}[varbad],
+        N.AbstractLoad{Float64}[N.NodeForce(d2, [0.0, 0.0, -1.0])])
+    @test_throws ArgumentError N.process!(m5)
 end

@@ -123,10 +123,10 @@ end
         n2 = N.Node([3000.0, 0.0, 0.0], :free)
 
         function tip_deflection(kz)
-            # Ψ = 0 so the global-Y load bends in the local x–y plane (EIx),
+            # rollangle = 0 so the global-Y load bends in the local x–y plane (EIx),
             # governed by the kz springs
             ends = N.EndConditions(N.EndSprings(Inf, Inf, Inf, kz), N.rigid_end())
-            el = N.FrameElement(n1, n2, sec, ends, :beam; Ψ=0.0)
+            el = N.FrameElement(n1, n2, sec, ends, :beam; rollangle=0.0)
             model = N.Model([n1, n2], N.AbstractElement{Float64}[el],
                 N.AbstractLoad{Float64}[N.NodeForce(n2, [0.0, -10.0, 0.0])])
             N.solve!(model)

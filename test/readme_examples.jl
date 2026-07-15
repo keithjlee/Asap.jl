@@ -37,7 +37,7 @@ println("nodes OK")
 # frame elements + releases ---------------------------------------------------
 na = Node([0.0, 0.0, 0.0], :fixed); nb = Node([4.0, 0.0, 0.0], :free)
 girder = FrameElement(na, nb, wshape, :girder)
-rolled = FrameElement(na, nb, wshape; Ψ = 0.0)
+rolled = FrameElement(na, nb, wshape; rollangle = 0.0)
 hinged = FrameElement(na, nb, wshape; release = :fixedfree)
 semi = FrameElement(na, nb, wshape,
     EndConditions(EndSprings(Inf, Inf, 5e4, 5e4), rigid_end()), :connection)
