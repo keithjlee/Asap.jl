@@ -16,3 +16,4 @@ figures/undisplaced2.png
 scratch.jl
 # Claude Code personal settings
 .claude/settings.local.json
+.DS_Store
