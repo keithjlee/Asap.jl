@@ -348,3 +348,27 @@ end
         N.AbstractLoad{Float64}[N.NodeForce(d2, [0.0, 0.0, -1.0])])
     @test_throws ArgumentError N.process!(m5)
 end
+
+@testset "assembly is allocation-free (truss AND frame groups)" begin
+    N = AsapNext
+    sec = N.Section(N.Material(200e6, 77e6, 8.0, 0.3), 1e-3, 1e-5, 1e-5, 1e-6)
+
+    #truss group: regression for the hvcat heap fallback in truss_stiffness
+    #(this once allocated MBs per assembly and was 8× slower on Julia 1.12)
+    #tetrahedron: three pinned base nodes + loaded apex — stable in 3D
+    tn = [N.Node([0.0, 0.0, 0.0], :pinned), N.Node([1.0, 0.0, 0.0], :pinned),
+        N.Node([0.5, 1.0, 0.0], :pinned), N.Node([0.5, 0.4, 1.0], :free)]
+    tels = N.AbstractElement{Float64}[N.TrussElement(tn[i], tn[4], sec) for i in 1:3]
+    tm = N.Model(tn, tels, N.AbstractLoad{Float64}[N.NodeForce(tn[4], [0.0, -1.0, -1.0])])
+    N.solve!(tm)
+    N.assemble_K!(tm.cache, tm)                       # warm up
+    @test @allocated(N.assemble_K!(tm.cache, tm)) <= 256
+
+    #frame group
+    fn = [N.Node([Float64(i), 0.0, 0.0], i == 1 ? :fixed : :free) for i in 1:3]
+    fels = N.AbstractElement{Float64}[N.FrameElement(fn[i], fn[i+1], sec) for i in 1:2]
+    fm = N.Model(fn, fels, N.AbstractLoad{Float64}[N.NodeForce(fn[3], [0.0, 0.0, -1.0])])
+    N.solve!(fm)
+    N.assemble_K!(fm.cache, fm)
+    @test @allocated(N.assemble_K!(fm.cache, fm)) <= 256
+end

@@ -183,7 +183,9 @@ function truss_stiffness(section::AbstractSection, x1::AbstractVector{<:Real}, x
     L = norm(v)
     n = v / L
     B = (EA(section) / L) * (n * n')
-    return [B -B; -B B]
+    # static block assembly: `[B -B; -B B]` (hvcat) would fall back to a
+    # heap-allocated Matrix and break the zero-allocation assembly contract
+    return hcat(vcat(B, -B), vcat(-B, B))
 end
 
 """
