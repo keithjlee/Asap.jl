@@ -28,6 +28,7 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_loads.jl")
     include("newcore/test_variable.jl")
     include("newcore/test_ad.jl")
+    include("newcore/test_forward.jl")
     include("characterization/test_publication.jl")
 
     # AsapToolkit oracles: consumed by the Phase 3 recovery tests

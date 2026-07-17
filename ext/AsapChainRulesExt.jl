@@ -14,6 +14,10 @@ that AD engines differentiate natively.
    the factorization already computed in the forward pass, with
    `K̄ = −λuᵀ` and `F̄ = λ`. K is symmetric, so no re-factorization.
 
+`solve_free` also carries the matching FORWARD rule (`frule`): the
+implicit-function theorem `K u̇ = Ḟ − K̇ u`, one extra back-substitution
+per tangent on the forward factorization.
+
 Loaded automatically as a package extension whenever ChainRulesCore is in
 the environment (`[weakdeps]`/`[extensions]` in Project.toml) — zero cost
 for users who never differentiate.
@@ -202,5 +206,25 @@ end
 @inline _rowdot(λ::AbstractVector, u::AbstractVector, i::Int, j::Int) = λ[i] * u[j]
 @inline _rowdot(λ::AbstractMatrix, u::AbstractMatrix, i::Int, j::Int) =
     dot(view(λ, i, :), view(u, j, :))
+
+"""
+Forward rule for the reduced solve — the implicit-function theorem:
+`K u̇ = Ḟ − K̇ u`, one extra back-substitution on the forward
+factorization per tangent. Consumed by forward-mode ChainRules engines
+and bridged to Enzyme's forward mode via `Enzyme.@import_frule`
+(`AsapEnzymeExt`). ForwardDiff does NOT read frules — its Dual path is
+`AsapForwardDiffExt`.
+"""
+function ChainRulesCore.frule((_, ΔK, ΔF), ::typeof(HOST.solve_free),
+    K::SparseMatrixCSC, F::AbstractVecOrMat)
+
+    fact = HOST._factorize(K)
+    u = fact \ F
+    ΔKm = unthunk(ΔK)
+    ΔFm = unthunk(ΔF)
+    rhs = ΔFm isa AbstractZero ? zero(u) : collect(ΔFm)
+    ΔKm isa AbstractZero || (rhs = rhs .- ΔKm * u)
+    return u, fact \ rhs
+end
 
 end # module

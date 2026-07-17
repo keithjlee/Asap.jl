@@ -50,6 +50,12 @@ end
 Material(E::Real, G::Real, ρ::Real, ν::Real) = Material(promote(E, G, ρ, ν)...)
 Material(E::Real, ρ::Real, ν::Real) = Material(E, E / (2 * (1 + ν)), ρ, ν)
 
+# eltype conversion (identity when already there) — lets Section promote its
+# material when a property arrives with a wider eltype (e.g. AD dual numbers)
+Base.convert(::Type{Material{T}}, m::Material{T}) where {T<:Real} = m
+Base.convert(::Type{Material{T}}, m::Material) where {T<:Real} =
+    Material(T(m.E), T(m.G), T(m.ρ), T(m.ν))
+
 "Structural steel in N–mm units: E = 200e3 N/mm², G = 77e3 N/mm², ρ = 8e-5 kg/mm³ (legacy value), ν = 0.3."
 const Steel_Nmm = Material(200e3, 77e3, 8e-5, 0.3)
 

@@ -12,12 +12,14 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [weakdeps]
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 
 [extensions]
 AsapChainRulesExt = "ChainRulesCore"
 AsapEnzymeExt = ["Enzyme", "ChainRulesCore"]
+AsapForwardDiffExt = "ForwardDiff"
 AsapLinearSolveExt = "LinearSolve"
 AsapMooncakeExt = ["Mooncake", "ChainRulesCore"]
 
@@ -25,6 +27,7 @@ AsapMooncakeExt = ["Mooncake", "ChainRulesCore"]
 ChainRulesCore = "1"
 CommonSolve = "0.2"
 Enzyme = "0.13"
+ForwardDiff = "0.10, 1"
 LinearSolve = "2, 3"
 Mooncake = "0.5"
 LinearAlgebra = "1"
@@ -33,10 +36,12 @@ StaticArrays = "1.9.18"
 julia = "1.10"
 
 [extras]
+ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [targets]
-test = ["Test", "Zygote", "FiniteDifferences", "LinearSolve"]
+test = ["Test", "Zygote", "FiniteDifferences", "LinearSolve", "ForwardDiff", "ChainRulesCore"]

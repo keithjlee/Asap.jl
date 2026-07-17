@@ -69,8 +69,11 @@ struct Section{T} <: AbstractSection{T}
     J::T  # torsional constant
 
     function Section(material::Material{T}, A::Real, Ix::Real, Iy::Real, J::Real) where {T}
-        A, Ix, Iy, J = promote(T(A), T(Ix), T(Iy), T(J))
-        return new{T}(material, A, Ix, Iy, J)
+        # promote (never narrow): a wider property eltype — e.g. ForwardDiff
+        # Duals from a design variable — lifts the whole section, material
+        # included, so forward-mode AD flows through geometric properties
+        Tp = promote_type(T, typeof(A), typeof(Ix), typeof(Iy), typeof(J))
+        return new{Tp}(convert(Material{Tp}, material), Tp(A), Tp(Ix), Tp(Iy), Tp(J))
     end
 end
 

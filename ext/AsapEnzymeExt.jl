@@ -17,7 +17,14 @@ closure (its captured params are data, not differentiable state):
         function_annotation = Enzyme.Const)
     DifferentiationInterface.gradient(x -> compliance(solve_structure(x, p), p), backend, x0)
 
-Activates automatically when Enzyme is loaded alongside Asap.
+Forward mode works the same way with `Enzyme.Forward` (the solve_free
+frule is imported alongside the rrules).
+
+LOADING NOTE: this extension requires BOTH Enzyme and ChainRulesCore in
+the session (`[extensions]` condition). Zygote/ChainRules-based setups
+load ChainRulesCore implicitly; with Enzyme alone add
+`using ChainRulesCore` — otherwise no rules register and Enzyme crashes
+inside CHOLMOD with an IllegalTypeAnalysisException.
 """
 module AsapEnzymeExt
 
@@ -33,6 +40,10 @@ function __init__()
         Enzyme.@import_rrule(typeof(Asap.solve_free), SparseMatrixCSC{Float64,Int}, Vector{Float64})
         Enzyme.@import_rrule(typeof(Asap.solve_free), SparseMatrixCSC{Float64,Int}, Matrix{Float64})
         Enzyme.@import_rrule(typeof(Asap.sparse_from_pattern), SparseMatrixCSC{Float64,Int}, Vector{Float64})
+        # forward mode: the solve_free frule (implicit-function theorem) —
+        # everything else Enzyme's forward pass traverses natively
+        Enzyme.@import_frule(typeof(Asap.solve_free), SparseMatrixCSC{Float64,Int}, Vector{Float64})
+        Enzyme.@import_frule(typeof(Asap.solve_free), SparseMatrixCSC{Float64,Int}, Matrix{Float64})
     end
     return nothing
 end
