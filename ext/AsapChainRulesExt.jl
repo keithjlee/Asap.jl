@@ -175,19 +175,18 @@ _flatten3(Δ::NTuple{3,Any}) = Δ
 _flatten3(Δ::ChainRulesCore.Tangent) = _flatten3(ChainRulesCore.backing(Δ))
 _flatten3(Δ::NamedTuple) = _flatten3(first(values(Δ)))
 
-function ChainRulesCore.rrule(::typeof(HOST.solve_free),
-    K::SparseMatrixCSC, F::AbstractVecOrMat)
-
-    fact = HOST._factorize(K)
+# shared reverse core, parameterized on the solver-seam backend. The
+# K-cotangent is returned PROJECTED onto K's sparsity pattern (the nonzero
+# entries of −λuᵀ that K actually stores). In Asap's pipeline K always
+# comes from sparse_from_pattern, whose pullback reads exactly those
+# entries — so this loses nothing, avoids materializing the dense n×n
+# outer product, and keeps the cotangent structurally compatible with
+# sparse-tangent AD engines (Mooncake).
+function _solve_free_reverse(solver, K::SparseMatrixCSC, F::AbstractVecOrMat)
+    fact = HOST._factorize(solver, K)
     u = fact \ F
 
-    # The K-cotangent is returned PROJECTED onto K's sparsity pattern (the
-    # nonzero entries of −λuᵀ that K actually stores). In Asap's pipeline K
-    # always comes from sparse_from_pattern, whose pullback reads exactly
-    # those entries — so this loses nothing, avoids materializing the dense
-    # n×n outer product, and keeps the cotangent structurally compatible
-    # with sparse-tangent AD engines (Mooncake).
-    function solve_free_pullback(Δu)
+    function core_pullback(Δu)
         λ = fact \ collect(unthunk(Δu))  # K symmetric: Kᵀ = K, reuse the factorization
         ΔK = @thunk begin
             rows = rowvals(K)
@@ -197,10 +196,24 @@ function ChainRulesCore.rrule(::typeof(HOST.solve_free),
             end
             SparseMatrixCSC(size(K, 1), size(K, 2), copy(K.colptr), copy(K.rowval), vals)
         end
-        return (NoTangent(), ΔK, λ)
+        return ΔK, λ
     end
 
+    return u, core_pullback
+end
+
+function ChainRulesCore.rrule(::typeof(HOST.solve_free),
+    K::SparseMatrixCSC, F::AbstractVecOrMat)
+    u, core_pullback = _solve_free_reverse(nothing, K, F)
+    solve_free_pullback(Δu) = (NoTangent(), core_pullback(Δu)...)
     return u, solve_free_pullback
+end
+
+function ChainRulesCore.rrule(::typeof(HOST.solve_free), solver,
+    K::SparseMatrixCSC, F::AbstractVecOrMat)
+    u, core_pullback = _solve_free_reverse(solver, K, F)
+    solve_free_solver_pullback(Δu) = (NoTangent(), NoTangent(), core_pullback(Δu)...)
+    return u, solve_free_solver_pullback
 end
 
 @inline _rowdot(λ::AbstractVector, u::AbstractVector, i::Int, j::Int) = λ[i] * u[j]
@@ -215,10 +228,8 @@ and bridged to Enzyme's forward mode via `Enzyme.@import_frule`
 (`AsapEnzymeExt`). ForwardDiff does NOT read frules — its Dual path is
 `AsapForwardDiffExt`.
 """
-function ChainRulesCore.frule((_, ΔK, ΔF), ::typeof(HOST.solve_free),
-    K::SparseMatrixCSC, F::AbstractVecOrMat)
-
-    fact = HOST._factorize(K)
+function _solve_free_forward(solver, K, F, ΔK, ΔF)
+    fact = HOST._factorize(solver, K)
     u = fact \ F
     ΔKm = unthunk(ΔK)
     ΔFm = unthunk(ΔF)
@@ -226,5 +237,13 @@ function ChainRulesCore.frule((_, ΔK, ΔF), ::typeof(HOST.solve_free),
     ΔKm isa AbstractZero || (rhs = rhs .- ΔKm * u)
     return u, fact \ rhs
 end
+
+ChainRulesCore.frule((_, ΔK, ΔF), ::typeof(HOST.solve_free),
+    K::SparseMatrixCSC, F::AbstractVecOrMat) =
+    _solve_free_forward(nothing, K, F, ΔK, ΔF)
+
+ChainRulesCore.frule((_, _, ΔK, ΔF), ::typeof(HOST.solve_free), solver,
+    K::SparseMatrixCSC, F::AbstractVecOrMat) =
+    _solve_free_forward(solver, K, F, ΔK, ΔF)
 
 end # module

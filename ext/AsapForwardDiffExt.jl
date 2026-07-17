@@ -42,11 +42,13 @@ _partials(::AbstractArray, ::Int) = false
 _same_pattern(K::SparseMatrixCSC, nz::AbstractVector) =
     SparseMatrixCSC(size(K, 1), size(K, 2), K.colptr, K.rowval, nz)
 
-function _solve_free_dual(::Type{Dual{Tg,V,N}}, K::SparseMatrixCSC,
+function _solve_free_dual(solver, ::Type{Dual{Tg,V,N}}, K::SparseMatrixCSC,
     F::AbstractVecOrMat) where {Tg,V,N}
 
     Kv = _same_pattern(K, _values(K.nzval))
-    fact = Asap._factorize(Kv)               # one factorization for value + all N partials
+    # ONE factorization for the value and all N partial systems — and with
+    # a CachedSolver, shared across every chunk/pass at the same design
+    fact = Asap._factorize(solver, Kv)
     u = fact \ _values(F)
     K_dual = eltype(K) <: Dual
     dus = ntuple(N) do k
@@ -62,14 +64,24 @@ end
 # vector/matrix methods mirror the base signatures — Dual <: Real, so a
 # single loose method would be ambiguous against Asap's own.
 Asap.solve_free(K::SparseMatrixCSC{D}, F::AbstractVector) where {D<:Dual} =
-    _solve_free_dual(D, K, F)
+    _solve_free_dual(nothing, D, K, F)
 Asap.solve_free(K::SparseMatrixCSC{D}, F::AbstractMatrix) where {D<:Dual} =
-    _solve_free_dual(D, K, F)
+    _solve_free_dual(nothing, D, K, F)
 
 # plain stiffness, Dual RHS (load-only derivatives): u̇ᵏ = K⁻¹Ḟᵏ
 Asap.solve_free(K::SparseMatrixCSC{<:AbstractFloat}, F::AbstractVector{D}) where {D<:Dual} =
-    _solve_free_dual(D, K, F)
+    _solve_free_dual(nothing, D, K, F)
 Asap.solve_free(K::SparseMatrixCSC{<:AbstractFloat}, F::AbstractMatrix{D}) where {D<:Dual} =
-    _solve_free_dual(D, K, F)
+    _solve_free_dual(nothing, D, K, F)
+
+# 3-arg (solver-seam) variants of the same four
+Asap.solve_free(solver, K::SparseMatrixCSC{D}, F::AbstractVector) where {D<:Dual} =
+    _solve_free_dual(solver, D, K, F)
+Asap.solve_free(solver, K::SparseMatrixCSC{D}, F::AbstractMatrix) where {D<:Dual} =
+    _solve_free_dual(solver, D, K, F)
+Asap.solve_free(solver, K::SparseMatrixCSC{<:AbstractFloat}, F::AbstractVector{D}) where {D<:Dual} =
+    _solve_free_dual(solver, D, K, F)
+Asap.solve_free(solver, K::SparseMatrixCSC{<:AbstractFloat}, F::AbstractMatrix{D}) where {D<:Dual} =
+    _solve_free_dual(solver, D, K, F)
 
 end # module

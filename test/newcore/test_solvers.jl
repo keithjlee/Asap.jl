@@ -67,3 +67,64 @@ using LinearSolve
         @test m.results.u ≈ uref rtol = 1e-8
     end
 end
+
+@testset "solver seam on the PURE path (solve_free 3-arg)" begin
+    N = AsapNext
+    sec = N.Section(N.Material(200e6, 77e6, 8.0, 0.3), 1e-2, 1e-4, 5e-5, 1e-6)
+    n1 = N.Node([0.0, 0.0, 0.0], :fixed)
+    n2 = N.Node([0.0, 0.0, 3.0], :free)
+    n3 = N.Node([5.0, 0.0, 3.0], :free)
+    n4 = N.Node([5.0, 0.0, 0.0], :fixed)
+    els = N.AbstractElement{Float64}[N.FrameElement(n1, n2, sec),
+        N.FrameElement(n2, n3, sec), N.FrameElement(n4, n3, sec)]
+    model = N.Model([n1, n2, n3, n4], els,
+        N.AbstractLoad{Float64}[N.NodeForce(n2, [5.0, 0.0, -3.0])])
+    N.solve!(model)
+    st = N.extract_state(model)
+
+    u0 = N.solve(model, st)                                     # default backend
+    for solver in (KLUFactorization(), KrylovJL_CG(), N.CachedSolver())
+        @test N.solve(model, st; solver = solver) ≈ u0 rtol = 1e-8
+    end
+
+    # gradients flow identically through every backend (the 3-arg rrule)
+    δ = zeros(size(st.X)); δ[3, 2] = 1.0
+    obj(θ, solver) = N.compliance(model,
+        N.ModelState{eltype(θ)}(st.X + θ[1] * δ, st.sections, st.EA, nothing);
+        solver = solver)
+    g0 = Zygote.gradient(θ -> obj(θ, nothing), [0.1])[1]
+    for solver in (KLUFactorization(), N.CachedSolver())
+        @test Zygote.gradient(θ -> obj(θ, solver), [0.1])[1] ≈ g0 rtol = 1e-8
+    end
+    gfd = FiniteDifferences.grad(central_fdm(5, 1), θ -> obj(θ, nothing), [0.1])[1]
+    @test g0 ≈ gfd rtol = 1e-6
+
+    # ForwardDiff through the 3-arg Dual methods
+    for solver in (KLUFactorization(), N.CachedSolver())
+        @test ForwardDiff.gradient(θ -> obj(θ, solver), [0.1]) ≈ g0 rtol = 1e-8
+    end
+end
+
+@testset "CachedSolver reuse semantics" begin
+    N = AsapNext
+    cs = N.CachedSolver()
+    # triplets in (1,1),(2,1),(2,2),(1,2) order — genuinely symmetric SPD
+    K1 = sparse([1, 2, 2, 1], [1, 1, 2, 2], [4.0, 1.0, 3.0, 1.0])
+    F = [1.0, 2.0]
+
+    u1 = N.solve_free(cs, K1, F)
+    @test u1 ≈ K1 \ F rtol = 1e-12
+    @test cs.hits == 0 && cs.refactorizations == 0
+
+    u1b = N.solve_free(cs, K1, F)                 # identical values → cache hit
+    @test u1b ≈ u1
+    @test cs.hits == 1 && cs.refactorizations == 0
+
+    K2 = sparse([1, 2, 2, 1], [1, 1, 2, 2], [5.0, 0.5, 4.0, 0.5])  # same pattern
+    u2 = N.solve_free(cs, K2, F)                  # numeric-only refactorization
+    @test u2 ≈ K2 \ F rtol = 1e-12
+    @test cs.refactorizations == 1
+
+    u2b = N.solve_free(cs, K2, F)
+    @test u2b ≈ u2 && cs.hits == 2
+end

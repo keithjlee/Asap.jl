@@ -199,6 +199,60 @@ _factorize(solver, K::SparseMatrixCSC) =
           "(or define the _factorize/_refactorize!/_backsolve seam methods for it)")
 
 """
+    CachedSolver(solver = nothing)
+
+A solver-seam wrapper that reuses ONE factorization for every solve with
+the same stiffness values: repeated `_factorize` calls compare `K.nzval`
+to the last factorized values — identical values return the stored
+factorization outright, changed values (same frozen pattern) trigger a
+numeric-only refactorization.
+
+This is what makes derivative evaluation cheap in an optimization loop.
+At a design iterate `x`, the objective gradient (reverse: forward solve +
+adjoint backsolve), the constraint Jacobian (forward: one tangent system
+per ForwardDiff chunk), and any plain re-evaluation all assemble the SAME
+K(x) — with a `CachedSolver` they share one factorization instead of
+paying one each (a chunked 512-variable ForwardDiff Jacobian alone costs
+~43 otherwise).
+
+    p = OptParams(model, vars; solver = Asap.CachedSolver())
+
+CONTRACT: derivative calls must be atomic — the pullback/tangent of one
+evaluation must run before the next evaluation at a DIFFERENT design
+begins, because refactorization mutates the stored factorization in place
+(a reverse-mode pullback holds a reference to it). Every standard driver
+(`Zygote.gradient`/`withgradient`/`jacobian`, `ForwardDiff.gradient`/
+`jacobian`, DifferentiationInterface prepared operators, optimizer loops
+built on these) satisfies this; hand-held `Zygote.pullback` closures
+called after later evaluations do not. Use one `CachedSolver` per
+model/OptParams — the frozen sparsity pattern is assumed constant.
+"""
+mutable struct CachedSolver
+    solver::Any
+    nzval::Vector{Float64}
+    fc::Union{FactorizationCache,Nothing}
+    hits::Int          # instrumentation: factorizations avoided
+    refactorizations::Int
+end
+CachedSolver(solver = nothing) = CachedSolver(solver, Float64[], nothing, 0, 0)
+
+function _factorize(cs::CachedSolver, K::SparseMatrixCSC)
+    if cs.fc !== nothing && length(cs.nzval) == nnz(K)
+        if cs.nzval == K.nzval
+            cs.hits += 1
+            return cs.fc
+        end
+        _refactorize!(cs.fc.solver, cs.fc, K)
+        copyto!(cs.nzval, K.nzval)
+        cs.refactorizations += 1
+        return cs.fc
+    end
+    cs.fc = _factorize(cs.solver, K)
+    cs.nzval = Vector{Float64}(K.nzval)
+    return cs.fc
+end
+
+"""
     _ensure_factorization!(cache, solver) -> FactorizationCache
 
 Reuse the cache's factorization when possible: same (or unspecified)

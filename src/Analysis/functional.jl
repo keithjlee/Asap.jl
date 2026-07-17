@@ -162,16 +162,26 @@ sparse_from_pattern(pattern::SparseMatrixCSC, nzval::AbstractVector) =
 
 """
     solve_free(K, F) -> u_free
+    solve_free(solver, K, F) -> u_free
 
 Solve the reduced linear system. The AD extension supplies the adjoint
 (one extra back-substitution on the cached factorization — the classical
 adjoint method).
+
+The 3-arg form goes through the solver seam (`_factorize(solver, K)`):
+`solver` may be `nothing` (built-in CHOLMOD), any LinearSolve algorithm
+(with `AsapLinearSolveExt`), or a [`CachedSolver`](@ref) wrapper that
+reuses one factorization across value/adjoint/tangent passes at the same
+design. The 2-arg form is the default-solver fast path — kept as its own
+method (not a forwarder) because Enzyme's imported rules match this exact
+signature.
 """
 solve_free(K::SparseMatrixCSC, F::AbstractVector) = _factorize(K) \ F
 solve_free(K::SparseMatrixCSC, F::AbstractMatrix) = _factorize(K) \ F   # multi-RHS
+solve_free(solver, K::SparseMatrixCSC, F::AbstractVecOrMat) = _factorize(solver, K) \ F
 
 """
-    solve(model, state; loads = :cached) -> Vector
+    solve(model, state; solver = nothing) -> Vector
 
 Pure linear solve on a processed model: assemble from the differentiable
 `state`, solve, and return the FULL-space displacement vector (inactive and
@@ -179,28 +189,32 @@ fixed slots zero). Requires `process!` (or a prior `solve!`) to have built
 the cache; load vectors are taken from the cache as constants — call
 `assemble_loads!` first if loads changed.
 
+`solver` selects the linear-solver backend for the reduced solve (see
+[`solve_free`](@ref)); `nothing` is the built-in CHOLMOD path.
+
 This is the AD entry point: gradients of any scalar of the returned vector
 with respect to node positions and section properties flow through Zygote
 with no further ceremony.
 """
-function solve(model::Model{T}, state::ModelState) where {T}
+function solve(model::Model{T}, state::ModelState; solver = nothing) where {T}
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
     F = (cache.P-cache.Pf)[cache.partition.free]
-    uf = solve_free(K, F)
+    # the default keeps the 2-arg call — Enzyme's imported rules match it
+    uf = solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
     return cache.free_embed * uf
 end
 
 """
-    compliance(model, state) -> T
+    compliance(model, state; solver = nothing) -> T
 
 External work `Fᵀu_free` of the pure solve — the canonical smooth stiffness
 objective, differentiable end-to-end.
 """
-function compliance(model::Model{T}, state::ModelState) where {T}
+function compliance(model::Model{T}, state::ModelState; solver = nothing) where {T}
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
     F = (cache.P-cache.Pf)[cache.partition.free]
-    uf = solve_free(K, F)
+    uf = solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
     return dot(F, uf)
 end
