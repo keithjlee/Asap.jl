@@ -216,5 +216,7 @@ function compliance(model::Model{T}, state::ModelState; solver = nothing) where 
     K = assemble_K(cache, state)
     F = (cache.P-cache.Pf)[cache.partition.free]
     uf = solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
-    return dot(F, uf)
+    # sum∘broadcast, not LinearAlgebra.dot: dot lowers to BLAS, which
+    # Enzyme's forward mode cannot handle under runtime activity
+    return sum(F .* uf)
 end
