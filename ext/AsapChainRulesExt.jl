@@ -175,44 +175,46 @@ _flatten3(Δ::NTuple{3,Any}) = Δ
 _flatten3(Δ::ChainRulesCore.Tangent) = _flatten3(ChainRulesCore.backing(Δ))
 _flatten3(Δ::NamedTuple) = _flatten3(first(values(Δ)))
 
-# shared reverse core, parameterized on the solver-seam backend. The
-# K-cotangent is returned PROJECTED onto K's sparsity pattern (the nonzero
-# entries of −λuᵀ that K actually stores). In Asap's pipeline K always
-# comes from sparse_from_pattern, whose pullback reads exactly those
-# entries — so this loses nothing, avoids materializing the dense n×n
-# outer product, and keeps the cotangent structurally compatible with
+# The K-cotangent is returned PROJECTED onto K's sparsity pattern (the
+# nonzero entries of −λuᵀ that K actually stores). In Asap's pipeline K
+# always comes from sparse_from_pattern, whose pullback reads exactly
+# those entries — so this loses nothing, avoids materializing the dense
+# n×n outer product, and keeps the cotangent structurally compatible with
 # sparse-tangent AD engines (Mooncake).
-function _solve_free_reverse(solver, K::SparseMatrixCSC, F::AbstractVecOrMat)
-    fact = HOST._factorize(solver, K)
-    u = fact \ F
-
-    function core_pullback(Δu)
-        λ = fact \ collect(unthunk(Δu))  # K symmetric: Kᵀ = K, reuse the factorization
-        ΔK = @thunk begin
-            rows = rowvals(K)
-            vals = Vector{eltype(K)}(undef, nnz(K))
-            @inbounds for j in 1:size(K, 2), p in nzrange(K, j)
-                vals[p] = -_rowdot(λ, u, rows[p], j)
-            end
-            SparseMatrixCSC(size(K, 1), size(K, 2), copy(K.colptr), copy(K.rowval), vals)
-        end
-        return ΔK, λ
+function _project_K_cotangent(K::SparseMatrixCSC, λ, u)
+    rows = rowvals(K)
+    vals = Vector{eltype(K)}(undef, nnz(K))
+    @inbounds for j in 1:size(K, 2), p in nzrange(K, j)
+        vals[p] = -_rowdot(λ, u, rows[p], j)
     end
-
-    return u, core_pullback
+    return SparseMatrixCSC(size(K, 1), size(K, 2), copy(K.colptr), copy(K.rowval), vals)
 end
 
+# NB two Enzyme-@import_rrule constraints on the 2-arg rule (the imported
+# one): the pullback must be FLAT (literal return tuple — no shared inner
+# closure with a splatted return), and the factorization must be the RAW
+# concretely-typed object from the one-arg _factorize — the
+# FactorizationCache wrapper's Any-typed fields put dynamic dispatch
+# inside the imported rule ("Illegal calling convention fixup").
 function ChainRulesCore.rrule(::typeof(HOST.solve_free),
     K::SparseMatrixCSC, F::AbstractVecOrMat)
-    u, core_pullback = _solve_free_reverse(nothing, K, F)
-    solve_free_pullback(Δu) = (NoTangent(), core_pullback(Δu)...)
+    fact = HOST._factorize(K)
+    u = fact \ F
+    function solve_free_pullback(Δu)
+        λ = fact \ collect(unthunk(Δu))  # K symmetric: Kᵀ = K, reuse the factorization
+        return (NoTangent(), @thunk(_project_K_cotangent(K, λ, u)), λ)
+    end
     return u, solve_free_pullback
 end
 
 function ChainRulesCore.rrule(::typeof(HOST.solve_free), solver,
     K::SparseMatrixCSC, F::AbstractVecOrMat)
-    u, core_pullback = _solve_free_reverse(solver, K, F)
-    solve_free_solver_pullback(Δu) = (NoTangent(), NoTangent(), core_pullback(Δu)...)
+    fact = HOST._factorize(solver, K)
+    u = fact \ F
+    function solve_free_solver_pullback(Δu)
+        λ = fact \ collect(unthunk(Δu))
+        return (NoTangent(), NoTangent(), @thunk(_project_K_cotangent(K, λ, u)), λ)
+    end
     return u, solve_free_solver_pullback
 end
 
