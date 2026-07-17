@@ -8,10 +8,10 @@ solves), translations, and hand-calculated equilibria.
     @testset "uniform network (batched path)" begin
         gen = N.GridNetwork(4, 6.0, 4, 6.0)
         nw = gen.network
-        @test nw.processed && !nw.mixed
-        @test nw.Naxis[1] == nw.Naxis[2] == nw.Naxis[3] == nw.N
+        @test nw.cache !== nothing && !nw.cache.mixed
+        @test nw.cache.Naxis[1] == nw.cache.Naxis[2] == nw.cache.Naxis[3] == nw.cache.N
         # interior nodes rose toward the load direction ([0,0,1] default)
-        zs = [n.position[3] for n in nw.nodes[nw.N]]
+        zs = [n.position[3] for n in nw.nodes[nw.cache.N]]
         @test all(zs .> 0)
     end
 
@@ -27,7 +27,9 @@ solves), translations, and hand-calculated equilibria.
         N.solve!(nw)
         @test m.position ≈ [1.0, 0.0, -0.5] rtol = 1e-12
         # anchors react; z-components sum against the load
-        @test a.reaction[3] + b.reaction[3] ≈ -1.0 rtol = 1e-10
+        ra = N.reaction(nw.results, a)
+        rb = N.reaction(nw.results, b)
+        @test ra[3] + rb[3] ≈ -1.0 rtol = 1e-10
     end
 
     @testset "per-axis fixity: plan prescribed, height free" begin
@@ -40,14 +42,17 @@ solves), translations, and hand-calculated equilibria.
         els = [N.FDMelement(a, m, 1.0), N.FDMelement(m, b, 1.0)]
         nw = N.Network([a, m, b], els, [N.FDMload(m, [0.0, 0.0, -1.0])])
         N.solve!(nw)
-        @test nw.mixed
+        @test nw.cache.mixed
         @test m.position[1] ≈ 0.7 atol = 1e-14          # plan untouched
         @test m.position[2] ≈ 0.3 atol = 1e-14
         @test m.position[3] ≈ -0.5 rtol = 1e-12          # height at equilibrium
         # the plan restraint reacts in x/y (member forces don't balance there),
         # and the free z-component is zero by definition
-        @test m.reaction[3] == 0.0
-        @test abs(m.reaction[1]) > 0
+        rm_ = N.reaction(nw.results, m)
+        @test rm_[3] == 0.0
+        @test abs(rm_[1]) > 0
+        # member forces via the results accessor
+        @test N.member_force(nw.results, els[1]) ≈ N.force(els[1]) rtol = 1e-12
 
         # pure re-solve variant: doubled q halves the sag (z = Pz/Σq with
         # anchors at z = 0), and the network itself is untouched
@@ -65,13 +70,13 @@ solves), translations, and hand-calculated equilibria.
         n2 = gen2.network
         # re-declare one FREE node's fixity per-axis (same values) and force
         # the mixed path by fixing a different node's z only
-        free_idx = first(n2.N)
+        free_idx = first(n2.cache.N)
         n2.nodes[free_idx].fixity = SVector(true, true, true)
-        other = n2.N[2]
+        other = n2.cache.N[2]
         n2.nodes[other].fixity = SVector(true, true, false)   # z now fixed
         zpin = n2.nodes[other].position[3]
         N.solve!(n2; reprocess = true)
-        @test n2.mixed
+        @test n2.cache.mixed
         @test n2.nodes[other].position[3] == zpin
         # and the fully-free node still equilibrates (finite, sensible)
         @test all(isfinite, n2.nodes[free_idx].position)

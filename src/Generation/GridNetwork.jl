@@ -81,7 +81,7 @@ struct GridNetwork <: AbstractGenerator
         end
 
         #make elements
-        elements = Vector{FDMelement}()
+        elements = Vector{FDMelement{Float64}}()
 
         #horizontal elements
         for i in axes(index_matrix, 1)

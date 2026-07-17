@@ -19,11 +19,11 @@ struct NetworkGeo <: AbstractGeo
     load_vectors::Vector{Vector{Float64}}
 
     function NetworkGeo(network::Network)
-        nodes = [Vector(row) for row in eachrow(network.xyz)]
+        nodes = [Vector(n.position) for n in network.nodes]
         indices = [[element.iStart, element.iEnd] for element in network.elements]
         indices_flat = vcat(indices...)
 
-        q = network.q
+        q = [el.q for el in network.elements]
         max_abs_q = maximum(abs.(q))
 
         forces = force.(network.elements)

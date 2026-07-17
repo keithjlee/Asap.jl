@@ -1,24 +1,25 @@
 """
-    FDMload(points::Vector{FDMnode}, i::Int64, force::Vector{<:Real})
-    FDMload(point::FDMnode, force::Vector{<:Real})
+    FDMload{T}
 
-An external force applied to a FDM node: `load = [Px, Py, Pz]`
+An external force applied to an FDM node.
+
+# Fields
+- `point::FDMnode{T}`: the loaded node
+- `force::SVector{3,T}`: the applied force [Px, Py, Pz] [force]
+
+# Constructors
+    FDMload(point, force)
+    FDMload(points, i::Int, force)
 """
-mutable struct FDMload
-    point::FDMnode # point at which load is applied
-    force::Vector{Float64} # force vector
+struct FDMload{T<:Real}
+    point::FDMnode{T}
+    force::SVector{3,T}
 
-    function FDMload(points::Vector{FDMnode}, i::Int64, force::Vector{<:Real})
-        @assert length(force) == 3 "Force vector should be length 3"
-
-        load = new(points[i], Float64.(force))
-        return load
-    end
-
-    function FDMload(point::FDMnode, force::Vector{<:Real})
-        @assert length(force) == 3 "Force vector should be length 3"
-
-        load = new(point, Float64.(force))
-        return load
+    function FDMload(point::FDMnode{T}, force::AbstractVector{<:Real}) where {T}
+        @assert Base.length(force) == 3 "Force vector should be length 3"
+        return new{T}(point, SVector{3,T}(force))
     end
 end
+
+FDMload(points::Vector{<:FDMnode}, i::Int, force::AbstractVector{<:Real}) =
+    FDMload(points[i], force)

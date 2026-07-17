@@ -9,7 +9,7 @@ function to_network(model::Model)
     end
 
     # convert nodes
-    nodeset = Vector{FDMnode}()
+    nodeset = Vector{FDMnode{Float64}}()
 
     for node in model.nodes
         pos = Vector(node.position)
@@ -28,7 +28,7 @@ function to_network(model::Model)
     end
 
     #convert loads
-    loadset = Vector{FDMload}()
+    loadset = Vector{FDMload{Float64}}()
 
     for load in model.loads
         i = load.node.index
@@ -37,7 +37,7 @@ function to_network(model::Model)
     end
 
     #convert elements
-    elset = Vector{FDMelement}()
+    elset = Vector{FDMelement{Float64}}()
 
     for element in model.elements
         istart, iend = element.nodeStart.index, element.nodeEnd.index
@@ -62,7 +62,7 @@ end
 Convert a solved FDM Network into an equivalent truss model with a given section. All fixed nodes are converted into pinned boundary conditions.
 """
 function to_truss(network::Network, section::AbstractSection)
-    if !network.processed
+    if network.cache === nothing
         error("Analyze network before conversion")
     end
 
@@ -94,7 +94,7 @@ function to_truss(network::Network, section::AbstractSection)
 
     #convert loads
     for load in network.loads
-        push!(loadset, NodeForce(nodeset[load.point.nodeID], Vector(load.force)))
+        push!(loadset, NodeForce(nodeset[load.point.index], Vector(load.force)))
     end
 
     truss = Model(nodeset, elset, loadset)

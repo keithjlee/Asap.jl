@@ -103,7 +103,7 @@ gen_truss_section = Section(gen_mat, 1e-3)
     @testset "GridNetwork (FDM)" begin
         gen = GridNetwork(4, 6.0, 4, 6.0)
         @test gen.network isa Network
-        @test gen.network.processed
+        @test gen.network.cache !== nothing
     end
 
     @testset "Ground structures" begin
@@ -177,7 +177,7 @@ gen_truss_section = Section(gen_mat, 1e-3)
         truss_gen = Pratt2D(12.0, 6, 1.5, gen_truss_section)
         network = to_network(truss_gen.model)
         @test network isa Network
-        @test network.processed
+        @test network.cache !== nothing
         @test length(network.elements) == length(truss_gen.model.elements)
 
         truss_back = to_truss(network, gen_truss_section)

@@ -347,9 +347,9 @@ Base.show(io::IO, l::FDMload) = print(io, "FDMload($(l.force))")
 function Base.show(io::IO, ::MIME"text/plain", nw::Network)
     println(io, "Network  (force density method)")
     println(io, "  $(length(nw.nodes)) nodes, $(length(nw.elements)) elements, $(length(nw.loads)) loads")
-    if nw.processed
-        println(io, "  $(length(nw.N)) fully free / $(length(nw.F)) supported nodes" *
-                    (nw.mixed ? "  (per-axis fixity: separable solves)" : ""))
+    if nw.cache !== nothing
+        println(io, "  $(length(nw.cache.N)) fully free / $(length(nw.cache.F)) supported nodes" *
+                    (nw.cache.mixed ? "  (per-axis fixity: separable solves)" : ""))
     else
         println(io, "  unprocessed (call process! or solve!)")
     end
