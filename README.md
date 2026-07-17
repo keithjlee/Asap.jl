@@ -315,6 +315,22 @@ ed = ElementDisplacements(bldg.model.elements[1], bldg.model; resolution = 20)
 ed.basepositions .+ 100 .* ed.uglobal   # 3×20 displaced curve, scaled ×100
 ```
 
+## Solver backends
+
+The built-in solver (CHOLMOD Cholesky with LDLᵀ fallback) needs nothing and is the default — most users never think about this. Loading [LinearSolve.jl](https://github.com/SciML/LinearSolve.jl) unlocks its entire algorithm collection through one keyword:
+
+```julia
+using LinearSolve
+
+solve!(model; solver = KLUFactorization())      # alternative direct solver
+solve!(model; solver = KrylovJL_CG())           # iterative — large models
+solve!(model)                                   # choice is remembered on the model
+```
+
+Repeated solves reuse the factorization's symbolic analysis (numeric-only refactorization on the frozen sparsity pattern) on every backend, including the default. Two notes: unpreconditioned iterative solvers want reasonably conditioned systems — supply a preconditioner for large/stiff models; and on the differentiable path, iterative solvers make gradients inexact adjoints (accuracy follows the solve tolerance) while direct factorizations stay exact.
+
+(`solve!`/`solve` extend the CommonSolve verbs, so loading LinearSolve or other SciML packages never shadows Asap's API.)
+
 # Documentation map
 
 - `docs/releases/` — release notes, including the v0.2.x → v1.0 breaking-change summary

@@ -45,8 +45,12 @@ reused across solves:
 - `K::SparseMatrixCSC{T,Int}`: the free×free stiffness matrix with a FROZEN
   sparsity pattern — numeric assembly only rewrites `nonzeros(K)`; no
   full-space matrix is ever formed
-- `spring_nz::Vector{Tuple{Int,T}}`: (nzval position, stiffness) pairs for
-  nodal springs on free DOFs
+- `spring_entries::Vector{Tuple{Int,Int,Int}}`: (nzval position, spring
+  index in `model.springs`, component 1:6) triples for nodal springs on free
+  DOFs — VALUES are read fresh from the model at every assembly, so
+  replacing a spring with a stiffer/softer one is picked up by the next
+  `solve!` (adding stiffness on a previously-zero component changes the
+  pattern and requires re-processing)
 - `P`, `Pf::Vector{T}`: full-space nodal-load and fixed-end-force vectors
 - `q_local::Vector{Vector{Vector{T}}}`: per element, per SEGMENT, the
   accumulated LOCAL condensed fixed-end force 12-vector (primitive elements
@@ -62,7 +66,7 @@ mutable struct AnalysisCache{T}
     partition::DofPartition
     groups::Vector{ElementGroup}
     K::SparseMatrixCSC{T,Int}
-    spring_nz::Vector{Tuple{Int,T}}
+    spring_entries::Vector{Tuple{Int,Int,Int}}
     P::Vector{T}
     Pf::Vector{T}
     q_local::Vector{Vector{Vector{T}}}
@@ -163,13 +167,13 @@ function build_cache(model::Model{T}) where {T}
         push!(groups, ElementGroup{E}(els, idxs, slots_all, gdofs_all, nzmaps, i1, i2, rollangles, endss, Cinc))
     end
 
-    spring_nz = Tuple{Int,T}[]
-    for sp in model.springs
+    spring_entries = Tuple{Int,Int,Int}[]
+    for (si, sp) in enumerate(model.springs)
         s = node_dof_start(sp.node)
         for i in 1:6
             f = g2f[s+i]
             if sp.stiffness[i] > 0 && f > 0
-                push!(spring_nz, (nzpos(f, f), T(sp.stiffness[i])))
+                push!(spring_entries, (nzpos(f, f), si, i))
             end
         end
     end
@@ -191,14 +195,14 @@ function build_cache(model::Model{T}) where {T}
     scatter = sparse(sI, sJ, ones(T, length(sI)), nnz(K), col)
 
     spring_nzvec = zeros(T, nnz(K))
-    for (pos, k) in spring_nz
-        spring_nzvec[pos] += k
+    for (pos, si, i) in spring_entries
+        spring_nzvec[pos] += T(model.springs[si].stiffness[i])
     end
 
     free_embed = sparse(part.free, collect(1:length(part.free)),
         ones(T, length(part.free)), part.n_global, length(part.free))
 
-    return AnalysisCache{T}(part, groups, K, spring_nz,
+    return AnalysisCache{T}(part, groups, K, spring_entries,
         zeros(T, part.n_global), zeros(T, part.n_global),
         [[zeros(T, 12) for _ in 1:n_segments(el)] for el in model.elements], nothing,
         scatter, spring_nzvec, free_embed)

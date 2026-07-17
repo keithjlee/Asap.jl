@@ -21,10 +21,25 @@ function assemble_K!(cache::AnalysisCache{T}, model::Model{T}) where {T}
     for g in cache.groups
         _assemble_group!(nz, g)               # function barrier: concrete E
     end
-    @inbounds for (pos, k) in cache.spring_nz
-        nz[pos] += k
+    @inbounds for (pos, si, i) in cache.spring_entries   # values read FRESH
+        nz[pos] += T(model.springs[si].stiffness[i])
     end
     return cache.K
+end
+
+"""
+    _refresh_spring_nzvec!(cache, model)
+
+Rebuild the pure path's spring-diagonal vector from the model's CURRENT
+springs (called by [`extract_state`](@ref) so replaced spring values are
+picked up — mirrors the fresh read the in-place assembler does).
+"""
+function _refresh_spring_nzvec!(cache::AnalysisCache{T}, model::Model{T}) where {T}
+    fill!(cache.spring_nzvec, zero(T))
+    @inbounds for (pos, si, i) in cache.spring_entries
+        cache.spring_nzvec[pos] += T(model.springs[si].stiffness[i])
+    end
+    return cache.spring_nzvec
 end
 
 function _assemble_group!(nz::Vector{T}, g::ElementGroup{E}) where {T,E}

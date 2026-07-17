@@ -79,20 +79,26 @@ a pair of triangular back-substitutions. Combinations then come free via
 [`combine`](@ref).
 """
 function solve_cases!(model::Model{T}; cases::Vector{Symbol}=load_cases(model),
-    reprocess::Bool=false) where {T}
+    reprocess::Bool=false, solver=nothing) where {T}
     (model.cache === nothing || reprocess) && process!(model)
     cache = model.cache::AnalysisCache{T}
 
     assemble_K!(cache, model)
-    cache.factorization = _factorize(cache.K)
+    fc = _ensure_factorization!(cache, solver)
     free = cache.partition.free
 
-    results = LinearResults{T}[]
+    # all case load vectors first, then ONE multi-RHS backsolve
     F = zeros(T, cache.partition.n_global, Base.length(cases))
     for (j, case) in enumerate(cases)
         assemble_loads!(cache, model; case=case)
         F[:, j] = cache.P .- cache.Pf
-        uf = cache.factorization \ F[free, j]
+    end
+    UF = _backsolve(fc.solver, fc, F[free, :])
+
+    results = LinearResults{T}[]
+    for (j, case) in enumerate(cases)
+        assemble_loads!(cache, model; case=case)   # restore q_local for recovery
+        uf = UF[:, j]
         u = zeros(T, cache.partition.n_global)
         u[free] = uf
         push!(results, _post_process(cache, model, u, dot(uf, F[free, j])))

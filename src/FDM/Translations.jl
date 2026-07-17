@@ -15,9 +15,13 @@ function to_network(model::Model)
         pos = Vector(node.position)
         id = node.id
 
-        dof = all(node.fixity[1:3])
-
-        fdmn = FDMnode(pos, dof)
+        #any structural support becomes a FULL anchor. Deliberately NOT
+        #per-axis: partially-anchored directions with mixed-sign force
+        #densities (a converted truss has compression members) are singular
+        #force-density systems — e.g. a roller's free direction has no
+        #anchor and no load, so its geometry is indeterminate. Build
+        #networks with per-axis `FDMnode` fixity directly when you mean it.
+        fdmn = FDMnode(pos, all(node.fixity[1:3]))
         fdmn.id = id
 
         push!(nodeset, fdmn)
@@ -71,9 +75,9 @@ function to_truss(network::Network, section::AbstractSection)
         pos = Vector(node.position)
         id = node.id
 
-        dof = node.dof ? :free : :pinned
-
-        tn = Node(pos, dof)
+        #per-axis: FDM translation fixity carries over; rotations stay free
+        #(truss rotations go inactive automatically)
+        tn = Node(pos, vcat(collect(node.fixity), trues(3)))
         tn.id = id
 
         push!(nodeset, tn)

@@ -313,3 +313,48 @@ end
 
 Base.show(io::IO, d::ElementDisplacements) =
     print(io, "ElementDisplacements(:$(d.element.id), $(d.resolution) stations)")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FDM (force density method)
+# ─────────────────────────────────────────────────────────────────────────────
+
+function Base.show(io::IO, ::MIME"text/plain", n::FDMnode)
+    axes = join((n.fixity[a] ? "free" : "FIXED" for a in 1:3), "/")
+    println(io, "FDMnode")
+    println(io, "  position = $(n.position)  [length]")
+    println(io, "  fixity   = x/y/z: $axes  (true = free)")
+    print(io,   "  id       = :$(n.id)")
+end
+
+Base.show(io::IO, n::FDMnode) =
+    print(io, "FDMnode(:$(n.id), $(n.position), $(collect(n.fixity)))")
+
+function Base.show(io::IO, ::MIME"text/plain", e::FDMelement)
+    println(io, "FDMelement")
+    println(io, "  q  = $(e.q)  [force/length]  (force density)")
+    print(io,   "  id = :$(e.id)")
+end
+
+Base.show(io::IO, e::FDMelement) = print(io, "FDMelement(:$(e.id), q=$(e.q))")
+
+function Base.show(io::IO, ::MIME"text/plain", l::FDMload)
+    println(io, "FDMload")
+    print(io, "  force = $(l.force)  [force] at node :$(l.point.id)")
+end
+
+Base.show(io::IO, l::FDMload) = print(io, "FDMload($(l.force))")
+
+function Base.show(io::IO, ::MIME"text/plain", nw::Network)
+    println(io, "Network  (force density method)")
+    println(io, "  $(length(nw.nodes)) nodes, $(length(nw.elements)) elements, $(length(nw.loads)) loads")
+    if nw.processed
+        println(io, "  $(length(nw.N)) fully free / $(length(nw.F)) supported nodes" *
+                    (nw.mixed ? "  (per-axis fixity: separable solves)" : ""))
+    else
+        println(io, "  unprocessed (call process! or solve!)")
+    end
+    print(io, "  solve!(network) finds the equilibrium geometry in place")
+end
+
+Base.show(io::IO, nw::Network) =
+    print(io, "Network($(length(nw.nodes)) nodes, $(length(nw.elements)) elements)")

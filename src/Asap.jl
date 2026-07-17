@@ -16,6 +16,11 @@ module Asap
 
 using LinearAlgebra, SparseArrays, StaticArrays
 
+# solve/solve! extend the CommonSolve verbs, so loading other CommonSolve
+# consumers (LinearSolve, the SciML stack) NEVER shadows Asap's API — both
+# packages export the same binding
+import CommonSolve: solve, solve!
+
 # global axes
 const globalX = SVector(1.0, 0.0, 0.0)
 const globalY = SVector(0.0, 1.0, 0.0)

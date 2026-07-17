@@ -19,10 +19,11 @@ end
 """
     dofs(points::Vector{FDMnode})
 
-Return the fixed/free DOF information from a vector of nodes.
+Fully-free flags (`true` only when every axis is free) — the uniform-network
+partition.
 """
 function dofs(points::Vector{FDMnode})
-    getproperty.(points, :dof)
+    [all(n.fixity) for n in points]
 end
 
 """
@@ -35,7 +36,7 @@ end
 """
     NF(points::Vector{FDMnode})
 
-Return fixed/free DOF indices from a vector of nodes.
+Return fixed/free node indices (fully free vs. the rest).
 """
 function NF(points::Vector{FDMnode})
     d = dofs(points)
@@ -45,10 +46,18 @@ end
 """
     NF!(network::Network)
 
-Extract fixed/free DOF indices from a vector of nodes.
+Populate the node partitions: the uniform `N`/`F` split (fully free vs. the
+rest) and the per-axis `Naxis`/`Faxis` splits that drive the separable
+solves. `mixed` records whether any node has non-uniform fixity — FDM
+equilibrium is separable per coordinate (the force-density matrix depends
+only on topology and q), so mixed networks simply solve each axis against
+its own partition.
 """
 function NF!(network::Network)
     network.N, network.F = NF(network.nodes)
+    network.Naxis = [findall(n -> n.fixity[a], network.nodes) for a in 1:3]
+    network.Faxis = [findall(n -> !n.fixity[a], network.nodes) for a in 1:3]
+    network.mixed = any(n -> any(n.fixity) != all(n.fixity), network.nodes)
 end
 
 """

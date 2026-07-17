@@ -2,7 +2,7 @@
 using Pkg
 Pkg.activate(; temp=true, io=devnull)
 Pkg.develop([PackageSpec(path="/Users/keithlee/Documents/dev/Asap")]; io=devnull)
-Pkg.add("Zygote"; io=devnull)
+Pkg.add(["Zygote", "LinearSolve"]; io=devnull)
 using Asap, LinearAlgebra
 
 # quick start ---------------------------------------------------------------
@@ -158,5 +158,25 @@ geo = Geo(truss.model)
 ed = ElementDisplacements(bldg.model.elements[1], bldg.model; resolution = 20)
 @assert size(ed.basepositions .+ 100 .* ed.uglobal) == (3, 20)
 println("generators OK")
+
+# solver backends ------------------------------------------------------------
+using LinearSolve
+sm = Warren2D(11, 1.5, 2.0, sec; load = [0.0, -20.0, 0.0]).model
+u0 = copy(sm.results.u)
+solve!(sm; solver = KLUFactorization())
+@assert sm.results.u ≈ u0 rtol = 1e-8
+solve!(sm)   # choice remembered
+@assert sm.cache.factorization.solver isa KLUFactorization
+
+# iterative solver on a well-conditioned frame (unpreconditioned CG needs a
+# reasonable condition number — precondition for big/stiff systems)
+p1 = Node([0.0, 0.0, 0.0], :fixed); p2 = Node([0.0, 0.0, 3.0], :free)
+pel = FrameElement(p1, p2, wshape)
+pm = Model([p1, p2], [pel], [NodeForce(p2, [10.0, 0.0, 0.0])])
+solve!(pm)
+v0 = copy(pm.results.u)
+solve!(pm; solver = KrylovJL_CG())
+@assert pm.results.u ≈ v0 rtol = 1e-5
+println("solver backends OK")
 
 println("ALL README EXAMPLES PASS")

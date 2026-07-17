@@ -372,3 +372,41 @@ end
     N.assemble_K!(fm.cache, fm)
     @test @allocated(N.assemble_K!(fm.cache, fm)) <= 256
 end
+
+@testset "mutate-and-resolve freshness + factorization reuse" begin
+    N = AsapNext
+    mat = N.Material(200e6, 77e6, 8.0, 0.3)
+    mk(k, A) = begin
+        n1 = N.Node([0.0, 0.0, 0.0], :fixed)
+        n2 = N.Node([0.0, 0.0, 3.0], :free)
+        el = N.FrameElement(n1, n2, N.Section(mat, A, 1e-4, 5e-5, 1e-6))
+        sp = N.NodalSpring(n2, [k, 0.0, 0.0, 0.0, 0.0, 0.0])
+        N.Model([n1, n2], N.AbstractElement{Float64}[el],
+            N.AbstractLoad{Float64}[N.NodeForce(n2, [10.0, 0.0, 0.0])]; springs = [sp])
+    end
+
+    m = mk(1e4, 1e-2)
+    N.solve!(m)
+    fc = m.cache.factorization
+    @test fc isa N.FactorizationCache
+
+    # replace spring (same pattern, new VALUE) + section; resolve WITHOUT reprocess
+    m.springs[1] = N.NodalSpring(m.nodes[2], [5e4, 0.0, 0.0, 0.0, 0.0, 0.0])
+    m.elements[1].section = N.Section(mat, 2e-2, 1e-4, 5e-5, 1e-6)
+    N.solve!(m)
+    fresh = mk(5e4, 2e-2)
+    N.solve!(fresh)
+    @test N.displacement(m.results, m.nodes[2]) ≈ N.displacement(fresh.results, fresh.nodes[2]) rtol = 1e-12
+
+    # the factorization object was REUSED (numeric-only refactorization)
+    @test m.cache.factorization === fc
+
+    # pure path reads replaced spring values too
+    st = N.extract_state(m)
+    K = N.assemble_K(m.cache, st)
+    @test K ≈ m.cache.K rtol = 1e-12
+
+    # sticky solver: default resolves keep the same FactorizationCache
+    N.solve!(m)
+    @test m.cache.factorization === fc
+end

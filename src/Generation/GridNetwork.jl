@@ -76,7 +76,7 @@ struct GridNetwork <: AbstractGenerator
 
         #make support nodes
         for node in nodes[support_indices]
-            node.dof = false
+            node.fixity = SVector(false, false, false)
             node.id = :support
         end
 

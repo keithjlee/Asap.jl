@@ -92,7 +92,7 @@ validate_rigidities(::AbstractElement) = nothing
 _plane_ok(rigidity, k1, k2) = rigidity > 0 || (iszero(k1) && iszero(k2))
 
 """
-    solve!(model; reprocess = false) -> model
+    solve!(model; reprocess = false, solver = nothing) -> model
 
 Run a linear static analysis: assemble the stiffness matrix and load
 vectors in place, factorize (Cholesky, with LDLᵀ fallback for indefinite
@@ -100,10 +100,16 @@ spring cases), solve for the free displacements, and post-process element
 end forces and support reactions into a fresh [`LinearResults`](@ref)
 stored at `model.results`.
 
-Repeated solves reuse the frozen sparsity pattern and all buffers. Pass
+Repeated solves reuse the frozen sparsity pattern, all buffers, AND the
+factorization's symbolic analysis (numeric-only refactorization). Pass
 `reprocess = true` after topology changes.
+
+`solver` selects the linear-solver backend. The default (`nothing`) is the
+built-in CHOLMOD path and needs no extra packages. With LinearSolve.jl
+loaded, any of its algorithms works — `solve!(model; solver = KrylovJL_CG())`
+— and the choice is remembered on the model's cache for subsequent solves.
 """
-function solve!(model::Model{T}; reprocess::Bool=false) where {T}
+function solve!(model::Model{T}; reprocess::Bool=false, solver=nothing) where {T}
     (model.cache === nothing || reprocess) && process!(model)
     cache = model.cache::AnalysisCache{T}
 
@@ -113,8 +119,8 @@ function solve!(model::Model{T}; reprocess::Bool=false) where {T}
     part = cache.partition
     F = cache.P[part.free] .- cache.Pf[part.free]
 
-    cache.factorization = _factorize(cache.K)
-    uf = cache.factorization \ F
+    fc = _ensure_factorization!(cache, solver)
+    uf = _backsolve(fc.solver, fc, F)
 
     u = zeros(T, part.n_global)
     u[part.free] = uf
@@ -123,8 +129,95 @@ function solve!(model::Model{T}; reprocess::Bool=false) where {T}
     return model
 end
 
-# factorization seam: Cholesky when SPD, LDLᵀ otherwise (kept behind one
-# function so a LinearSolve.jl extension can swap strategies later)
+"""
+    FactorizationCache
+
+Holder for the factorization state behind the solver seam: which `solver`
+backend produced it (`nothing` = the built-in CHOLMOD path), the backend
+factorization object `F`, and backend-private `meta` (the built-in path
+stores whether it fell back to LDLᵀ). Opaque solver state — declared
+tangent-free for AD engines, so ANY backend's internals stay invisible to
+differentiation.
+"""
+mutable struct FactorizationCache
+    solver::Any
+    F::Any
+    meta::Any
+end
+
+#=
+The solver seam. Three functions, dispatched on the solver object:
+
+    _factorize(solver, K)      -> FactorizationCache   (symbolic + numeric)
+    _refactorize!(solver, fc, K) -> fc                  (numeric only — the
+                                    sparsity pattern is frozen, so repeated
+                                    solves reuse the symbolic analysis)
+    _backsolve(solver, fc, b)  -> x                     (vector or multi-RHS)
+
+`solver === nothing` is the zero-dependency default (CHOLMOD Cholesky with
+LDLᵀ fallback). Extensions add methods for their own solver types — e.g.
+`AsapLinearSolveExt` accepts any `LinearSolve.SciMLLinearSolveAlgorithm`:
+
+    using LinearSolve
+    solve!(model; solver = KrylovJL_CG())
+
+The chosen solver is remembered on the cache: subsequent `solve!` calls
+reuse it (and its symbolic analysis) without re-passing the keyword.
+=#
+function _factorize(::Nothing, K::SparseMatrixCSC)
+    try
+        return FactorizationCache(nothing, cholesky(Symmetric(K)), false)
+    catch err
+        err isa LinearAlgebra.PosDefException || rethrow()
+        return FactorizationCache(nothing, ldlt(Symmetric(K)), true)
+    end
+end
+
+function _refactorize!(::Nothing, fc::FactorizationCache, K::SparseMatrixCSC)
+    try
+        if fc.meta === true
+            ldlt!(fc.F, Symmetric(K))
+        else
+            cholesky!(fc.F, Symmetric(K))
+        end
+    catch err
+        err isa LinearAlgebra.PosDefException || rethrow()
+        newfc = _factorize(nothing, K)
+        fc.F = newfc.F
+        fc.meta = newfc.meta
+    end
+    return fc
+end
+
+_backsolve(::Nothing, fc::FactorizationCache, b::AbstractVecOrMat) = fc.F \ b
+
+# convenience: the wrapper solves like a factorization (`fc \ b`)
+Base.:\(fc::FactorizationCache, b::AbstractVecOrMat) = _backsolve(fc.solver, fc, b)
+
+_factorize(solver, K::SparseMatrixCSC) =
+    error("no solver backend for $(typeof(solver)) — load LinearSolve.jl " *
+          "(or define the _factorize/_refactorize!/_backsolve seam methods for it)")
+
+"""
+    _ensure_factorization!(cache, solver) -> FactorizationCache
+
+Reuse the cache's factorization when possible: same (or unspecified)
+solver → numeric-only refactorization on the frozen pattern; first solve or
+a different solver → fresh symbolic + numeric factorization, remembered for
+subsequent solves.
+"""
+function _ensure_factorization!(cache::AnalysisCache, solver)
+    fc = cache.factorization
+    if fc isa FactorizationCache && (solver === nothing || solver === fc.solver)
+        return _refactorize!(fc.solver, fc, cache.K)
+    end
+    fc = _factorize(solver, cache.K)
+    cache.factorization = fc
+    return fc
+end
+
+# raw single-shot factorization (pure path / rrule use — no cache, default
+# backend): Cholesky when SPD, LDLᵀ otherwise
 function _factorize(K::SparseMatrixCSC)
     try
         return cholesky(Symmetric(K))

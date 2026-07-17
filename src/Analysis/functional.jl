@@ -50,6 +50,9 @@ ModelState{T}(X::Matrix, sections::AbstractVector, EA) where {T} =
 The model's current geometry and sections as a differentiable state.
 """
 function extract_state(model::Model{T}) where {T}
+    #pure-path spring diagonals read the model's CURRENT springs (same
+    #freshness contract as the in-place assembler)
+    model.cache === nothing || _refresh_spring_nzvec!(model.cache, model)
     sections = Any[_state_sections(el) for el in model.elements]
     ea = [s isa AbstractVector ? zero(T) : T(EA(s)) for s in sections]   # (super-elements: unused)
     return ModelState{T}(reduce(hcat, (collect(n.position) for n in model.nodes)),

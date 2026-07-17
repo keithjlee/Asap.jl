@@ -22,6 +22,10 @@ using SparseArrays
 # closure) and fails deep in its internals.
 Mooncake.tangent_type(::Type{<:SparseArrays.CHOLMOD.Factor}) = Mooncake.NoTangent
 
+# The solver-seam wrapper is likewise opaque solver state — one declaration
+# covers EVERY backend's factorization internals (LinearSolve caches etc.)
+Mooncake.tangent_type(::Type{Asap.FactorizationCache}) = Mooncake.NoTangent
+
 # Bridge adapter: Asap's solve_free rule returns its K-cotangent as a
 # SparseMatrixCSC sharing the primal's pattern; Mooncake's ChainRules
 # interop lacks a conversion for sparse cotangents onto its structural
