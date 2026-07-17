@@ -179,4 +179,20 @@ solve!(pm; solver = KrylovJL_CG())
 @assert pm.results.u ≈ v0 rtol = 1e-5
 println("solver backends OK")
 
+# force density method ------------------------------------------------------
+fa = FDMnode([0.0, 0.0, 0.0], false)
+fm = FDMnode([1.0, 0.0, 0.0], true, :mid)
+fb = FDMnode([2.0, 0.0, 0.0], false)
+cables = [FDMelement(fa, fm, 2.0), FDMelement(fm, fb, 2.0)]
+net = Network([fa, fm, fb], cables, [FDMload(fm, [0.0, 0.0, -1.0])])
+solve!(net)
+@assert fm.position ≈ [1.0, 0.0, -0.25] rtol = 1e-12
+@assert member_force(net.results, cables[1]) ≈ 2.0 * length(cables[1]) rtol = 1e-12
+@assert reaction(net.results, fa)[3] ≈ -0.5 rtol = 1e-10
+update_q!(net, 4.0)
+@assert fm.position[3] ≈ -0.125 rtol = 1e-12      # q doubled → sag halves
+crown = FDMnode([1.0, 1.0, 0.0], Bool[false, false, true])
+@assert crown.fixity == Bool[false, false, true]
+println("FDM OK")
+
 println("ALL README EXAMPLES PASS")
