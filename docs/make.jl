@@ -16,7 +16,7 @@ makedocs(
     checkdocs = :exports,
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", "false") == "true",
-        canonical = "https://keithjlee.github.io/Asap",
+        canonical = "https://keithjlee.github.io/Asap.jl",
         edit_link = "main",
         size_threshold = 400 * 2^10,
         size_threshold_warn = 250 * 2^10,
@@ -55,7 +55,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/keithjlee/Asap",
+    repo = "github.com/keithjlee/Asap.jl",
     devbranch = "main",
     push_preview = false,
 )
