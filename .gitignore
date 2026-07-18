@@ -23,3 +23,7 @@ CLAUDE.md
 PROGRESS.md
 docs/MIGRATION_v1.md
 docs/MODERNIZATION.md
+
+# Documenter build artifacts
+docs/build/
+docs/Manifest.toml

@@ -1,0 +1,8 @@
+[deps]
+Asap = "763a8c06-ba23-41fc-b385-b3b57b52403a"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+LinearSolve = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+
+[compat]
+Documenter = "1"

@@ -1,4 +1,6 @@
 [![DOI](https://zenodo.org/badge/426740094.svg)](https://zenodo.org/doi/10.5281/zenodo.10581559)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://keithjlee.github.io/Asap/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://keithjlee.github.io/Asap/dev/)
 
 ![](READMEassets/forces-axo.png)
 
@@ -357,6 +359,7 @@ Repeated solves reuse the factorization's symbolic analysis (numeric-only refact
 
 # Documentation map
 
+- **[keithjlee.github.io/Asap](https://keithjlee.github.io/Asap/stable/)** — the full documentation site: guide pages for every feature (with executed examples), the v0.2 → v1.0 migration guide, and the complete API reference.
 - `docs/releases/` — release notes, including the v0.2.x → v1.0 breaking-change summary
 - Every exported function and type carries a full docstring (`?Section`, `?dof_signature`, …), and every type has an engineer-readable REPL display.
 
