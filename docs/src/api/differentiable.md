@@ -15,3 +15,9 @@ The linear-solve seam of the differentiable path (the function AD rules attach t
 ```@docs
 Asap.solve_free
 ```
+
+The plain-data mirror of the applied element loads that [`assemble_Pf`](@ref) re-evaluates per state:
+
+```@docs
+Asap.FEFTable
+```
