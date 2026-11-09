@@ -75,6 +75,9 @@ Element loads run the generic lowering: clamped local FEFs from the load's
 [`fixed_end_forces`](@ref) kernel → end-condition condensation
 ([`condense_fef`](@ref)) → accumulate locally in `cache.q_local` (for force
 recovery) and globally (blockwise Λᵀ rotation) into `Pf`.
+
+Also rebuilds `cache.fef` ([`FEFTable`](@ref)), the plain-data mirror of the
+applied element loads that the pure path re-evaluates per design state.
 """
 function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
     case::Union{Nothing,Symbol}=nothing) where {T}
@@ -85,12 +88,74 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
     end
 
     inactive = Set(cache.partition.inactive)
+    tracked = Any[]
+    static = zeros(T, length(cache.Pf))
 
     for load in model.loads
         case === nothing || load.case === case || continue
-        _apply_load!(cache, load, inactive)
+        if load isa ElementLoad && load.element isa VariableElement
+            before = copy(cache.Pf)
+            _apply_load!(cache, load, inactive)
+            static .+= cache.Pf .- before
+        else
+            _apply_load!(cache, load, inactive)
+            load isa ElementLoad && push!(tracked, load)
+        end
     end
+    cache.fef = _build_fef_table(T, tracked, length(cache.Pf), static)
     return cache.P, cache.Pf
+end
+
+# the plain-data table of state-tracked element loads (FrameElement only)
+function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::Vector{T}) where {T}
+    n = length(loads)
+    elem = Vector{Int}(undef, n); i1 = similar(elem); i2 = similar(elem)
+    roll = Vector{T}(undef, n); ends = Vector{Any}(undef, n)
+    I_ = Int[]; J_ = Int[]
+    for (j, load) in enumerate(loads)
+        el = load.element::FrameElement
+        elem[j] = el.index
+        i1[j] = el.nodeStart.index
+        i2[j] = el.nodeEnd.index
+        roll[j] = el.rollangle
+        ends[j] = el.ends
+        g = element_global_dofs(el)
+        for k in 1:12
+            push!(I_, g[k]); push!(J_, 12(j - 1) + k)
+        end
+    end
+    scatter = sparse(I_, J_, ones(T, length(I_)), n_global, 12n)
+    return FEFTable{T}(loads, elem, i1, i2, roll, ends, scatter, static)
+end
+
+"""
+    condensed_fef(load, section, ends, x1, x2, rollangle) -> SVector{12}
+
+The element load's fixed-end force vector in LOCAL coordinates, consistent
+with the element's end conditions: the clamped kernel
+([`fixed_end_forces`](@ref)) followed by end-spring condensation
+([`condense_fef`](@ref)). This is `q̃` in the local force recovery
+`f = k·u_local + q̃`. Pure and differentiable in the positions `x1`, `x2`,
+the `section` and the `ends`.
+"""
+function condensed_fef(load::ElementLoad, section::AbstractSection, ends::EndConditions,
+    x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
+    q = fixed_end_forces(load, section, ends, x1, x2, rollangle)
+    return condense_fef(q, section, element_length(x1, x2), ends)
+end
+
+"""
+    element_fef_global(load, section, ends, x1, x2, rollangle) -> SVector{12}
+
+[`condensed_fef`](@ref) rotated to GLOBAL coordinates (blockwise Λᵀ): the
+element load's contribution to `Pf` at the element's 12 global DOFs. Pure
+and differentiable; the stateful assembler and the pure path
+([`assemble_Pf`](@ref)) both evaluate exactly this.
+"""
+function element_fef_global(load::ElementLoad, section::AbstractSection, ends::EndConditions,
+    x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
+    q̃ = condensed_fef(load, section, ends, x1, x2, rollangle)
+    return _rotate12(local_frame(x1, x2, rollangle)', q̃)
 end
 
 function _apply_load!(cache::AnalysisCache, load::NodeForce, inactive)
@@ -131,15 +196,12 @@ function _apply_element_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
     el::FrameElement) where {T}
     x1 = el.nodeStart.position
     x2 = el.nodeEnd.position
-    L = element_length(x1, x2)
 
-    q = fixed_end_forces(load, el.section, el.ends, x1, x2, el.rollangle)
-    q̃ = condense_fef(q, el.section, L, el.ends)
-
+    # the same pure kernels the differentiable path evaluates (assemble_Pf)
+    q̃ = condensed_fef(load, el.section, el.ends, x1, x2, el.rollangle)
     cache.q_local[el.index][1] .+= q̃
 
-    Λ = local_frame(x1, x2, el.rollangle)
-    Qg = _rotate12(Λ', q̃)                     # local → global, blockwise
+    Qg = _rotate12(local_frame(x1, x2, el.rollangle)', q̃)   # local → global, blockwise
     g = element_global_dofs(el)
     @inbounds for i in 1:12
         cache.Pf[g[i]] += Qg[i]
@@ -225,15 +287,19 @@ function _intensity_at(load::DistributedLoad{T}, t::Real) where {T}
     return load.w[s] + (load.w[s+1] - load.w[s]) * frac
 end
 
-# blockwise rotation of a 12-vector by a 3×3 matrix (four 3-blocks)
+"""
+    _rotate12(A, v) -> SVector{12}
+
+Blockwise rotation of a 12-vector by a 3×3 matrix (four 3-blocks: start
+force, start moment, end force, end moment). Written as one immutable
+`SVector` expression (no scratch buffer) so it is differentiable on the pure
+path; the per-entry arithmetic order is the explicit `a·x + b·y + c·z`, the
+same as the in-place version it replaced, so stateful results are unchanged.
+"""
 function _rotate12(A::SMatrix{3,3}, v::AbstractVector)
-    T = promote_type(eltype(A), eltype(v))
-    out = _mutable12vec(T)
-    @inbounds for b in 0:3
-        i = 3b
-        out[i+1] = A[1, 1] * v[i+1] + A[1, 2] * v[i+2] + A[1, 3] * v[i+3]
-        out[i+2] = A[2, 1] * v[i+1] + A[2, 2] * v[i+2] + A[2, 3] * v[i+3]
-        out[i+3] = A[3, 1] * v[i+1] + A[3, 2] * v[i+2] + A[3, 3] * v[i+3]
-    end
-    return SVector{12,T}(out)
+    r(b, row) = A[row, 1] * v[3b+1] + A[row, 2] * v[3b+2] + A[row, 3] * v[3b+3]
+    return SVector(
+        r(0, 1), r(0, 2), r(0, 3), r(1, 1), r(1, 2), r(1, 3),
+        r(2, 1), r(2, 2), r(2, 3), r(3, 1), r(3, 2), r(3, 3),
+    )
 end

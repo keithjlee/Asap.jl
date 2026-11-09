@@ -28,6 +28,7 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_loads.jl")
     include("newcore/test_variable.jl")
     include("newcore/test_ad.jl")
+    include("newcore/test_design_loads.jl")
     include("newcore/test_forward.jl")
     include("characterization/test_publication.jl")
 

@@ -33,6 +33,46 @@ struct ElementGroup{E<:AbstractElement}
 end
 
 """
+    FEFTable{T}
+
+Plain-data mirror of the element loads applied by the last
+[`assemble_loads!`](@ref), consumed by the differentiable pure path
+([`assemble_Pf`](@ref)) to re-evaluate fixed-end forces at any design state.
+Rebuilt by every `assemble_loads!` call, so it respects the same `case`
+selection as `P`.
+
+Only loads on `FrameElement`s are tracked per state. Loads on
+`VariableElement`s (whose internal geometry the pure state does not carry)
+contribute a constant `static` vector, frozen at the model's stored values.
+
+# Fields
+- `loads::Vector{Any}`: the element-load objects (immutable; only their
+  intensity/position/direction fields are read, never `load.element`)
+- `elem::Vector{Int}`: model element index of each load
+- `i1`, `i2::Vector{Int}`: start/end node indices (columns of `state.X`)
+- `rollangle::Vector{T}`: the element's roll angle [rad]
+- `ends::Vector{Any}`: the element's `EndConditions` (overridden per element
+  by `state.ends` when the state carries them)
+- `scatter::SparseMatrixCSC{T,Int}`: `n_global × 12·n_loads` 0/1 map from the
+  stacked per-load global 12-vectors to global DOFs
+- `static::Vector{T}`: full-space FEF contribution of loads NOT tracked per
+  state (`VariableElement` loads)
+"""
+struct FEFTable{T}
+    loads::Vector{Any}
+    elem::Vector{Int}
+    i1::Vector{Int}
+    i2::Vector{Int}
+    rollangle::Vector{T}
+    ends::Vector{Any}
+    scatter::SparseMatrixCSC{T,Int}
+    static::Vector{T}
+end
+
+FEFTable{T}(n_global::Int) where {T} = FEFTable{T}(Any[], Int[], Int[], Int[], T[], Any[],
+    spzeros(T, n_global, 0), zeros(T, n_global))
+
+"""
     AnalysisCache{T}
 
 The analysis structure derived from a `Model` by [`process!`](@ref) —
@@ -57,6 +97,9 @@ reused across solves:
   have one segment) — needed for element force recovery
 - `factorization`: cached factorization of `K` (set on first solve; numeric
   refactorization reuses the symbolic analysis since the pattern is frozen)
+- `fef::FEFTable{T}`: the applied element loads as plain data, so the pure
+  path can re-evaluate fixed-end forces at any design state
+  ([`assemble_Pf`](@ref)); rebuilt by every `assemble_loads!`
 
 Geometry/section/load *values* may change freely between solves; adding or
 removing nodes, elements, springs, or changing end conditions in a way that
@@ -75,6 +118,7 @@ mutable struct AnalysisCache{T}
     scatter::SparseMatrixCSC{T,Int}      # nnz(K) × Σnactive² — nzval = scatter·V + spring_nzvec
     spring_nzvec::Vector{T}              # spring diagonal contributions in nzval layout
     free_embed::SparseMatrixCSC{T,Int}   # n_global × n_free — u = free_embed · u_free
+    fef::FEFTable{T}                     # element loads as plain data (rebuilt by assemble_loads!)
 end
 
 # active slots of an element (positions 1:12 where the signature is true)
@@ -205,7 +249,7 @@ function build_cache(model::Model{T}) where {T}
     return AnalysisCache{T}(part, groups, K, spring_entries,
         zeros(T, part.n_global), zeros(T, part.n_global),
         [[zeros(T, 12) for _ in 1:n_segments(el)] for el in model.elements], nothing,
-        scatter, spring_nzvec, free_embed)
+        scatter, spring_nzvec, free_embed, FEFTable{T}(part.n_global))
 end
 
 # closure looking up the nzval position of entry (i, j) in a CSC matrix

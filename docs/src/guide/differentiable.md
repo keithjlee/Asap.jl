@@ -34,6 +34,20 @@ g = Zygote.gradient(state.X) do X
 end[1]
 ```
 
-Gradients flow with respect to node positions, section properties, and semi-rigid connection stiffnesses. For design-variable bookkeeping (areas, coupled symmetric geometry, bounds) and optimization-ready objectives, use [AsapOptim](https://github.com/keithjlee/AsapOptim) — a thin layer over this path, verified against the original published implementation to 13 digits (see its `docs/AD_VERIFICATION_AND_BENCHMARKS.md`).
+Gradients flow with respect to node positions, section properties, and semi-rigid connection stiffnesses.
+
+## Element loads follow the design
+
+Element-load fixed-end forces are re-evaluated at the state ([`assemble_Pf`](@ref)), so the load path is part of every gradient. In the portal above, moving a knee changes the beam's length and with it the total line load, and the gradient includes that term. The defaults under design change:
+
+| Load | Under a design change |
+|---|---|
+| `LineLoad` / `DistributedLoad` | per-unit-length intensity over fractions of the member: the total is recomputed from the current length |
+| `PointLoad` / `PointMoment` | stays at its fraction of the member, riding with it |
+| `SelfWeight` | follows the current ρA and length |
+| `:local` directions | rotate with the member (`:global` ones do not) |
+| semi-rigid / released ends | condensed end moments follow the end springs and EI |
+
+Pass `loads = :frozen` to `solve`/`compliance` to keep the fixed-end forces at the model's stored design (the behavior before v1.2), for studies where the load is fixed in space. Nodal loads (`NodeForce`, `NodeMoment`) are constant either way. For design-variable bookkeeping (areas, coupled symmetric geometry, bounds) and optimization-ready objectives, use [AsapOptim](https://github.com/keithjlee/AsapOptim) — a thin layer over this path, verified against the original published implementation to 13 digits (see its `docs/AD_VERIFICATION_AND_BENCHMARKS.md`).
 
 Forward-mode AD (ForwardDiff, Enzyme forward) and Mooncake are supported through the same path via their own package extensions — load the AD package and differentiate; no further setup.

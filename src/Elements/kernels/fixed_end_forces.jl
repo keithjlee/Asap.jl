@@ -42,22 +42,57 @@ them the *consistent* load lowering.
     return Na, Nb, H1, H2, H3, H4
 end
 
-# accumulate a local force density contribution c·(dx, dy, dz) at station x
-# into the 12-vector scratch q (local DOF order; y couples +H2/+H4 rotations,
-# z couples −H2/−H4 — the legacy x–z plane sign convention)
-@inline function _accumulate_fef!(q, c::Real, d::SVector{3}, x::Real, L::Real)
+"""
+    _fef_contribution(c, d, x, L) -> SVector{12}
+
+The local 12-vector contribution of a force density `c·d` (`d` a local
+direction 3-vector) acting at station `x ∈ [0, L]`: axial against the linear
+shape functions, transverse against the cubic Hermite ones (local DOF order;
+y couples +H2/+H4 rotations, z couples −H2/−H4 — the legacy x–z plane sign
+convention).
+
+Returned as a fresh immutable `SVector` rather than accumulated into a
+scratch buffer: the FEF kernels are on the differentiable pure path
+(design-dependent loads), and an in-place accumulation is opaque to
+reverse-mode AD (Zygote). Summation order is unchanged, so the stateful
+path's numbers are too.
+"""
+@inline function _fef_contribution(c::Real, d::AbstractVector, x::Real, L::Real)
     Na, Nb, H1, H2, H3, H4 = shape_functions(x, L)
-    @inbounds begin
-        q[1] += c * d[1] * Na
-        q[7] += c * d[1] * Nb
-        q[2] += c * d[2] * H1
-        q[6] += c * d[2] * H2
-        q[8] += c * d[2] * H3
-        q[12] += c * d[2] * H4
-        q[3] += c * d[3] * H1
-        q[5] -= c * d[3] * H2
-        q[9] += c * d[3] * H3
-        q[11] -= c * d[3] * H4
+    return SVector(
+        c * d[1] * Na, c * d[2] * H1, c * d[3] * H1, zero(c * d[1] * Na),
+        -(c * d[3] * H2), c * d[2] * H2,
+        c * d[1] * Nb, c * d[2] * H3, c * d[3] * H3, zero(c * d[1] * Nb),
+        -(c * d[3] * H4), c * d[2] * H4,
+    )
+end
+
+"""
+    _distributed_fef(t, w, d, L) -> SVector{12}
+
+Clamped-clamped local FEF of a piecewise-linear distributed load: intensity
+`w[s] → w[s+1]` [force/length] over each fraction interval `t[s] → t[s+1]` of
+the CURRENT length `L` (so the total load scales with `L` — per-unit-length
+semantics), along the local direction `d`. Three-point Gauss–Legendre per
+segment, exact for the degree-≤4 integrand.
+"""
+function _distributed_fef(t::AbstractVector, w::AbstractVector, d::AbstractVector, L::Real)
+    TQ = promote_type(eltype(w), eltype(d), typeof(L))
+    q = zero(SVector{12,TQ})
+    for s in 1:length(t)-1
+        # degenerate (zero-length) segment: decided on the fractions, which
+        # are constants — never on a possibly-Dual length
+        t[s+1] - t[s] < eps(float(eltype(t))) && continue
+        a = t[s] * L
+        b = t[s+1] * L
+        h = (b - a) / 2
+        m = (a + b) / 2
+        for k in 1:3
+            x = m + h * GAUSS3_X[k]
+            wi = w[s] + (w[s+1] - w[s]) * (x - a) / (b - a)
+            c = -GAUSS3_W[k] * h * wi          # FEF = −consistent nodal load
+            q = q + _fef_contribution(c, d, x, L)
+        end
     end
     return q
 end
@@ -77,6 +112,17 @@ to global coordinates are applied generically by the load assembler.
 `section`, `x1`, `x2`, `rollangle` describe the element (positions passed explicitly
 so the pure AD path can differentiate through geometry); `ends` is accepted
 for interface uniformity but the returned vector is always the CLAMPED one.
+
+# Semantics under design change (the pure path re-evaluates FEFs per state)
+- distributed loads are per-unit-length intensities over fractions of the
+  member: the total load is recomputed from the current length
+- point forces/moments sit at a fixed FRACTION of the member, so they ride
+  with it
+- `SelfWeight` follows the current `ρA` and length
+- `:local` directions rotate with the member; `:global` ones do not
+
+All methods are non-mutating (immutable `SVector` arithmetic), so they are
+differentiable by ForwardDiff, Zygote and the other AD backends.
 """
 function fixed_end_forces(load::DistributedLoad{T}, section::AbstractSection,
     ends::EndConditions, x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real},
@@ -85,25 +131,7 @@ function fixed_end_forces(load::DistributedLoad{T}, section::AbstractSection,
     L = element_length(x1, x2)
     Λ = local_frame(x1, x2, rollangle)
     d = _local_direction(load.direction, load.coords, Λ)
-
-    TQ = promote_type(T, eltype(L))
-    q = _mutable12vec(TQ)
-
-    @inbounds for s in 1:length(load.t)-1
-        a = load.t[s] * L
-        b = load.t[s+1] * L
-        b - a < eps(typeof(L)) * L && continue
-        h = (b - a) / 2
-        m = (a + b) / 2
-        for k in 1:3
-            x = m + h * GAUSS3_X[k]
-            wi = load.w[s] + (load.w[s+1] - load.w[s]) * (x - a) / (b - a)
-            c = -GAUSS3_W[k] * h * wi          # FEF = −consistent nodal load
-            _accumulate_fef!(q, c, d, x, L)
-        end
-    end
-
-    return SVector{12,TQ}(q)
+    return _distributed_fef(load.t, load.w, d, L)
 end
 
 function fixed_end_forces(load::PointLoad{T}, section::AbstractSection,
@@ -113,12 +141,8 @@ function fixed_end_forces(load::PointLoad{T}, section::AbstractSection,
     L = element_length(x1, x2)
     Λ = local_frame(x1, x2, rollangle)
     p = load.coords === :local ? load.value : Λ * load.value
-
-    TQ = promote_type(T, eltype(L))
-    q = _mutable12vec(TQ)
     # a point force is the c = −1 limit of the quadrature: one kernel evaluation
-    _accumulate_fef!(q, -one(TQ), p, load.position * L, L)
-    return SVector{12,TQ}(q)
+    return _fef_contribution(-one(eltype(p)), p, load.position * L, L)
 end
 
 """
@@ -151,24 +175,13 @@ function fixed_end_forces(load::PointMoment{T}, section::AbstractSection,
     Na, Nb, _ = shape_functions(x, L)
     _, _, H1′, H2′, H3′, H4′ = shape_function_slopes(x, L)
 
-    TQ = promote_type(T, typeof(L))
-    q = _mutable12vec(TQ)
-    @inbounds begin
-        # torsion (moment about local x): linear interpolation, like axial
-        q[4] = -m[1] * Na
-        q[10] = -m[1] * Nb
-        # moment about local z: pairs with the x–y plane displacement slope
-        q[2] = -m[3] * H1′
-        q[6] = -m[3] * H2′
-        q[8] = -m[3] * H3′
-        q[12] = -m[3] * H4′
-        # moment about local y: x–z plane, flipped rotation pairing
-        q[3] = m[2] * H1′
-        q[5] = -m[2] * H2′
-        q[9] = m[2] * H3′
-        q[11] = -m[2] * H4′
-    end
-    return SVector{12,TQ}(q)
+    # slots: torsion (moment about local x) interpolates linearly, like axial;
+    # moment about local z pairs with the x–y plane displacement slope; moment
+    # about local y is the x–z plane with the flipped rotation pairing
+    return SVector(
+        zero(m[1] * Na), -m[3] * H1′, m[2] * H1′, -m[1] * Na, -m[2] * H2′, -m[3] * H2′,
+        zero(m[1] * Nb), -m[3] * H3′, m[2] * H3′, -m[1] * Nb, -m[2] * H4′, -m[3] * H4′,
+    )
 end
 
 function fixed_end_forces(load::SelfWeight{T}, section::AbstractSection,
@@ -176,15 +189,16 @@ function fixed_end_forces(load::SelfWeight{T}, section::AbstractSection,
     rollangle::Real) where {T}
 
     gmag = norm(load.g)
-    iszero(gmag) && return zero(SVector{12,T})
+    iszero(gmag) && return zero(SVector{12,promote_type(T, eltype(x1), eltype(x2), typeof(ρA(section)))})
+    # a uniform global line load of intensity ρA·|g|·factor along ĝ — lowered
+    # through the kernel directly (no DistributedLoad{T} construction, which
+    # could not hold a Dual ρA)
     w = ρA(section) * gmag * load.factor
-    lowered = DistributedLoad(load.element, T[0, 1], [w, w], load.g ./ gmag;
-        coords=:global, id=load.id, case=load.case)
-    return fixed_end_forces(lowered, section, ends, x1, x2, rollangle)
+    L = element_length(x1, x2)
+    Λ = local_frame(x1, x2, rollangle)
+    d = Λ * (load.g ./ gmag)
+    return _distributed_fef(SVector(zero(T), one(T)), SVector(w, w), d, L)
 end
-
-# mutable 12-vector scratch, mirroring _mutable12
-_mutable12vec(::Type{T}) where {T} = isbitstype(T) ? zeros(MVector{12,T}) : zeros(T, 12)
 
 """
     condense_fef(q, section, L, ends::EndConditions) -> SVector{12}
@@ -220,10 +234,12 @@ function condense_fef(q::SVector{12,T}, section::AbstractSection, L::Real,
     qy = _condense_plane(SVector(q[3], q[5], q[9], q[11]),
         EIy(section), L, ends.e1.ky, ends.e2.ky, true)
 
-    return SVector{12,T}(
+    # eltype promotes (not fixed to q's): EI or the springs may carry AD
+    # partials that the clamped q (geometry/intensity only) does not
+    return SVector(promote(
         q[1], qz[1], qy[1], q[4], qy[2], qz[2],
         q[7], qz[3], qy[3], q[10], qy[4], qz[4],
-    )
+    )...)
 end
 
 function _condense_plane(qp::SVector{4,T}, EI::Real, L::Real,

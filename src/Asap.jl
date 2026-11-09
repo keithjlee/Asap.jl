@@ -82,7 +82,8 @@ export LinearResults, displacement, reaction, element_forces, axial_force
 export ElementForceState, LoadTrace, internal_forces, InternalForces
 export shear_y, shear_z, torsion, moment_y, moment_z, local_displacements
 export LoadCombination, CaseResults, load_cases, solve_cases!, combine, Envelope, envelope
-export ModelState, extract_state, solve, compliance, assemble_K
+export ModelState, extract_state, solve, compliance, assemble_K, assemble_Pf, fef_local
+export condensed_fef, element_fef_global
 
 # ── model utilities ─────────────────────────────────────────────────────────
 include("Model/utilities.jl")

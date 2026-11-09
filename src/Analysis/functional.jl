@@ -20,9 +20,13 @@ perturbed states in your objective (e.g. rebuild positions from a design
 vector, or sections from area variables) — see the gradient tests for
 patterns.
 
-Loads are treated as constant data in the pure path for now (`P` and `Pf`
-are read from the cache); differentiating through load values/FEFs is a
-Phase 5a extension if needed.
+Loads: nodal loads `P` are constant data read from the cache. Element-load
+fixed-end forces are DESIGN-DEPENDENT: the pure path re-evaluates them at the
+state's positions, sections and end conditions ([`assemble_Pf`](@ref)), so
+gradients include the load path (a member's line load scales with its
+length, self-weight with ρA, condensed end moments with the end springs and
+EI). Pass `loads = :frozen` to [`solve`](@ref)/[`compliance`](@ref) for the
+cached, design-constant fixed-end forces instead.
 """
 struct ModelState{T}
     X::Matrix{T}
@@ -181,13 +185,89 @@ solve_free(K::SparseMatrixCSC, F::AbstractMatrix) = _factorize(K) \ F   # multi-
 solve_free(solver, K::SparseMatrixCSC, F::AbstractVecOrMat) = _factorize(solver, K) \ F
 
 """
-    solve(model, state; solver = nothing) -> Vector
+    assemble_Pf(cache, state) -> Vector
+
+The full-space fixed-end force vector `Pf` evaluated at the design `state`:
+every element load applied by the last [`assemble_loads!`](@ref) (the
+plain-data [`FEFTable`](@ref) in `cache.fef`) is lowered through
+[`element_fef_global`](@ref) at the state's node positions, the element's
+state section, and its end conditions (`state.ends` when the state carries
+them, else the model's), then scattered to global DOFs.
+
+Pure and differentiable: one map over the loaded elements of immutable
+12-vector kernels and one sparse matvec. With no element loads it returns
+the cached `Pf` untouched, so nodal-load-only models pay nothing. Loads on
+`VariableElement`s enter as the constant `cache.fef.static` (their internal
+geometry is not part of the state).
+
+At the model's own state (`extract_state(model)`) this reproduces the
+stateful `cache.Pf` to rounding.
+"""
+function assemble_Pf(cache::AnalysisCache, state::ModelState)
+    t = cache.fef
+    isempty(t.loads) && return cache.Pf
+    Q = map(eachindex(t.loads)) do j
+        e = t.elem[j]
+        ends = state.ends === nothing ? t.ends[j] : state.ends[e]
+        element_fef_global(t.loads[j], state.sections[e], ends,
+            _position(state.X, t.i1[j]), _position(state.X, t.i2[j]), t.rollangle[j])
+    end
+    return t.static + t.scatter * reduce(vcat, Q)
+end
+
+"""
+    fef_local(cache, state) -> Matrix   (12 × n_loads)
+
+The LOCAL condensed fixed-end force vectors `q̃` ([`condensed_fef`](@ref)) of
+every state-tracked element load at the design `state`, one column per load,
+in `cache.fef` order (`cache.fef.elem[j]` is load `j`'s element). These are
+the `q̃` terms of the local force recovery `f = k·u_local + q̃`, e.g. slot 7
+is the load's contribution to the end-node axial action. Pure and
+differentiable.
+"""
+function fef_local(cache::AnalysisCache, state::ModelState)
+    t = cache.fef
+    T = eltype(state.X)
+    isempty(t.loads) && return zeros(T, 12, 0)
+    Q = map(eachindex(t.loads)) do j
+        e = t.elem[j]
+        ends = state.ends === nothing ? t.ends[j] : state.ends[e]
+        condensed_fef(t.loads[j], state.sections[e], ends,
+            _position(state.X, t.i1[j]), _position(state.X, t.i2[j]), t.rollangle[j])
+    end
+    return reshape(reduce(vcat, Q), 12, :)
+end
+
+# does the pure path re-evaluate fixed-end forces? (validates `loads`)
+function _design_loads(cache::AnalysisCache, loads::Symbol)
+    loads === :design || loads === :frozen ||
+        throw(ArgumentError("loads must be :design or :frozen, got :$loads"))
+    return loads === :design && !isempty(cache.fef.loads)
+end
+
+# the reduced solve, behind a function barrier: each caller branch passes a
+# concretely-typed F, so the solve_free call site stays type-stable on the
+# constant-load path (Enzyme's imported rules and forward mode need that;
+# the design-load path maps over abstract load objects and may infer loosely)
+function _pure_solve(K, F, solver)
+    # the default keeps the 2-arg call — Enzyme's imported rules match it
+    return solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
+end
+
+"""
+    solve(model, state; solver = nothing, loads = :design) -> Vector
 
 Pure linear solve on a processed model: assemble from the differentiable
 `state`, solve, and return the FULL-space displacement vector (inactive and
 fixed slots zero). Requires `process!` (or a prior `solve!`) to have built
-the cache; load vectors are taken from the cache as constants — call
+the cache; nodal loads are taken from the cache as constants, so call
 `assemble_loads!` first if loads changed.
+
+`loads = :design` (default) re-evaluates element-load fixed-end forces at
+the state ([`assemble_Pf`](@ref)): a member's line load follows its current
+length, self-weight its ρA, condensed end moments its end springs and EI.
+`loads = :frozen` uses the cached, design-constant `Pf` instead (the
+behavior before v1.2: loads fixed at the model's stored geometry).
 
 `solver` selects the linear-solver backend for the reduced solve (see
 [`solve_free`](@ref)); `nothing` is the built-in CHOLMOD path.
@@ -196,27 +276,37 @@ This is the AD entry point: gradients of any scalar of the returned vector
 with respect to node positions and section properties flow through Zygote
 with no further ceremony.
 """
-function solve(model::Model{T}, state::ModelState; solver = nothing) where {T}
+function solve(model::Model{T}, state::ModelState; solver = nothing, loads::Symbol = :design) where {T}
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
-    F = (cache.P-cache.Pf)[cache.partition.free]
-    # the default keeps the 2-arg call — Enzyme's imported rules match it
-    uf = solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
+    free = cache.partition.free
+    if _design_loads(cache, loads)
+        uf = _pure_solve(K, (cache.P - assemble_Pf(cache, state))[free], solver)
+    else
+        uf = _pure_solve(K, (cache.P - cache.Pf)[free], solver)
+    end
     return cache.free_embed * uf
 end
 
 """
-    compliance(model, state; solver = nothing) -> T
+    compliance(model, state; solver = nothing, loads = :design) -> T
 
 External work `Fᵀu_free` of the pure solve — the canonical smooth stiffness
-objective, differentiable end-to-end.
+objective, differentiable end-to-end. `loads` as in [`solve`](@ref): with
+design-dependent loads `F` itself varies with the design, and the gradient
+includes that term.
 """
-function compliance(model::Model{T}, state::ModelState; solver = nothing) where {T}
+function compliance(model::Model{T}, state::ModelState; solver = nothing, loads::Symbol = :design) where {T}
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
-    F = (cache.P-cache.Pf)[cache.partition.free]
-    uf = solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
-    # sum∘broadcast, not LinearAlgebra.dot: dot lowers to BLAS, which
-    # Enzyme's forward mode cannot handle under runtime activity
-    return sum(F .* uf)
+    free = cache.partition.free
+    if _design_loads(cache, loads)
+        F = (cache.P - assemble_Pf(cache, state))[free]
+        # sum∘broadcast, not LinearAlgebra.dot: dot lowers to BLAS, which
+        # Enzyme's forward mode cannot handle under runtime activity
+        return sum(F .* _pure_solve(K, F, solver))
+    else
+        F0 = (cache.P - cache.Pf)[free]
+        return sum(F0 .* _pure_solve(K, F0, solver))
+    end
 end
