@@ -25,9 +25,9 @@
 | S0 derivation dossier | ✅ membrane transcribed from ITW report; MITC4 written, primary-PDF recheck open | — |
 | S1 n-node analysis-layer generalization | ✅ bitwise parity with main; lockstep green | `e5a8ce2` |
 | S2 `ShellSection` + ITW drilling membrane | ✅ enhanced variant (DERIVATION §2.1) — Keith OK'd 2026-11-23 | `4e9677f` |
-| S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | (see `git log`) |
-| S4 area loads, resultants, `section_cut` | ✅ (pier/spandrel labelling moved to S5a with the mesher) | (see `git log`) |
-| S5a wall mesher + 2-node link/spring element | ☐ | |
+| S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | `2b67b1e` |
+| S4 area loads, resultants, `section_cut` | ✅ | `da60f78` |
+| S5a wall mesher + edge loads + 2-node link element | ✅ | (see `git log`) |
 | S5b rigid diaphragm constraints | ☐ | |
 | S6 pure path / AD + AsapOptim thickness variable | ☐ | |
 | Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ☐ | |
@@ -57,9 +57,14 @@
   - **Gotcha:** a uniform LINE traction on a drilling-element edge is consistent only with
     end moments ∓p·l²/12 per edge (−at J, +at K). Nodal forces alone are not. S5a should ship
     an edge-load helper that adds them.
-- **Next (S5a):** wall mesher (rectangle plus rectangular openings, hard points, edge-node sets,
-  pier/spandrel labelling via `section_cut`), the edge-load helper, and a 2-node link/spring
-  element.
+- **S5a (done):** `mesh_wall` (structured, with openings and hard lines; `reuse` connects
+  walls to walls and frames), `wall_cut` (pier/spandrel free bodies for `section_cut`),
+  `edge_loads` (consistent line traction including the drilling end moments), and
+  `LinkElement` (zero-length 6-spring, enforced at `process!`). Verified: a beam framing
+  in-plane into a stiff wall reaches PL³/3EI within 2% (drilling moment transfer); a stiff
+  link equals the monolithic wall to 1e-6; pier shears sum exactly to the storey shear.
+- **Next (S5b):** rigid diaphragms. The design (a linear map after assembly,
+  nzval(K̂) = M·nzval(K)) is in DERIVATION §5.
 - **S3 (old note, done):** implement `_plate_stiffness(xy, section)` as MITC4 (DERIVATION §3) in the
   12×12 (w, θx, θy)×4 layout, which `_shell_local` already embeds. First pull Bathe & Dvorkin
   1985 (Undermind) to confirm the tying-point formulas.

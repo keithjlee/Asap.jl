@@ -19,7 +19,7 @@ end
 # consistent nodal loads of an edge traction `q(y)` (quadratic at most) on the
 # vertical edge whose node heights are `ys` (linear shape functions; Simpson
 # is exact for quadratic × linear)
-function edge_loads(ys, q)
+function _edge_traction_loads(ys, q)
     F = zeros(length(ys))
     for j in 1:length(ys)-1
         ya, yb = ys[j], ys[j+1]
@@ -40,7 +40,7 @@ function cantilever_wall(nx, ny; L = 48.0, H = 12.0)
     sec = ShellSection(Material(30000.0, 1.0, 0.25), 1.0)
     grid, els = membrane_mesh(nx, ny, (i, j) -> (L * i / nx, H * j / ny), sec;
         fix = (i, j) -> i == 0 ? (true, true, true) : nothing)
-    F = edge_loads([H * j / ny for j in 0:ny], y -> 40 * 1.5 / H * (1 - (2y / H - 1)^2))
+    F = _edge_traction_loads([H * j / ny for j in 0:ny], y -> 40 * 1.5 / H * (1 - (2y / H - 1)^2))
     m = Model(vec(grid), els, AbstractLoad{Float64}[NodeForce(grid[nx+1, j+1], [0.0, F[j+1], 0.0]) for j in 0:ny])
     solve!(m)
     return sum(F[j+1] * displacement(m.results, grid[nx+1, j+1])[2] for j in 0:ny) / 40

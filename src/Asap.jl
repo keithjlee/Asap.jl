@@ -51,12 +51,13 @@ include("Elements/interface.jl")
 include("Elements/frame.jl")
 include("Elements/variable.jl")
 include("Elements/shell.jl")
+include("Elements/link.jl")
 export AbstractElement, AbstractLineElement, FrameElement, TrussElement, VariableElement
 export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment
 export ShellElement, shell_frame, shell_stiffness, itw_membrane_stiffness
-export shell_resultants, section_cut
+export shell_resultants, section_cut, LinkElement
 
 # ── springs ─────────────────────────────────────────────────────────────────
 include("Springs/nodal_springs.jl")
@@ -105,8 +106,10 @@ include("FDM/FDM.jl")
 
 # ── parametric structure generators (absorbed from AsapToolkit) ──────────────
 include("Generation/Generators.jl")
+include("Generation/WallMesh.jl")
 export Frame, SpaceFrame, Warren2D, Pratt2D, SpaceFrameBeam, BakerTruss,
     TrussFrame, GridNetwork, GridFrame
+export WallMesh, mesh_wall, wall_cut, edge_loads
 export XGroundStructure, DenseGroundStructure, BoundedGroundStructure
 export to_truss, to_frame
 

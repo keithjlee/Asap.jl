@@ -47,4 +47,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_shell_membrane.jl")
     include("newcore/test_shell_plate.jl")
     include("newcore/test_shell_loads_results.jl")
+    include("newcore/test_shell_mesh_links.jl")
 end

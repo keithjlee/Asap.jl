@@ -155,6 +155,26 @@ end
 
 Base.show(io::IO, el::ShellElement{T,N}) where {T,N} = print(io, "ShellElement{$N}(:$(el.id))")
 
+function Base.show(io::IO, ::MIME"text/plain", el::LinkElement)
+    println(io, "LinkElement :$(el.id)  (zero-length 6-spring connection)")
+    println(io, "  at $(collect(el.nodeStart.position))")
+    println(io, "  k₁, k₂, k₃    = $(collect(el.k[SOneTo(3)]))  [force/length]       (along link axes)")
+    print(io,   "  kθ₁, kθ₂, kθ₃ = $(collect(el.k[SVector(4, 5, 6)]))  [force·length/rad]  (about link axes)")
+end
+
+Base.show(io::IO, el::LinkElement) = print(io, "LinkElement(:$(el.id))")
+
+function Base.show(io::IO, ::MIME"text/plain", m::WallMesh)
+    println(io, "WallMesh  ($(length(m.elements)) shell elements, $(length(m.nodes)) nodes)")
+    println(io, "  origin = $(collect(m.origin))  [length]")
+    println(io, "  along  = $(collect(m.along))   (wall length direction, local e₁)")
+    println(io, "  up     = $(collect(m.up))   (wall height direction)")
+    println(io, "  length = $(m.s[end]), height = $(m.z[end])  [length]")
+    print(io,   "  grid   = $(length(m.s)) × $(length(m.z)) lines (openings removed)")
+end
+
+Base.show(io::IO, m::WallMesh) = print(io, "WallMesh($(length(m.elements)) elements)")
+
 function Base.show(io::IO, ::MIME"text/plain", el::FrameElement)
     sym = release_symbol(el.ends)
     conn = sym === nothing ? "semi-rigid connections" : "connections :$sym"
