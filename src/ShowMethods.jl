@@ -247,6 +247,15 @@ Base.show(io::IO, sp::NodalSpring) =
 # Model & results
 # ─────────────────────────────────────────────────────────────────────────────
 
+function Base.show(io::IO, ::MIME"text/plain", d::RigidDiaphragm)
+    ax = ("X", "Y", "Z")[d.axis]
+    println(io, "RigidDiaphragm :$(d.id)  (rigid in-plane floor, normal $ax)")
+    println(io, "  slaves = $(length(d.nodes)) nodes  (in-plane DOFs follow the master rigidly)")
+    print(io,   "  master at $(collect(d.master.position))  (apply storey forces/torques here)")
+end
+
+Base.show(io::IO, d::RigidDiaphragm) = print(io, "RigidDiaphragm(:$(d.id), $(length(d.nodes)) nodes)")
+
 function Base.show(io::IO, ::MIME"text/plain", m::Model)
     nf = count(el -> el isa FrameElement, m.elements)
     nt = count(el -> el isa TrussElement, m.elements)

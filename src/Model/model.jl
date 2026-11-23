@@ -22,11 +22,14 @@ The model is the first of three separated layers:
 - `loads::Vector{AbstractLoad{T}}`
 - `springs::Vector{NodalSpring{T}}`: elastic supports (applicative — nodes
   don't know about their springs)
+- `diaphragms::Vector{RigidDiaphragm{T}}`: rigid in-plane floor constraints
+  ([`RigidDiaphragm`](@ref)); their master nodes are added to `nodes`
 - `cache`: the `AnalysisCache` after processing (`nothing` before)
 - `results`: the most recent `LinearResults` (`nothing` before solving)
 
 # Constructor
-    Model(nodes, elements, loads = AbstractLoad{T}[]; springs = NodalSpring{T}[])
+    Model(nodes, elements, loads = AbstractLoad{T}[]; springs = NodalSpring{T}[],
+          diaphragms = RigidDiaphragm{T}[])
 
 # Typical use
 ```julia-repl
@@ -42,16 +45,23 @@ mutable struct Model{T<:Real}
     elements::Vector{AbstractElement{T}}
     loads::Vector{AbstractLoad{T}}
     springs::Vector{NodalSpring{T}}
+    diaphragms::Vector{RigidDiaphragm{T}}
     cache::Any        # ::Union{Nothing, AnalysisCache{T}} — Any avoids a mutual-recursion forward reference
     results::Any      # ::Union{Nothing, LinearResults{T}}
 
     function Model(nodes::Vector{Node{T}}, elements::Vector{<:AbstractElement{T}},
         loads::Vector{<:AbstractLoad{T}}=AbstractLoad{T}[];
-        springs::Vector{NodalSpring{T}}=NodalSpring{T}[]) where {T}
+        springs::Vector{NodalSpring{T}}=NodalSpring{T}[],
+        diaphragms::AbstractVector=RigidDiaphragm{T}[]) where {T}
         @assert !isempty(nodes) "a model needs nodes"
         @assert !isempty(elements) "a model needs elements"
-        return new{T}(nodes, collect(AbstractElement{T}, elements),
-            collect(AbstractLoad{T}, loads), springs, nothing, nothing)
+        ds = collect(RigidDiaphragm{T}, diaphragms)
+        allnodes = nodes
+        for d in ds   # auto-created (or not-yet-listed) masters join the model
+            any(n -> n === d.master, allnodes) || (allnodes = vcat(allnodes, d.master))
+        end
+        return new{T}(allnodes, collect(AbstractElement{T}, elements),
+            collect(AbstractLoad{T}, loads), springs, ds, nothing, nothing)
     end
 end
 

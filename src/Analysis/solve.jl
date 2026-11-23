@@ -29,6 +29,8 @@ function process!(model::Model{T}) where {T}
         end
     end
     model.cache = build_cache(model)
+    cm = model.cache.constraint
+    cm === nothing || _refresh_constraint!(cm, model)
     return model
 end
 
@@ -119,8 +121,16 @@ function solve!(model::Model{T}; reprocess::Bool=false, solver=nothing) where {T
     part = cache.partition
     F = cache.P[part.free] .- cache.Pf[part.free]
 
-    fc = _ensure_factorization!(cache, solver)
-    uf = _backsolve(fc.solver, fc, F)
+    cm = cache.constraint
+    if cm === nothing
+        fc = _ensure_factorization!(cache, solver)
+        uf = _backsolve(fc.solver, fc, F)
+    else
+        _refresh_constraint!(cm, model)
+        _reduce_K!(cm, cache.K)
+        fc = _ensure_factorization!(cache, solver; K = cm.Khat)
+        uf = cm.C * _backsolve(fc.solver, fc, cm.C' * F)
+    end
 
     u = zeros(T, part.n_global)
     u[part.free] = uf
@@ -260,12 +270,12 @@ solver → numeric-only refactorization on the frozen pattern; first solve or
 a different solver → fresh symbolic + numeric factorization, remembered for
 subsequent solves.
 """
-function _ensure_factorization!(cache::AnalysisCache, solver)
+function _ensure_factorization!(cache::AnalysisCache, solver; K::SparseMatrixCSC = cache.K)
     fc = cache.factorization
     if fc isa FactorizationCache && (solver === nothing || solver === fc.solver)
-        return _refactorize!(fc.solver, fc, cache.K)
+        return _refactorize!(fc.solver, fc, K)
     end
-    fc = _factorize(solver, cache.K)
+    fc = _factorize(solver, K)
     cache.factorization = fc
     return fc
 end

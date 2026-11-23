@@ -93,6 +93,11 @@ function partition_dofs(model::Model)
             sp.stiffness[i] > 0 && (active[s+i] = true)
         end
     end
+    for d in model.diaphragms      # the master carries the diaphragm's in-plane DOFs
+        s = node_dof_start(d.master)
+        b, c = _inplane_axes(d.axis)
+        active[s+b] = active[s+c] = active[s+3+d.axis] = true
+    end
 
     free = Int[]
     fixed = Int[]

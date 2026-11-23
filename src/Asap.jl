@@ -74,11 +74,14 @@ export fixed_end_forces, condense_fef
 export AreaLoad
 
 # ── model ───────────────────────────────────────────────────────────────────
+include("Model/diaphragm.jl")
 include("Model/model.jl")
 export Model, node_positions, connectivity, volume
+export RigidDiaphragm
 
 # ── analysis ────────────────────────────────────────────────────────────────
 include("Analysis/dofs.jl")
+include("Analysis/constraints.jl")   # ConstraintMap is a field type of AnalysisCache
 include("Analysis/symbolic.jl")
 include("Analysis/assemble.jl")
 include("Results/results.jl")

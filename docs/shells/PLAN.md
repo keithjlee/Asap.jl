@@ -27,8 +27,8 @@
 | S2 `ShellSection` + ITW drilling membrane | ✅ enhanced variant (DERIVATION §2.1) — Keith OK'd 2026-11-23 | `4e9677f` |
 | S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | `2b67b1e` |
 | S4 area loads, resultants, `section_cut` | ✅ | `da60f78` |
-| S5a wall mesher + edge loads + 2-node link element | ✅ | (see `git log`) |
-| S5b rigid diaphragm constraints | ☐ | |
+| S5a wall mesher + edge loads + 2-node link element | ✅ | `bc682a4` |
+| S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | (see `git log`) |
 | S6 pure path / AD + AsapOptim thickness variable | ☐ | |
 | Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ☐ | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
@@ -63,8 +63,16 @@
   `LinkElement` (zero-length 6-spring, enforced at `process!`). Verified: a beam framing
   in-plane into a stiff wall reaches PL³/3EI within 2% (drilling moment transfer); a stiff
   link equals the monolithic wall to 1e-6; pier shears sum exactly to the storey shear.
-- **Next (S5b):** rigid diaphragms. The design (a linear map after assembly,
-  nzval(K̂) = M·nzval(K)) is in DERIVATION §5.
+- **S5b (done):** `RigidDiaphragm(nodes; master, axis, id)` plus the `Model(...; diaphragms)`
+  keyword (auto-masters join `model.nodes`). `ConstraintMap` lives in the cache and every solve
+  path has a constrained branch: `solve!`, `solve_cases!`, pure `solve`/`compliance`.
+  Unconstrained branches are untouched, and existing models are still bitwise identical to
+  `main`. In the pure path C (the offsets) is frozen at the last `solve!`.
+  - **Note:** `Model` gained a field (`diaphragms`, before `cache`). Downstream code reads
+    fields by name, so nothing broke, but AsapOptim should be aware.
+- **Next (S6):** AD/pure path for shells. Area loads are still frozen (static), and AsapOptim's
+  `OptParams` assumes line elements (`i1`/`i2`/`Cinc` from `nodeStart`/`nodeEnd`). Decide
+  between supporting shells there and rejecting them clearly, and add a `ThicknessVariable`.
 - **S3 (old note, done):** implement `_plate_stiffness(xy, section)` as MITC4 (DERIVATION §3) in the
   12×12 (w, θx, θy)×4 layout, which `_shell_local` already embeds. First pull Bathe & Dvorkin
   1985 (Undermind) to confirm the tying-point formulas.

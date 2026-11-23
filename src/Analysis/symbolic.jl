@@ -99,6 +99,9 @@ reused across solves:
   element force recovery
 - `factorization`: cached factorization of `K` (set on first solve; numeric
   refactorization reuses the symbolic analysis since the pattern is frozen)
+- `constraint`: the rigid-diaphragm transformation ([`ConstraintMap`](@ref
+  Asap.ConstraintMap)) or `nothing`; when present every solve works on the
+  reduced system `CᵀKC·û = CᵀF`, `u_free = C·û`
 - `fef::FEFTable{T}`: the applied element loads as plain data, so the pure
   path can re-evaluate fixed-end forces at any design state
   ([`assemble_Pf`](@ref)); rebuilt by every `assemble_loads!`
@@ -121,6 +124,7 @@ mutable struct AnalysisCache{T}
     spring_nzvec::Vector{T}              # spring diagonal contributions in nzval layout
     free_embed::SparseMatrixCSC{T,Int}   # n_global × n_free — u = free_embed · u_free
     fef::FEFTable{T}                     # element loads as plain data (rebuilt by assemble_loads!)
+    constraint::Union{Nothing,ConstraintMap{T}}   # rigid diaphragms (u_free = C·û), or nothing
 end
 
 # active slots of an element (positions 1:12 where the signature is true)
@@ -252,7 +256,8 @@ function build_cache(model::Model{T}) where {T}
     return AnalysisCache{T}(part, groups, K, spring_entries,
         zeros(T, part.n_global), zeros(T, part.n_global),
         [[zeros(T, 6 * length(nodes(el))) for _ in 1:n_segments(el)] for el in model.elements], nothing,
-        scatter, spring_nzvec, free_embed, FEFTable{T}(part.n_global))
+        scatter, spring_nzvec, free_embed, FEFTable{T}(part.n_global),
+        build_constraint(model, part, K))
 end
 
 # N × nel node-index matrix of a concretely-typed element vector (every

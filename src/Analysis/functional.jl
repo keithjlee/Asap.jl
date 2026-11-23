@@ -281,6 +281,14 @@ function _pure_solve(K, F, solver)
     return solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
 end
 
+# reduced solve through the diaphragm map: u_free = C·(CᵀKC)⁻¹·CᵀF — K̂'s values
+# are a sparse linear map of K's (differentiable); C is frozen at the last
+# solve!/process! (offsets constant under AD)
+function _constrained_solve(cm::ConstraintMap, K, F, solver)
+    Khat = _reduce_K(cm, K)
+    return cm.C * _pure_solve(Khat, cm.C' * F, solver)
+end
+
 """
     solve(model, state; solver = nothing, loads = :design) -> Vector
 
@@ -307,6 +315,10 @@ function solve(model::Model{T}, state::ModelState; solver = nothing, loads::Symb
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
     free = cache.partition.free
+    if cache.constraint !== nothing
+        F = _design_loads(cache, loads) ? (cache.P - assemble_Pf(cache, state))[free] : (cache.P - cache.Pf)[free]
+        return cache.free_embed * _constrained_solve(cache.constraint, K, F, solver)
+    end
     if _design_loads(cache, loads)
         uf = _pure_solve(K, (cache.P - assemble_Pf(cache, state))[free], solver)
     else
@@ -327,6 +339,10 @@ function compliance(model::Model{T}, state::ModelState; solver = nothing, loads:
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
     free = cache.partition.free
+    if cache.constraint !== nothing
+        F = _design_loads(cache, loads) ? (cache.P - assemble_Pf(cache, state))[free] : (cache.P - cache.Pf)[free]
+        return sum(F .* _constrained_solve(cache.constraint, K, F, solver))
+    end
     if _design_loads(cache, loads)
         F = (cache.P - assemble_Pf(cache, state))[free]
         # sum∘broadcast, not LinearAlgebra.dot: dot lowers to BLAS, which
