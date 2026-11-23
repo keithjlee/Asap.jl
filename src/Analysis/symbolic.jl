@@ -58,6 +58,10 @@ contribute a constant `static` vector, frozen at the model's stored values.
   stacked per-load global 12-vectors to global DOFs
 - `static::Vector{T}`: full-space FEF contribution of loads NOT tracked per
   state (`VariableElement` loads)
+- `sloads`, `selem`, `snodes`, `sscatter`: the SHELL surface loads
+  (`AreaLoad`, `SelfWeight` on `ShellElement`s), re-evaluated per state:
+  model element index, the 4 node indices (4 × n), and the
+  `n_global × 24·n` scatter of their global 24-vectors
 """
 struct FEFTable{T}
     loads::Vector{Any}
@@ -68,10 +72,14 @@ struct FEFTable{T}
     ends::Vector{Any}
     scatter::SparseMatrixCSC{T,Int}
     static::Vector{T}
+    sloads::Vector{Any}
+    selem::Vector{Int}
+    snodes::Matrix{Int}
+    sscatter::SparseMatrixCSC{T,Int}
 end
 
 FEFTable{T}(n_global::Int) where {T} = FEFTable{T}(Any[], Int[], Int[], Int[], T[], Any[],
-    spzeros(T, n_global, 0), zeros(T, n_global))
+    spzeros(T, n_global, 0), zeros(T, n_global), Any[], Int[], zeros(Int, 4, 0), spzeros(T, n_global, 0))
 
 """
     AnalysisCache{T}

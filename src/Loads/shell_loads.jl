@@ -54,5 +54,9 @@ _shell_traction(load::AreaLoad, el::ShellElement) =
     load.frame === :global ? load.q : local_frame(el)' * load.q
 _shell_traction(load::SelfWeight, el::ShellElement) =
     areal_mass(el.section) * load.factor * load.g
+# state variants (pure path): frame R and section from the design state
+_shell_traction_state(load::AreaLoad, sec, R) = load.frame === :global ? load.q : R' * load.q
+_shell_traction_state(load::SelfWeight, sec, R) = areal_mass(sec) * load.factor * load.g
+
 _shell_traction(load::ElementLoad, el::ShellElement) = throw(ArgumentError(
     "$(nameof(typeof(load))) cannot be applied to a ShellElement — use AreaLoad, SelfWeight or NodeForce"))

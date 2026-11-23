@@ -28,9 +28,9 @@
 | S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | `2b67b1e` |
 | S4 area loads, resultants, `section_cut` | ✅ | `da60f78` |
 | S5a wall mesher + edge loads + 2-node link element | ✅ | `bc682a4` |
-| S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | (see `git log`) |
-| S6 pure path / AD + AsapOptim thickness variable | ☐ | |
-| Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ☐ | |
+| S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | `deddfa7` |
+| S6 pure path / AD + AsapOptim thickness variable | ✅ design-dependent shell loads; `AsapShellADExt`; AsapOptim `ThicknessVariable` (branch `shells`) | (see `git log`) |
+| Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ⏳ docs/notes drafted; **awaiting Keith: merge + push + register** | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
 
 ### Handoff notes
@@ -70,9 +70,34 @@
   `main`. In the pure path C (the offsets) is frozen at the last `solve!`.
   - **Note:** `Model` gained a field (`diaphragms`, before `cache`). Downstream code reads
     fields by name, so nothing broke, but AsapOptim should be aware.
-- **Next (S6):** AD/pure path for shells. Area loads are still frozen (static), and AsapOptim's
-  `OptParams` assumes line elements (`i1`/`i2`/`Cinc` from `nodeStart`/`nodeEnd`). Decide
-  between supporting shells there and rejecting them clearly, and add a `ThicknessVariable`.
+- **S6 (done):**
+  - `FEFTable` shell-load fields; `assemble_Pf` re-evaluates `AreaLoad`/`SelfWeight` on shells
+    per state.
+  - Zygote ≡ finite differences for positions and thickness. A `:frozen` thickness gradient
+    differs from the design-dependent one, because self-weight follows t.
+  - **Perf:** Zygote tracing through the 24×24 kernels was 796 ms per gradient (29 elements;
+    primal 1.9 ms) with a 128 s compile. `ext/AsapShellADExt.jl` adds `rrule`s on
+    `_shell_K_plain`/`_shell_fef_plain` that compute the local Jacobian with ForwardDiff
+    (chunk 4: 85 s compile, 49 ms gradient; chunk 12: 155 s / 52 ms; chunk 2: 75 s / 101 ms).
+    Remaining cost: first-call compile.
+  - **Follow-ups:**
+    - batch shell kernels across elements (cf. the deferred batched-frame work);
+    - an analytic membrane/plate pullback if compile time matters;
+    - make `solution_tangents` shell-aware (it currently refuses thickness variables and
+      diaphragms).
+  - AsapOptim (branch `shells`):
+    - `ThicknessVariable(elements, value, lb, ub)` covers whole walls;
+    - `shell_volume(x, p)`;
+    - generic `i1`/`i2`;
+    - **two bugs fixed in passing:** `solve_structure` would have frozen shell loads (new
+      `_design_F` predicate), and it bypassed rigid diaphragms (now through
+      `Asap._constrained_solve`).
+- **Release (pending Keith):**
+  - docs pages `guide/shells.md` and `api/shells.md`, `docs/releases/v1.3.0.md`, the README
+    section, and `test/readme_examples.jl` (its stale pre-ecosystem path is fixed);
+  - steps: merge `shells` to `main` in Asap and AsapOptim, bump to 1.3.0 (AsapOptim compat
+    `Asap = "1.3"` if it needs the new API, plus its own version), push, docs CI, and
+    `@JuliaRegistrator register`.
 - **S3 (old note, done):** implement `_plate_stiffness(xy, section)` as MITC4 (DERIVATION §3) in the
   12×12 (w, θx, θy)×4 layout, which `_shell_local` already embeds. First pull Bathe & Dvorkin
   1985 (Undermind) to confirm the tying-point formulas.

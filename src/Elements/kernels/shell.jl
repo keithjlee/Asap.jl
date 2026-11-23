@@ -250,10 +250,16 @@ positions. Local matrices are built in the element plane
 ([`shell_frame`](@ref)) and rotated blockwise: `K = Tᵀ K_local T`,
 `T = diag(R, …, R)`.
 """
-function shell_stiffness(section::AbstractShellSection, X1, X2, X3, X4)
+shell_stiffness(section::AbstractShellSection, X1, X2, X3, X4) =
+    _shell_K_plain(membrane_rigidity(section), bending_rigidity(section),
+        shear_rigidity(section), drilling_rigidity(section), X1, X2, X3, X4)
+
+# the kernel on plain data (rigidities + positions): the AD rule's target
+# (ext/AsapShellADExt.jl — local ForwardDiff Jacobian instead of a scalar trace)
+function _shell_K_plain(A, D, S, γt, X1, X2, X3, X4)
     R, xy, _ = shell_frame(X1, X2, X3, X4)
-    Km = itw_membrane_stiffness(xy, membrane_rigidity(section), drilling_rigidity(section))
-    Kp = _plate_stiffness(xy, section)
+    Km = itw_membrane_stiffness(xy, A, γt)
+    Kp = mitc4_plate_stiffness(xy, D, S)
     return _rotate_shell(_shell_local(Km, Kp), R)
 end
 

@@ -232,14 +232,50 @@ stateful `cache.Pf` to rounding.
 """
 function assemble_Pf(cache::AnalysisCache, state::ModelState)
     t = cache.fef
-    isempty(t.loads) && return cache.Pf
+    isempty(t.loads) && isempty(t.sloads) && return cache.Pf
+    isempty(t.sloads) && return t.static + _frame_fef(t, state)
+    isempty(t.loads) && return t.static + _shell_fef(t, state)
+    return t.static + _frame_fef(t, state) + _shell_fef(t, state)
+end
+
+function _frame_fef(t::FEFTable, state::ModelState)
     Q = map(eachindex(t.loads)) do j
         e = t.elem[j]
         ends = state.ends === nothing ? t.ends[j] : state.ends[e]
         element_fef_global(t.loads[j], state.sections[e], ends,
             _position(state.X, t.i1[j]), _position(state.X, t.i2[j]), t.rollangle[j])
     end
-    return t.static + t.scatter * reduce(vcat, Q)
+    return t.scatter * reduce(vcat, Q)
+end
+
+# shell surface loads at the state: traction (local pressure follows the
+# element orientation; self-weight follows ρt of the state section) →
+# condensed consistent load → global 24-vector, scattered
+function _shell_fef(t::FEFTable, state::ModelState)
+    Q = map(eachindex(t.sloads)) do j
+        sec = state.sections[t.selem[j]]
+        X = (_position(state.X, t.snodes[1, j]), _position(state.X, t.snodes[2, j]),
+             _position(state.X, t.snodes[3, j]), _position(state.X, t.snodes[4, j]))
+        _shell_fef_global(t.sloads[j], sec, X)
+    end
+    return t.sscatter * reduce(vcat, Q)
+end
+
+function _shell_fef_global(load, sec, X)
+    R = shell_frame(X...)[1]
+    q = _shell_traction_state(load, sec, R)
+    return _shell_fef_plain(membrane_rigidity(sec), q, X...)
+end
+
+# global fixed-end 24-vector of a uniform global traction q: plain-data AD target
+function _shell_fef_plain(A, q, X1, X2, X3, X4)
+    R, xy, _ = shell_frame(X1, X2, X3, X4)
+    f24, fb = shell_consistent_load(xy, R * q)
+    K16 = _itw_K16(xy, A)
+    b = SVector(13, 14, 15, 16)
+    corr = K16[_SONE12, b] * (K16[b, b] \ fb)
+    Δ = vcat(corr, zero(eltype(corr)))[_IDX_MEMBRANE]
+    return _rotate24(R', -(f24 - Δ))
 end
 
 """
@@ -269,7 +305,7 @@ end
 function _design_loads(cache::AnalysisCache, loads::Symbol)
     loads === :design || loads === :frozen ||
         throw(ArgumentError("loads must be :design or :frozen, got :$loads"))
-    return loads === :design && !isempty(cache.fef.loads)
+    return loads === :design && !(isempty(cache.fef.loads) && isempty(cache.fef.sloads))
 end
 
 # the reduced solve, behind a function barrier: each caller branch passes a

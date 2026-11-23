@@ -89,25 +89,30 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
 
     inactive = Set(cache.partition.inactive)
     tracked = Any[]
+    stracked = Any[]
     static = zeros(T, length(cache.Pf))
 
     for load in model.loads
         case === nothing || load.case === case || continue
-        if load isa ElementLoad && (load.element isa VariableElement || load.element isa ShellElement)
+        if load isa ElementLoad && load.element isa VariableElement
             before = copy(cache.Pf)
             _apply_load!(cache, load, inactive)
             static .+= cache.Pf .- before
+        elseif load isa ElementLoad && load.element isa ShellElement
+            _apply_load!(cache, load, inactive)
+            push!(stracked, load)
         else
             _apply_load!(cache, load, inactive)
             load isa ElementLoad && push!(tracked, load)
         end
     end
-    cache.fef = _build_fef_table(T, tracked, length(cache.Pf), static)
+    cache.fef = _build_fef_table(T, tracked, length(cache.Pf), static, stracked)
     return cache.P, cache.Pf
 end
 
 # the plain-data table of state-tracked element loads (FrameElement only)
-function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::Vector{T}) where {T}
+function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::Vector{T},
+    sloads::Vector{Any} = Any[]) where {T}
     n = length(loads)
     elem = Vector{Int}(undef, n); i1 = similar(elem); i2 = similar(elem)
     roll = Vector{T}(undef, n); ends = Vector{Any}(undef, n)
@@ -125,7 +130,23 @@ function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::
         end
     end
     scatter = sparse(I_, J_, ones(T, length(I_)), n_global, 12n)
-    return FEFTable{T}(loads, elem, i1, i2, roll, ends, scatter, static)
+    ns = length(sloads)
+    selem = Vector{Int}(undef, ns)
+    snodes = Matrix{Int}(undef, 4, ns)
+    SI = Int[]; SJ = Int[]
+    for (j, load) in enumerate(sloads)
+        el = load.element::ShellElement
+        selem[j] = el.index
+        for k in 1:4
+            snodes[k, j] = el.nodes[k].index
+        end
+        g = element_global_dofs(el)
+        for k in 1:24
+            push!(SI, g[k]); push!(SJ, 24(j - 1) + k)
+        end
+    end
+    sscatter = sparse(SI, SJ, ones(T, length(SI)), n_global, 24ns)
+    return FEFTable{T}(loads, elem, i1, i2, roll, ends, scatter, static, sloads, selem, snodes, sscatter)
 end
 
 """
