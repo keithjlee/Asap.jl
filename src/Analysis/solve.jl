@@ -313,6 +313,20 @@ function _post_process(cache::AnalysisCache{T}, model::Model{T}, u::Vector{T},
     return LinearResults{T}(u, reactions, forces, compliance)
 end
 
+# generic N-node fallback (element types without a local-frame recovery of
+# their own): GLOBAL nodal forces Kₑ·uₑ — 6 per node in `nodes(el)` order.
+# Element loads are not supported on such elements (their q_local stays 0).
+function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
+    el::AbstractElement, u::Vector{T}) where {T}
+    Ke = element_stiffness(el)
+    g = element_global_dofs(el)
+    f_global = Ke * u[g]
+    @inbounds for i in eachindex(g)
+        isfixed[g[i]] && (reactions[g[i]] += f_global[i])
+    end
+    return Vector{T}(f_global)
+end
+
 # primitive elements: one 12-vector of local end forces
 function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
     el::Union{FrameElement,TrussElement}, u::Vector{T}) where {T}

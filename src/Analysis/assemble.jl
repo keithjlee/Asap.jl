@@ -44,7 +44,7 @@ end
 
 function _assemble_group!(nz::Vector{T}, g::ElementGroup{E}) where {T,E}
     @inbounds for (e, el) in enumerate(g.elements)
-        Ke = stiffness(el, el.nodeStart.position, el.nodeEnd.position)
+        Ke = element_stiffness(el)
         slots = g.slots[e]
         m = g.nzmap[e]
         n = length(slots)

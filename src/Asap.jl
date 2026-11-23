@@ -46,7 +46,7 @@ include("Elements/kernels/stiffness.jl")
 include("Elements/interface.jl")
 include("Elements/frame.jl")
 include("Elements/variable.jl")
-export AbstractElement, FrameElement, TrussElement, VariableElement
+export AbstractElement, AbstractLineElement, FrameElement, TrussElement, VariableElement
 export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment

@@ -85,8 +85,30 @@ function stiffness_entries(cache::AnalysisCache, state::ModelState)
     return reduce(vcat, parts)
 end
 
-# default: per-element kernel evaluation
+# generic N-node default (surface elements and other non-line types):
+# per-element kernel evaluation at the state's positions of ALL its nodes.
+# Element types specialize `_group_entries_nnode` to consume plain data only
+# (the default reads the element struct — fine for prototypes, not for
+# reverse-mode AD at scale).
 function _group_entries_all(g::ElementGroup, state::ModelState)
+    return _group_entries_nnode_all(g, state, Val(size(g.inodes, 1)))
+end
+
+function _group_entries_nnode_all(g::ElementGroup, state::ModelState, ::Val{N}) where {N}
+    reduce(vcat, map(eachindex(g.elements)) do e
+        X = ntuple(k -> _position(state.X, g.inodes[k, e]), Val(N))
+        _group_entries_nnode(g, e, state.sections[g.model_indices[e]], X)
+    end)
+end
+
+function _group_entries_nnode(g::ElementGroup, e::Int, section, X::NTuple)
+    Ke = stiffness(g.elements[e], X...)
+    slots = g.slots[e]
+    return Base.length(slots) == size(Ke, 1) ? vec(Ke) : vec(Ke[slots, slots])
+end
+
+# line elements: per-element kernel evaluation from the two endpoint columns
+function _group_entries_all(g::ElementGroup{<:AbstractLineElement}, state::ModelState)
     reduce(vcat, map(eachindex(g.elements)) do e
         _group_entries(g, e, state.sections[g.model_indices[e]],
             _position(state.X, g.i1[e]), _position(state.X, g.i2[e]),

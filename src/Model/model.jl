@@ -69,8 +69,16 @@ node_positions(model::Model{T}) where {T} =
 `n_elements × n_nodes` signed incidence matrix: −1 at each element's start
 node, +1 at its end node — so `C * X` gives element vectors for nodal
 coordinate columns `X`.
+
+Defined for models of line elements ([`AbstractLineElement`](@ref)) only: a
+signed two-node incidence has no meaning for surface elements, so a model
+containing any throws an `ArgumentError` rather than silently dropping rows
+(which would shift element indices).
 """
 function connectivity(model::Model)
+    all(el -> el isa AbstractLineElement, model.elements) || throw(ArgumentError(
+        "connectivity(model) is defined for line elements only; this model contains " *
+        "surface elements"))
     I_ = Int[]
     J_ = Int[]
     V_ = Int[]
@@ -90,7 +98,9 @@ geometric area (`Section`); `RigiditySection`s have no geometric area and
 contribute zero (they represent effective rigidities, not geometry).
 """
 volume(model::Model{T}) where {T} =
-    sum(el -> _section_area(el.section) * Base.length(el), model.elements; init=zero(T))
+    sum(_element_volume, model.elements; init=zero(T))
+
+_element_volume(el::AbstractLineElement) = _section_area(el.section) * Base.length(el)
 
 _section_area(s::Section) = s.A
 _section_area(::AbstractSection{T}) where {T} = zero(T)

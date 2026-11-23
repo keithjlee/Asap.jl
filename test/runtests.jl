@@ -43,4 +43,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_generation.jl")
     include("newcore/test_solvers.jl")
     include("newcore/test_fdm.jl")
+    include("newcore/test_nnode.jl")
 end
