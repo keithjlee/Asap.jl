@@ -113,6 +113,48 @@ end
 # Elements
 # ─────────────────────────────────────────────────────────────────────────────
 
+# shell sections
+
+_fmt3(M) = join((join((string(round(M[i, j]; sigdigits = 5)) for j in axes(M, 2)), "  ") for i in axes(M, 1)), "; ")
+
+function Base.show(io::IO, ::MIME"text/plain", s::ShellSection)
+    println(io, "ShellSection  (homogeneous isotropic shell)")
+    println(io, "  t = $(s.t)  [length]  (thickness)")
+    println(io, "  material: E = $(s.material.E), G = $(s.material.G), ρ = $(s.material.ρ), ν = $(s.material.ν)")
+    println(io, "  rigidities (what the stiffness matrix consumes):")
+    println(io, "    A  = [$(_fmt3(membrane_rigidity(s)))]  [force/length]   (membrane, N = A·ε)")
+    println(io, "    D  = [$(_fmt3(bending_rigidity(s)))]  [force·length]   (bending, M = D·κ)")
+    println(io, "    S  = [$(_fmt3(shear_rigidity(s)))]  [force/length]   (transverse shear, Q = S·γ)")
+    println(io, "    γt = $(drilling_rigidity(s))  [force/length]   (drilling penalty)")
+    print(io,   "    ρt = $(areal_mass(s))  [mass/length²]   (mass per unit area)")
+end
+
+Base.show(io::IO, s::ShellSection) = print(io, "ShellSection(t=$(s.t))")
+
+function Base.show(io::IO, ::MIME"text/plain", s::ShellRigiditySection)
+    println(io, "ShellRigiditySection  (effective rigidities stored directly)")
+    println(io, "  A  = [$(_fmt3(s.A))]  [force/length]   (membrane, N = A·ε)")
+    println(io, "  D  = [$(_fmt3(s.D))]  [force·length]   (bending, M = D·κ)")
+    println(io, "  S  = [$(_fmt3(s.S))]  [force/length]   (transverse shear, Q = S·γ)")
+    println(io, "  γt = $(s.γt)  [force/length]   (drilling penalty)")
+    print(io,   "  ρt = $(s.ρt)  [mass/length²]   (mass per unit area)")
+end
+
+Base.show(io::IO, s::ShellRigiditySection) = print(io, "ShellRigiditySection(A₁₁=$(s.A[1,1]), D₁₁=$(s.D[1,1]))")
+
+function Base.show(io::IO, ::MIME"text/plain", el::ShellElement{T,N}) where {T,N}
+    println(io, "ShellElement{$N} :$(el.id)  (flat shell: drilling membrane + MITC plate)")
+    for (k, n) in enumerate(el.nodes)
+        println(io, "  node $k: $(collect(n.position))")
+    end
+    R = local_frame(el)
+    println(io, "  area   = $(area(el))  [length²]")
+    println(io, "  normal = $(collect(R[3, :]))  (local e₃; right-hand rule over the node order)")
+    print(io,   "  section: ", el.section)
+end
+
+Base.show(io::IO, el::ShellElement{T,N}) where {T,N} = print(io, "ShellElement{$N}(:$(el.id))")
+
 function Base.show(io::IO, ::MIME"text/plain", el::FrameElement)
     sym = release_symbol(el.ends)
     conn = sym === nothing ? "semi-rigid connections" : "connections :$sym"

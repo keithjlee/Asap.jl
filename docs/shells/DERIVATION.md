@@ -172,6 +172,64 @@ this one does not (ITW §4.1).
   | 8×8 | 0.0937 |
   | 16×16 | 0.0935 |
 
+### 2.1 Implementation findings (S2, 2026-11-23) and the enhanced variant
+
+**Verified properties of the implementation.**
+
+- Exactly 3 zero eigenvalues (u, v and in-plane rotation with ψ = θ). A constant ψ is not a
+  zero mode.
+- Both variants pass the distorted-patch test, including ψ = ω, to 1e-14.
+- The strain operator matches finite differences of the interpolated field.
+- Displacements are continuous across shared edges (checked numerically).
+- ½aᵀKa equals an independent 12×12-Gauss integration of the field energy: exact on
+  rectangles, 3e-5 on a distorted quad from 3×3 Gauss on a rational integrand.
+
+**Why the ITW tables are not reproduced digit for digit.**
+
+1. **Drilling DOFs at supports.** On an Allman element, u = v = 0 at the nodes of an edge does
+   *not* clamp the edge. With ψ free, the edge term (l/8)(ψ_K − ψ_J)n lets it bulge
+   quadratically between the nodes.
+   - So "clamped" must also fix ψ, which Asap's `:fixed` does.
+   - With ψ free, the clamped cantilever overshoots the converged value by up to 7% (8×2) and
+     converges non-monotonically.
+   - ITW's figures show point supports, and the treatment of ψ there is not stated.
+2. **Cook's reference point.** The literature value 23.96 (ITW: 23.91; Bergan & Fellipa 1985:
+   23.9) is the vertical displacement at the **right-edge midpoint (48, 52)**.
+   - The top corner converges to about 25.1 (conforming Q4 and ITW agree).
+   - ITW's own 1×1 entry (14.065) can't be a midpoint value, so their measurement point and
+     boundary treatment are ambiguous.
+3. **Pure bending on a regular mesh (ITW Table 1).** ITW report exactly 1.5 / 0.6. The
+   interpolation as transcribed gives 1.4615 / 0.5801 (ν = 0.3).
+   - Allman edge modes span only the *normal* edge quadratics, and one bubble cannot produce
+     the Poisson strain ε_yy = νκy uniformly.
+   - Without the bubble the result is exactly 1.5·(1 − ν²) = 1.365, the classic Poisson
+     locking. This is an analytical property of the transcribed fields, not a coding error.
+     ITW's code presumably had more than the paper describes.
+
+**Enhanced variant (the default; `enhanced = false` gives the element as published).** Add the
+two *complementary* tangential incompatible modes, u ∝ 1 − ξ² and v ∝ 1 − η².
+
+- Derivatives use the Taylor–Beresford–Wilson (1976) correction: centre Jacobian, scaled by
+  detJ₀/detJ, so the distorted patch test still passes.
+- Both modes are condensed together with the bubble. They carry no rotation into the 1-point
+  penalty.
+- Adding all four Wilson modes instead (QM6) duplicates Allman's normal quadratics and makes ψ
+  ill-determined (end rotation 23 instead of 0.6), so only the complementary pair is used.
+
+**Benchmark comparison** (fully clamped; ratio to a converged reference cross-checked against a
+256×64 conforming-Q4 run, 0.35601):
+
+| Case | Published ITW | Enhanced |
+|---|---|---|
+| Pure bending, regular mesh | 1.4615 / 0.5801 | **1.5 / 0.6 (exact)** |
+| Cantilever l/h = 4, 4×1 · 8×2 · 16×4 | 0.955 · 0.987 · 0.995 | **0.981 · 1.000 · 0.998** |
+| Cantilever, distorted 4×1 | 0.939 | **0.963** |
+| Squat wall l/h = 1, 1×1 · 2×2 · 4×4 | 0.757 · 0.926 · 0.973 | **0.790 · 0.969 · 0.983** |
+| Cook midpoint 2 · 4 · 8 (→ 23.96) | 21.62 · 23.17 · 23.66 | **22.03 · 23.32 · 23.70** |
+
+For scale, plain Q4 gives 0.68 on the 4×1 cantilever. A wall meshed two elements wide is now
+within 3% in-plane, which was the point of choosing a drilling membrane.
+
 ## 3. Plate: MITC4 (Dvorkin–Bathe)
 
 Sources: Dvorkin & Bathe (1984), Engineering Computations 1:77–88; Bathe & Dvorkin (1985),

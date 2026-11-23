@@ -29,9 +29,12 @@ const globalZ = SVector(0.0, 0.0, 1.0)
 # ── materials & sections ────────────────────────────────────────────────────
 include("Materials/materials.jl")
 include("Materials/sections.jl")
+include("Materials/shell_sections.jl")
 export Material, Steel_Nmm, Steel_kNm
 export AbstractSection, Section, RigiditySection
 export EA, EIx, EIy, GJ, ρA
+export AbstractShellSection, ShellSection, ShellRigiditySection
+export membrane_rigidity, bending_rigidity, shear_rigidity, drilling_rigidity, areal_mass, thickness
 
 # ── nodes ───────────────────────────────────────────────────────────────────
 include("Nodes/node.jl")
@@ -43,13 +46,16 @@ export EndSprings, EndConditions, rigid_end, pinned_end, RELEASES, release_symbo
 
 include("Elements/kernels/transformation.jl")
 include("Elements/kernels/stiffness.jl")
+include("Elements/kernels/shell.jl")
 include("Elements/interface.jl")
 include("Elements/frame.jl")
 include("Elements/variable.jl")
+include("Elements/shell.jl")
 export AbstractElement, AbstractLineElement, FrameElement, TrussElement, VariableElement
 export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment
+export ShellElement, shell_frame, shell_stiffness, itw_membrane_stiffness
 
 # ── springs ─────────────────────────────────────────────────────────────────
 include("Springs/nodal_springs.jl")

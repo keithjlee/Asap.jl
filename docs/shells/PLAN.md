@@ -23,8 +23,8 @@
 | Phase | Status | Commit |
 |---|---|---|
 | S0 derivation dossier | ✅ membrane transcribed from ITW report; MITC4 written, primary-PDF recheck open | — |
-| S1 n-node analysis-layer generalization | ⏳ | |
-| S2 `ShellSection` + ITW drilling membrane | ☐ | |
+| S1 n-node analysis-layer generalization | ✅ bitwise parity with main; lockstep green | `e5a8ce2` |
+| S2 `ShellSection` + ITW drilling membrane | ✅ membrane-only element; enhanced variant (DERIVATION §2.1) — **awaiting Keith's OK on the enhancement** | (see `git log`) |
 | S3 MITC4 plate → full `ShellElement` | ☐ | |
 | S4 area loads, resultants, `section_cut`, pier/spandrel | ☐ | |
 | S5a wall mesher + 2-node link/spring element | ☐ | |
@@ -34,6 +34,23 @@
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
 
 ### Handoff notes
+
+- **S2 (done):** `ShellElement{T,4,S}`, `ShellSection`/`ShellRigiditySection` (+ modifier
+  constructor), kernels in `src/Elements/kernels/shell.jl`. The element is currently
+  **membrane-only**: `_plate_stiffness` returns zeros, so out-of-plane DOFs must be
+  restrained (tests planarize) until S3 lands MITC4 there. Kernel performance: about 5 µs and 0
+  allocations per 24×24 global stiffness; first-call compile about 8 s.
+  - **Gotchas:** (1) `SVector{3}(::SVector)` has no working Zygote pullback; use `_sv3`. (2)
+    Closures capturing reassigned locals get boxed (294 allocations); keep one function barrier
+    per quadrature term. (3) `kron` and 24×24 0/1 embedding products are slow and Zygote-hostile;
+    use the static-index gather (`_shell_local`) and the reshape-based blockwise rotation
+    (`_rotate_shell`). (4) With a drilling element, "clamped" must fix ψ too.
+  - ForwardDiff through the kernel works but its first compile is about 50 s (Dual SMatrix
+    24×24); revisit in S6.
+  - Benchmark oracles live in `test/newcore/shell_test_utils.jl` plus `test_shell_membrane.jl`.
+- **Next (S3):** implement `_plate_stiffness(xy, section)` as MITC4 (DERIVATION §3) in the
+  12×12 (w, θx, θy)×4 layout, which `_shell_local` already embeds. First pull Bathe & Dvorkin
+  1985 (Undermind) to confirm the tying-point formulas.
 
 - **S0:** the ITW report PDF (UCB/SEMM-89/17, scanned, no text layer; read as page images) was
   fetched from escholarship (`qt9v61q2nj`). Bathe & Dvorkin 1985 and MacNeal & Harder 1985 are

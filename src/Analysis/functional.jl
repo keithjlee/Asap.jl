@@ -58,7 +58,7 @@ function extract_state(model::Model{T}) where {T}
     #freshness contract as the in-place assembler)
     model.cache === nothing || _refresh_spring_nzvec!(model.cache, model)
     sections = Any[_state_sections(el) for el in model.elements]
-    ea = [s isa AbstractVector ? zero(T) : T(EA(s)) for s in sections]   # (super-elements: unused)
+    ea = [s isa AbstractSection ? T(EA(s)) : zero(T) for s in sections]  # (super-elements, shells: unused)
     return ModelState{T}(reduce(hcat, (collect(n.position) for n in model.nodes)),
         sections, ea, nothing)
 end
@@ -106,6 +106,11 @@ function _group_entries_nnode(g::ElementGroup, e::Int, section, X::NTuple)
     slots = g.slots[e]
     return Base.length(slots) == size(Ke, 1) ? vec(Ke) : vec(Ke[slots, slots])
 end
+
+# shells: the kernel takes only (section, positions) — no element-struct reads
+# inside the differentiated closure; every slot is active (no slicing)
+_group_entries_nnode(::ElementGroup{<:ShellElement}, e::Int, section, X::NTuple) =
+    vec(shell_stiffness(section, X...))
 
 # line elements: per-element kernel evaluation from the two endpoint columns
 function _group_entries_all(g::ElementGroup{<:AbstractLineElement}, state::ModelState)
