@@ -56,6 +56,7 @@ export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment
 export ShellElement, shell_frame, shell_stiffness, itw_membrane_stiffness
+export shell_resultants, section_cut
 
 # ── springs ─────────────────────────────────────────────────────────────────
 include("Springs/nodal_springs.jl")
@@ -64,9 +65,12 @@ export NodalSpring
 # ── loads ───────────────────────────────────────────────────────────────────
 include("Loads/loads.jl")
 include("Elements/kernels/fixed_end_forces.jl")
+include("Loads/shell_loads.jl")
+include("Elements/kernels/shell_loads_recovery.jl")
 export AbstractLoad, NodeLoad, ElementLoad
 export NodeForce, NodeMoment, DistributedLoad, LineLoad, TrapezoidLoad, PointLoad, PointMoment, SelfWeight
 export fixed_end_forces, condense_fef
+export AreaLoad
 
 # ── model ───────────────────────────────────────────────────────────────────
 include("Model/model.jl")
@@ -80,6 +84,7 @@ include("Results/results.jl")
 include("Analysis/solve.jl")
 include("Analysis/functional.jl")
 include("Results/recovery.jl")
+include("Results/shell_results.jl")
 include("Analysis/cases.jl")
 export DofPartition, AnalysisCache
 export process!, solve!, assemble_K!, assemble_loads!

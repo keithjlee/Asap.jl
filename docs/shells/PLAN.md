@@ -26,7 +26,7 @@
 | S1 n-node analysis-layer generalization | ✅ bitwise parity with main; lockstep green | `e5a8ce2` |
 | S2 `ShellSection` + ITW drilling membrane | ✅ enhanced variant (DERIVATION §2.1) — Keith OK'd 2026-11-23 | `4e9677f` |
 | S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | (see `git log`) |
-| S4 area loads, resultants, `section_cut`, pier/spandrel | ☐ | |
+| S4 area loads, resultants, `section_cut` | ✅ (pier/spandrel labelling moved to S5a with the mesher) | (see `git log`) |
 | S5a wall mesher + 2-node link/spring element | ☐ | |
 | S5b rigid diaphragm constraints | ☐ | |
 | S6 pure path / AD + AsapOptim thickness variable | ☐ | |
@@ -48,7 +48,19 @@
   - ForwardDiff through the kernel works but its first compile is about 50 s (Dual SMatrix
     24×24); revisit in S6.
   - Benchmark oracles live in `test/newcore/shell_test_utils.jl` plus `test_shell_membrane.jl`.
-- **Next (S3):** implement `_plate_stiffness(xy, section)` as MITC4 (DERIVATION §3) in the
+- **S4 (done):** `AreaLoad` (global/local, pressure shorthand) and `SelfWeight` on shells
+  lower to CONSISTENT loads, including drilling moments from in-plane traction and the condensed
+  bubble. `shell_resultants(model, el; at, results, factors)` gives N/M/Q in local axes, and
+  `section_cut(model, elements, cut_nodes; about, axes, results)` is built from nodal forces,
+  so it is exact for statics. Shell loads are FROZEN in the pure path (static, like
+  `VariableElement` loads) until S6.
+  - **Gotcha:** a uniform LINE traction on a drilling-element edge is consistent only with
+    end moments ∓p·l²/12 per edge (−at J, +at K). Nodal forces alone are not. S5a should ship
+    an edge-load helper that adds them.
+- **Next (S5a):** wall mesher (rectangle plus rectangular openings, hard points, edge-node sets,
+  pier/spandrel labelling via `section_cut`), the edge-load helper, and a 2-node link/spring
+  element.
+- **S3 (old note, done):** implement `_plate_stiffness(xy, section)` as MITC4 (DERIVATION §3) in the
   12×12 (w, θx, θy)×4 layout, which `_shell_local` already embeds. First pull Bathe & Dvorkin
   1985 (Undermind) to confirm the tying-point formulas.
 

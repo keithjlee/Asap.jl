@@ -298,7 +298,26 @@ interpolation and sign conventions verbatim, and record their benchmark values. 
   - pinched hemisphere: 0.094;
   - straight cantilever with rectangular, trapezoidal and parallelogram meshes.
 
-## 4. Stress resultants (S4)
+## 4. Stress resultants (S4) — implemented
+
+Conventions as shipped (`shell_resultants`):
+- N is tension positive.
+- Positive M_xx puts the +e₃ face in tension along e₁ (the β-based curvature with
+  β = (θy, −θx)).
+- Q is in local axes.
+- The membrane's condensed modes are recovered as α = K_bb⁻¹(f_b − K_ba a) from the element's
+  own surface loads (case-weighted by `factors`), so N is the field the stiffness integrated.
+- Verified:
+  - uniform tension is reproduced exactly on a distorted mesh (with consistent edge loads,
+    which include the drilling end moments ∓p·l²/12);
+  - simply supported square plate centre moment within 3% of 0.0479qa² (16×16, corner of the
+    central element).
+
+Consistent surface loads (`shell_load_vector`) integrate the element's own interpolation by
+3×3 Gauss: Nₐ on (u, v, w), dₐ·q∥ on ψ, and the bubble ∫NB q∥ condensed onto the nodes. The
+incompatible modes are strain enhancements and carry no load.
+
+Original sketch:
 
 At any (ξ, η), from the local element displacements:
 
@@ -309,17 +328,37 @@ At any (ξ, η), from the local element displacements:
   for section cuts (§ plan 4). They are exact for equilibrium: Σ over a free body of nodal
   forces = applied loads.
 
-## 5. Rigid diaphragm constraint (S5b)
+## 5. Rigid diaphragm constraint (S5b): design
 
-For a diaphragm with unit normal n (default global Z) and master node m:
+**Kinematics.** Take a diaphragm with normal n along a global axis (floors: n = Z; arbitrary
+normals are out of scope), master node m and slave nodes s. For n = Z:
 
-- each slave s has in-plane translations and the rotation about n tied to the master:
-  u_s∥ = u_m∥ + θ_m,n · n × (x_s − x_m) and θ_s,n = θ_m,n;
-- the out-of-plane translation and the two out-of-plane rotations stay independent;
-- implemented as a transformation u = T û, applied **per element** (K̂ₑ = Tₑᵀ Kₑ Tₑ, where Tₑ is
-  a pure function of positions, so it is AD-transparent and the frozen-pattern / nzmap
-  machinery still holds);
-- loads P̂ = Tᵀ P, and recovery u = T û;
-- the master is an existing node or an auto-generated node at the diaphragm centroid.
+  u_x,s = u_x,m − θ_z,m (y_s − y_m)
+  u_y,s = u_y,m + θ_z,m (x_s − x_m)
+  θ_z,s = θ_z,m
 
-Details to be written up in S5b before implementing.
+u_z, θ_x and θ_y of each slave stay independent (bending of the floor, column axial forces).
+
+**Implementation: a linear map after assembly.** This was chosen over per-element
+transformation because it touches far fewer code paths.
+
+1. Partition as today, with slave DOFs classed FREE: the full free×free K and F are assembled
+   with the existing frozen pattern and nzmaps, untouched.
+2. Build C (n_free × n_red): identity columns for unconstrained free DOFs; each constrained
+   slave DOF row expresses it through its master's free DOFs, with coefficients from the
+   CURRENT positions (refreshed at every solve, like spring values).
+3. Then:
+   - K̂ = CᵀKC;
+   - since K̂ is linear in K's entries, its nonzeros are a sparse linear map of K's:
+     nzval(K̂) = M·nzval(K), with M (nnz(K̂) × nnz(K)) built symbolically once;
+   - F̂ = CᵀF, û = K̂ \ F̂, u_free = C·û.
+4. What stays unchanged:
+   - post-processing (element forces, reactions) already works from the full u;
+   - compliance F̂·û = F·u;
+   - the factorization pattern is frozen, so numeric refactorization still applies.
+5. Pure path: nzval(K̂) = M·nzval(K), F̂ = CᵀF and u = Cû are sparse matvecs, so AD flows
+   through K and F. The dependence of C on node positions is frozen (gradients w.r.t.
+   diaphragm-node coordinates omit the offset terms; documented, revisit if needed).
+6. Masters: an existing node, or an auto-created node at the centroid of the slaves, with its
+   out-of-plane DOFs fixed. Diaphragm loads (story forces, accidental-torsion moments) are
+   applied to the master.

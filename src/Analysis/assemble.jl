@@ -93,7 +93,7 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
 
     for load in model.loads
         case === nothing || load.case === case || continue
-        if load isa ElementLoad && load.element isa VariableElement
+        if load isa ElementLoad && (load.element isa VariableElement || load.element isa ShellElement)
             before = copy(cache.Pf)
             _apply_load!(cache, load, inactive)
             static .+= cache.Pf .- before
@@ -185,6 +185,7 @@ end
 
 function _apply_load!(cache::AnalysisCache{T}, load::ElementLoad{T}, inactive) where {T}
     el = load.element
+    el isa ShellElement && return _apply_shell_load!(cache, load, el)
     el isa Union{FrameElement,VariableElement} ||
         error("element loads require a FrameElement or VariableElement " *
               "(a $(nameof(typeof(el))) cannot carry transverse load) — " *
@@ -206,6 +207,21 @@ function _apply_element_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
     @inbounds for i in 1:12
         cache.Pf[g[i]] += Qg[i]
     end
+end
+
+# shells: uniform traction → consistent (condensed) local load; q̃ = −f is
+# stored locally for force recovery and rotated blockwise into Pf
+function _apply_shell_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
+    el::ShellElement{T,4}) where {T}
+    X = map(n -> n.position, el.nodes)
+    q̃, R = shell_load_vector(el.section, X..., SVector{3,T}(_shell_traction(load, el)))
+    cache.q_local[el.index][1] .+= q̃
+    Qg = _rotate24(R', q̃)
+    g = element_global_dofs(el)
+    @inbounds for i in 1:24
+        cache.Pf[g[i]] += Qg[i]
+    end
+    return nothing
 end
 
 """
