@@ -265,7 +265,20 @@ that (∂/∂ξ, ∂/∂η) = J·(∂/∂x, ∂/∂y). Shear energy ½∫ γᵀ 
   constraint is enforced only at the tying points.
 - MITC4 has no spurious zero-energy modes with full 2×2 integration, and passes the patch test.
 
-**Open item (S0 → S3):** pull Bathe & Dvorkin (1985) and confirm the tying-point
+**Implemented in S3 (2026-11-23), results:**
+- exactly 3 rigid modes for the plate and 6 for the full shell in any orientation;
+- the constant-curvature patch test passes on a distorted patch for thin (t = 0.001) and thick
+  (0.05) plates;
+- square plate, simply supported, uniform load:
+  0.0039728 · 0.0040466 · 0.0040653 (4×4 · 8×8 · 16×16, reference 0.00406);
+- clamped plate: 0.0012641 at 16×16 (reference 0.00126);
+- centre point load: 0.011612 at 16×16 (reference 0.0116);
+- thickness sweep (8×8, a/t = 10² · 10³ · 10⁴): 0.0040466 · 0.0040415 · 0.0040414, so no
+  locking; a/t = 10 gives 0.0044731 (Mindlin shear flexibility);
+- Scordelis–Lo, lumped gravity: 0.3174 · 0.3042 · 0.3017 · 0.3014 (4 · 8 · 16 · 32 mesh;
+  reference 0.3024, and flat facets converge to about 0.301).
+
+**Still open:** pull Bathe & Dvorkin (1985) and confirm the tying-point
 interpolation and sign conventions verbatim, and record their benchmark values. That is the
 "derivations verifiable against primary literature" standard.
 

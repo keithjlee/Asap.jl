@@ -24,8 +24,8 @@
 |---|---|---|
 | S0 derivation dossier | ✅ membrane transcribed from ITW report; MITC4 written, primary-PDF recheck open | — |
 | S1 n-node analysis-layer generalization | ✅ bitwise parity with main; lockstep green | `e5a8ce2` |
-| S2 `ShellSection` + ITW drilling membrane | ✅ membrane-only element; enhanced variant (DERIVATION §2.1) — **awaiting Keith's OK on the enhancement** | `4e9677f` |
-| S3 MITC4 plate → full `ShellElement` | ☐ | |
+| S2 `ShellSection` + ITW drilling membrane | ✅ enhanced variant (DERIVATION §2.1) — Keith OK'd 2026-11-23 | `4e9677f` |
+| S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | (see `git log`) |
 | S4 area loads, resultants, `section_cut`, pier/spandrel | ☐ | |
 | S5a wall mesher + 2-node link/spring element | ☐ | |
 | S5b rigid diaphragm constraints | ☐ | |

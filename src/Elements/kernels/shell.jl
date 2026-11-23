@@ -257,6 +257,77 @@ function shell_stiffness(section::AbstractShellSection, X1, X2, X3, X4)
     return _rotate_shell(_shell_local(Km, Kp), R)
 end
 
-# plate (w, θx, θy)×4 stiffness — MITC4 lands in S3; until then the element is
-# membrane-only and its out-of-plane DOFs carry no stiffness
-_plate_stiffness(xy, section) = zero(SMatrix{12,12,promote_type(eltype(xy[1]), eltype(membrane_rigidity(section)))})
+_plate_stiffness(xy, section::AbstractShellSection) =
+    mitc4_plate_stiffness(xy, bending_rigidity(section), shear_rigidity(section))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Plate: MITC4 (Dvorkin & Bathe 1984; Bathe & Dvorkin 1985)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Per-node DOFs (w, θx, θy); rotations of the normal β = (βx, βy) = (θy, −θx)
+# (right-hand nodal rotations about the local axes). Curvatures
+# κ = (βx,x, βy,y, βx,y + βy,x); transverse shear γ = (w,x + βx, w,y + βy).
+# Assumed shear: covariant components e_ξ = w,ξ + β·x,ξ tied at the edge
+# midpoints A = (0,−1), C = (0,+1) and e_η = w,η + β·x,η at B = (+1,0),
+# D = (−1,0), interpolated linearly across and mapped by γ = J⁻¹·ẽ.
+
+# covariant shear row of e_ξ (dir = 1) or e_η (dir = 2) at natural point (ξ, η)
+@inline function _mitc_tying_row(xy, ξ, η, dir::Int)
+    N, Nξ, Nη = _q4_N(ξ, η)
+    xξ, yξ, xη, yη, _ = _q4_jacobian(xy, Nξ, Nη)
+    Nd, tx, ty = dir == 1 ? (Nξ, xξ, yξ) : (Nη, xη, yη)
+    # e = w,d + βx·x,d + βy·y,d = Σ [Nd w + N·(x,d θy − y,d θx)]
+    return vcat(SVector(Nd[1], -N[1] * ty, N[1] * tx), SVector(Nd[2], -N[2] * ty, N[2] * tx),
+                SVector(Nd[3], -N[3] * ty, N[3] * tx), SVector(Nd[4], -N[4] * ty, N[4] * tx))
+end
+
+# bending operator (3×12) from Cartesian corner derivatives
+@inline function _mitc_Bb(Nx, Ny)
+    blk(a) = SMatrix{3,3}(zero(Nx[a]), zero(Nx[a]), zero(Nx[a]),   # w
+        zero(Nx[a]), -Ny[a], -Nx[a],                                # θx (βy = −θx)
+        Nx[a], zero(Nx[a]), Ny[a])                                  # θy (βx = θy)
+    return hcat(blk(1), blk(2), blk(3), blk(4))
+end
+
+"""
+    mitc4_plate_stiffness(xy, D, S) -> SMatrix{12,12}
+
+Local MITC4 plate stiffness over the DOFs `(w, θx, θy)` of nodes 1…4
+(Dvorkin & Bathe 1984; Bathe & Dvorkin 1985).
+
+- `xy`: local in-plane node coordinates (counter-clockwise) [length]
+- `D`: bending rigidity [force·length]
+- `S`: transverse shear rigidity [force/length]
+
+Bending `∫Bbᵀ D Bb` and assumed-strain transverse shear `∫Bsᵀ S Bs`, both by
+2×2 Gauss. The covariant transverse shear strains are tied at the four edge
+midpoints, which removes shear locking: the element is valid from thick
+(Reissner–Mindlin) to thin (Kirchhoff limit) plates.
+"""
+function mitc4_plate_stiffness(xy, D::AbstractMatrix, S::AbstractMatrix)
+    eA = _mitc_tying_row(xy, 0.0, -1.0, 1)
+    eC = _mitc_tying_row(xy, 0.0, 1.0, 1)
+    eB = _mitc_tying_row(xy, 1.0, 0.0, 2)
+    eD = _mitc_tying_row(xy, -1.0, 0.0, 2)
+    K = _mitc_gauss_term(xy, D, S, eA, eC, eB, eD, 1, 1)
+    for i in 1:2, j in 1:2
+        (i, j) == (1, 1) && continue
+        K += _mitc_gauss_term(xy, D, S, eA, eC, eB, eD, i, j)
+    end
+    return K
+end
+
+@inline function _mitc_gauss_term(xy, D, S, eA, eC, eB, eD, i::Int, j::Int)
+    ξ, η = _GAUSS2_X[i], _GAUSS2_X[j]
+    _, Nξ, Nη = _q4_N(ξ, η)
+    xξ, yξ, xη, yη, detJ = _q4_jacobian(xy, Nξ, Nη)
+    Nx, Ny = _cartesian(Nξ, Nη, xξ, yξ, xη, yη, detJ)
+    Bb = _mitc_Bb(Nx, Ny)
+    eξ = ((1 - η) / 2) * eA + ((1 + η) / 2) * eC        # 12-rows of the assumed covariant strains
+    eη = ((1 + ξ) / 2) * eB + ((1 - ξ) / 2) * eD
+    # γ = J⁻¹·(eξ, eη) with J = [xξ yξ; xη yη]
+    γx = (yη * eξ - yξ * eη) / detJ
+    γy = (xξ * eη - xη * eξ) / detJ
+    Bs = vcat(γx', γy')
+    return detJ * (Bb' * D * Bb + Bs' * S * Bs)
+end
