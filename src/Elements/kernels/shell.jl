@@ -26,6 +26,11 @@ const _GAUSS2_X = (-1 / sqrt(3), 1 / sqrt(3))
 # Geometry: local frame of a (possibly warped) quadrilateral
 # ─────────────────────────────────────────────────────────────────────────────
 
+# identity for static 3-vectors (the AD path): `SVector{3}(::SVector)` has no
+# working Zygote pullback, so never convert what is already static
+@inline _sv3(x::SVector{3}) = x
+@inline _sv3(x::AbstractVector) = SVector{3}(x)
+
 """
     shell_frame(X1, X2, X3, X4) -> (R, xy, warp)
 
@@ -41,11 +46,6 @@ Local frame of a 4-node flat shell from its global node positions:
 - `warp::T`: largest out-of-plane offset of a node from the mean plane,
   divided by `√(area)` (dimensionless warping measure; 0 for a flat quad).
 """
-# identity for static 3-vectors (the AD path): `SVector{3}(::SVector)` has no
-# working Zygote pullback, so never convert what is already static
-@inline _sv3(x::SVector{3}) = x
-@inline _sv3(x::AbstractVector) = SVector{3}(x)
-
 function shell_frame(X1::AbstractVector, X2::AbstractVector, X3::AbstractVector, X4::AbstractVector)
     x1, x2, x3, x4 = _sv3(X1), _sv3(X2), _sv3(X3), _sv3(X4)
     c = (x1 + x2 + x3 + x4) / 4

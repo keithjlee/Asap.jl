@@ -255,6 +255,28 @@ env = envelope(model, beam, cr,
 env.x; env.lo; env.hi                       # rows: N, Vy, Mz, Vz, My, Mx
 ```
 
+## Shells, walls and diaphragms
+
+`ShellElement` is a 4-node flat shell: a drilling-rotation membrane plus the MITC4 plate. It mixes freely with frames. `mesh_wall` meshes walls with openings, `section_cut` gives exact pier forces, `LinkElement` models precast joints, and `RigidDiaphragm` ties a floor rigidly in its plane:
+
+```julia
+concrete = Material(3.0e7, 2.4, 0.2)                    # kN, m
+w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 6.0, 3.0, ShellSection(concrete, 0.2);
+              openings = [(2.0, 0.0, 1.0, 2.1)], z_lines = [1.0], size = 0.5)
+top = [w.grid[i, end] for i in eachindex(w.s)]
+floor = RigidDiaphragm(top)
+wallmodel = Model(w.nodes, AbstractElement{Float64}[w.elements...],
+    AbstractLoad{Float64}[[SelfWeight(el; g = [0.0, 0, -9.81]) for el in w.elements]...,
+                          NodeForce(floor.master, [60.0, 0, 0])]; diaphragms = [floor])
+solve!(wallmodel)
+
+piers = [wall_cut(w, 1.0; s_range = r) for r in ((0.0, 2.0), (3.0, 6.0))]
+shears = [section_cut(wallmodel, e, c).F[1] for (e, c) in piers]   # sums to 60 exactly
+shell_resultants(wallmodel, w.elements[1]).N                        # (Nxx, Nyy, Nxy)
+```
+
+Surface loads: `AreaLoad(el, q)` (global traction) or `AreaLoad(el, p)` (normal pressure), and `SelfWeight`. Shells take part in the differentiable path, including gradients with respect to thickness. Load ForwardDiff alongside Zygote for the fast shell rules.
+
 ## Differentiable analysis
 
 The entire pipeline has a **pure functional path**: extract a `ModelState` (positions and sections as plain data), evaluate, differentiate. Loading Zygote (or anything ChainRules-aware) activates Asap's rule extension automatically; a handful of small rules cover the sparse construction and the linear solve, and everything else differentiates natively.
