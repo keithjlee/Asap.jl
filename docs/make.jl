@@ -37,6 +37,7 @@ makedocs(
             "Structure generators" => "guide/generators.md",
             "Geometry extraction" => "guide/geometry.md",
             "Solver backends" => "guide/solvers.md",
+            "Walkthroughs" => "guide/examples.md",
         ],
         "Migrating from v0.2" => "migration.md",
         "API reference" => [

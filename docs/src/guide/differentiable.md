@@ -36,6 +36,12 @@ end[1]
 
 Gradients flow with respect to node positions, section properties, and semi-rigid connection stiffnesses.
 
+For fast Zygote gradients, load ForwardDiff as well. The frame and shell kernels then get reverse
+rules that evaluate each element's derivative with ForwardDiff (`AsapFrameADExt`,
+`AsapShellADExt`) instead of tracing the small static-matrix kernels scalar by scalar (frames: about
+4× faster at 120 elements). Without ForwardDiff, the gradients are the same, just slower. See
+`examples/ad/reverse_scaling.jl` for timings against model size.
+
 ## Element loads follow the design
 
 Element-load fixed-end forces are re-evaluated at the state ([`assemble_Pf`](@ref)), so the load path is part of every gradient. In the portal above, moving a knee changes the beam's length and with it the total line load, and the gradient includes that term. The defaults under design change:

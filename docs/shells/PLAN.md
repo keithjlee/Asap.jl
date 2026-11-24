@@ -31,8 +31,41 @@
 | S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | `deddfa7` |
 | S6 pure path / AD + AsapOptim thickness variable | ✅ design-dependent shell loads; `AsapShellADExt`; AsapOptim `ThicknessVariable` (branch `shells`) | (see `git log`) |
 | S6b feature parity (Keith, 2026-11-23 — before release) | ✅ P1–P7; lockstep green (Asap 3067), docs + README pass | `0826a8e`, `e7e85da`; AsapOptim `0dc0ae8` |
+| S6c examples for ALL scenarios + Enzyme across Asap (Keith, 2026-11-23 evening) | ✅ walkthroughs + Typst reports + Enzyme matrix (1.13 + 1.12, 18/18) | see below |
+| S6d reverse-mode performance (overnight 2026-11-23/24) | ✅ AsapFrameADExt (frames 1.7–3.8×); gather refactor REVERTED (broke Enzyme); bitwise primal vs v1.2 | release notes "Performance" |
 | Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ⏳ everything ready; **awaiting Keith: merge + bump + push + register** | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
+
+### S6c — walkthroughs for every scenario + Enzyme verification (Keith: before release)
+
+Keith: "full walkthrough example docs for all structural scenarios in the examples folder:
+frames, trusses, 2D/3D, varying joint stiffnesses, spring supports, shape vs size optimization,
+etc." and "verify that Enzyme can now work across Asap".
+
+Layout: `Asap/examples/` is ONE environment (Project.toml moved up from `shells/`).
+`figures.jl` is shared (line-element plots added; `set_figdir(@__DIR__)` per folder).
+Folders: `analysis/`, `shells/`, `optimization/`, `ad/`.
+- [x] E1 restructure: shared env and figures; shells walkthroughs re-pointed and re-run
+- [x] E2 `analysis/01_truss_2d` — planar truss by hand and by generator: supports, loads,
+      axial forces, reactions, deflected shape
+- [x] E3 `analysis/02_spaceframe_3d` — 3D space truss: self-weight, reactions, force distribution
+- [x] E4 `analysis/03_frame_2d` — portal frame: line/point loads, releases, internal-force
+      diagrams, deflected shape
+- [x] E5 `analysis/04_frame_3d_building` — 3D building frame: load cases, combinations,
+      envelopes, drift
+- [x] E6 `analysis/05_joints_springs_variable` — semi-rigid connections (EndSprings sweep),
+      spring supports (NodalSpring, soil), VariableElement (haunched girder)
+- [x] E7 `optimization/01_truss_size` — AreaVariables: compliance with a volume limit
+      (optimality criteria), gradients checked
+- [x] E8 `optimization/02_truss_shape` — SpatialVariables (coupled/symmetric): shape vs size,
+      what each buys
+- [x] E9 `optimization/03_frame_joints` — JointVariable: cheapest connection stiffness
+      meeting drift
+- [x] E10 `ad/enzyme_matrix.jl` — Enzyme (reverse and forward) vs Zygote/FD on: truss area,
+      truss shape, large spaceframe, frame with element loads, semi-rigid joints, springs,
+      VariableElement, shells (thickness), diaphragm. One process per case under `timeout`;
+      Julia 1.13 (+1.11 if time); results table in `ad/ENZYME_STATUS.md` and the memory note
+- [x] E11 index README, docs guide page "Examples", lockstep, commit
 
 ### S6b — feature parity checklist (Keith: "full feature parity for shells before 1.3")
 
@@ -54,8 +87,15 @@ Audit 2026-11-23 of user-facing paths on models containing shells:
       `figures.jl` figure generators (mesh, deformed shape, resultant contours, pier forces)
       P6: Mooncake needed `AsapShellMooncakeExt` (its own rule derivation overflows on the
       shell kernels) plus cotangent adapters (nested `Tangent` in, static-array rdata out);
-      now Mooncake ≡ Zygote to 1e-16 and is FASTER (13 ms vs 49 ms). Enzyme is not verified
-      with shells (Enzyme is broadly broken; see the memory note).
+      Mooncake ≡ Zygote to 1e-16. CORRECTION (2026-11-23 evening): an earlier "Mooncake faster,
+      13 vs 49 ms" compared a 12- with a 29-element model. On the same models Mooncake is the
+      SLOWEST (96 el: Zygote 51, Enzyme 32, Mooncake 84 ms). Enzyme REVERSE works via
+      `AsapShellEnzymeExt` (`@import_rrule` of the shell rules; native Enzyme fails in type
+      analysis on the large SMatrix registers): ≡ Zygote to 1e-16 and the FASTEST.
+      Enzyme forward mode is not bridged for shells; use ForwardDiff. Benchmark script:
+      `examples/ad/ad_backends_shells.jl`.
+- [x] P9 Bathe & Dvorkin 1985 primary-source check (`test_shell_mitc4_bd85.jl`;
+      DERIVATION §3).
 
 ### Handoff notes
 
@@ -378,3 +418,25 @@ rejected with a clear error. That decision belongs to S6, and AsapOptim's suite 
 
 (Citations from memory except Ibrahimbegović 1990 and the OpenSees DKGQ docs, which were checked
 2026-11-23. All get verified against the PDFs in S0.)
+
+### S6d — reverse-mode performance (overnight, 2026-11-23/24)
+
+Keith: "carry forward with any cleanup of the code, any performance gains". Profiled first
+(`examples/ad/reverse_scaling.jl`):
+- Zygote frame gradients cost ~150× the primal: per element, the stiffness pullback was 150 µs
+  (kernel 0.8 µs) and the element-load pullback 256 µs (kernel 0.1 µs) — Zygote tracing 12×12 SMatrix
+  kernels. Shell gradient per element grew with model size (650 → 1266 µs, 96 → 1536 el): O(n²) from
+  captured-array indexing in the per-element closures.
+- KEPT `af97018` — `AsapFrameADExt`: local ForwardDiff rules on plain-data frame kernels (bitwise
+  primal). Frames 62.8 → 16.7 ms (120 el), 436 → 256 ms (665 el).
+- REVERTED `32f23aa` → `f8aa055` — gather + `map` over gathered arrays fixed the O(n²) for Zygote
+  (shells 2.5×, frames to 11–13× with the rules) but Enzyme mishandles `map` over `Vector{Any}`:
+  reverse throws, FORWARD SILENTLY WRONG. Caught only by the Enzyme matrix rerun.
+- Verified on the final code: Asap suite, lockstep, Enzyme matrix 1.13 + 1.12, regression vs v1.2.0
+  (primal + ForwardDiff gradients bitwise, Zygote ≤ 6e-15).
+- OPEN — Enzyme-safe O(n²) fix. Candidate: a ChainRules rule with a RuleConfig on the per-group
+  entries function (`_group_entries_all(g, state)`): primal = today's closure code (Enzyme keeps
+  seeing it), pullback = loop over elements calling the plain-kernel VJPs and accumulating straight
+  into ONE dX (sections/ends cotangents via `rrule_via_ad` on the accessors). Zygote-only by
+  construction. Must pass the full Enzyme matrix and the regression.
+- OPEN — shell kernel pullbacks ~240 µs/element (ForwardDiff chunk 4 over 35 inputs).
