@@ -143,11 +143,24 @@ function shell_resultants_local(section::AbstractShellSection, xy, a24::SVector{
     xξ, yξ, xη, yη, detJ = _q4_jacobian(xy, Nξ, Nη)
     Nx, Ny = _cartesian(Nξ, Nη, xξ, yξ, xη, yη, detJ)
     M = bending_rigidity(section) * (_mitc_Bb(Nx, Ny) * ap)
+    Q = shear_rigidity(section) * _mitc_gamma(xy, ap, ξ, η)
+    return (N = N, M = M, Q = Q)
+end
+
+"""
+    _mitc_gamma(xy, ap, ξ, η) -> SVector{2}
+
+The MITC4 assumed transverse shear strains `(γxz, γyz)` at `(ξ, η)` from the
+plate DOFs `ap = (w, θx, θy)×4` — the same field the stiffness integrates
+(covariant strains tied at the edge midpoints, mapped by `J⁻¹`). Verified
+against Bathe & Dvorkin (1985) eqs. 8–10 in `test_shell_mitc4_bd85.jl`.
+"""
+function _mitc_gamma(xy, ap, ξ, η)
+    _, Nξ, Nη = _q4_N(ξ, η)
+    xξ, yξ, xη, yη, detJ = _q4_jacobian(xy, Nξ, Nη)
     eA = _mitc_tying_row(xy, 0.0, -1.0, 1); eC = _mitc_tying_row(xy, 0.0, 1.0, 1)
     eB = _mitc_tying_row(xy, 1.0, 0.0, 2); eD = _mitc_tying_row(xy, -1.0, 0.0, 2)
     eξ = dot(((1 - η) / 2) * eA + ((1 + η) / 2) * eC, ap)
     eη = dot(((1 + ξ) / 2) * eB + ((1 - ξ) / 2) * eD, ap)
-    γ = SVector((yη * eξ - yξ * eη) / detJ, (xξ * eη - xη * eξ) / detJ)
-    Q = shear_rigidity(section) * γ
-    return (N = N, M = M, Q = Q)
+    return SVector((yη * eξ - yξ * eη) / detJ, (xξ * eη - xη * eξ) / detJ)
 end

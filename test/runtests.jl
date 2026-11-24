@@ -51,4 +51,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_diaphragm.jl")
     include("newcore/test_shell_ad.jl")
     include("newcore/test_shell_parity.jl")
+    include("newcore/test_shell_mitc4_bd85.jl")
 end

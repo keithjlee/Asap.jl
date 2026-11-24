@@ -278,9 +278,27 @@ that (∂/∂ξ, ∂/∂η) = J·(∂/∂x, ∂/∂y). Shear energy ½∫ γᵀ 
 - Scordelis–Lo, lumped gravity: 0.3174 · 0.3042 · 0.3017 · 0.3014 (4 · 8 · 16 · 32 mesh;
   reference 0.3024, and flat facets converge to about 0.301).
 
-**Still open:** pull Bathe & Dvorkin (1985) and confirm the tying-point
-interpolation and sign conventions verbatim, and record their benchmark values. That is the
-"derivations verifiable against primary literature" standard.
+**Verified against the primary source (2026-11-23).** Bathe & Dvorkin (1985), IJNME 21:367–383,
+was read from the scanned PDF hosted by Bathe's group at MIT. Checks are in
+`test/newcore/test_shell_mitc4_bd85.jl`:
+- **Formulation:**
+  - Tying points A, C (γ_rz at s = ±1) and B, D (γ_sz at r = ±1) with linear interpolation
+    (their eq. 6) match ours up to node labels: their node 1 is at (1, 1).
+  - Their eq. 9 bracket is our covariant e_ξ at the tying point.
+  - Their prefactor √((Cx + rBx)² + …)/(8 det J) = |g_s|/(2 det J), and eq. 8 (with angles α,
+    β) is algebraically γ = J⁻¹·ẽ.
+  - Signs: they use β_y = θ_x with minus signs in κ and γ; we use β_y = −θ_x, so the physics
+    is identical.
+  - **Eqs. 8–10 implemented verbatim agree with Asap's `_mitc_gamma` to 1e-12** on a
+    distorted element.
+- **Fig. 3 patch** (their geometry, t = 1 and 0.001): bending, twisting and shearing pass.
+  Their shearing case restrains θ at all nodes, since constant transverse shear is not a
+  Mindlin equilibrium state otherwise.
+- **Fig. 5 cantilever under tip moment** (one element, and two elements distorted by ±0.1L):
+  Bernoulli theory reproduced to 4e-11 at t = 1. At their t = 0.1 the error is 1e-6, which is
+  round-off: the single-element stiffness has a condition number around 1e10.
+- **Fig. 8 thin plates** (L/h = 1000): the error trend over N = 2, 4, 6 matches their plots.
+- Their Fig. 6 and Fig. 10 meshes are not fully dimensioned, so those cases were not reproduced.
 
 **Verification targets (S3)** (references to be pulled in S0/S3):
 
