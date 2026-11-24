@@ -1,0 +1,14 @@
+[deps]
+Asap = "763a8c06-ba23-41fc-b385-b3b57b52403a"
+AsapOptim = "d81720e7-9d76-4c66-a69e-8f07ca321cc4"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
+kjlMakie = "713ab87d-2ebe-4706-96d5-b81d6dfd37e0"
+
+[sources]
+Asap = {path = "../.."}
+AsapOptim = {path = "../../../AsapOptim"}
+kjlMakie = {url = "https://github.com/keithjlee/kjlMakie", rev = "master"}
