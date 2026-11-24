@@ -123,10 +123,16 @@ struct ShellRigiditySection{T} <: AbstractShellSection{T}
     ρt::T
 end
 
+_smat(::Type{M}, A::M) where {M<:SMatrix} = A
+_smat(::Type{M}, A::AbstractMatrix) where {M<:SMatrix} = M(A)
+
 function ShellRigiditySection(A::AbstractMatrix, D::AbstractMatrix, S::AbstractMatrix,
     ρt::Real; γt::Real = A[3, 3])
     T = promote_type(eltype(A), eltype(D), eltype(S), typeof(ρt), typeof(γt))
-    As, Ds, Ss = SMatrix{3,3,T}(A), SMatrix{3,3,T}(D), SMatrix{2,2,T}(S)
+    # skip same-type conversions: `SMatrix{3,3,T}(::SMatrix{3,3,T})` has no clean
+    # Zygote pullback (structural cotangent), and the stiffness-modifier
+    # constructor below passes static matrices of the right type
+    As, Ds, Ss = _smat(SMatrix{3,3,T,9}, A), _smat(SMatrix{3,3,T,9}, D), _smat(SMatrix{2,2,T,4}, S)
     for (M, name) in ((As, "membrane"), (Ds, "bending"), (Ss, "shear"))
         M ≈ M' || throw(ArgumentError("$name rigidity matrix must be symmetric"))
         isposdef(Symmetric(Matrix(M))) ||
@@ -208,6 +214,12 @@ self-weight per unit area. `ShellSection`: `ρ·t`.
 """
 areal_mass(s::ShellSection) = s.material.ρ * s.t
 areal_mass(s::ShellRigiditySection) = s.ρt
+
+# the four stiffness rigidities `(A, D, S, γt)` in one call: the section input of
+# the shell kernels. One call gives reverse AD one rule per section type
+# (AsapShellADExt: `ShellSection`) instead of a trace of four accessors.
+_shell_rigidities(s::AbstractShellSection) =
+    (membrane_rigidity(s), bending_rigidity(s), shear_rigidity(s), drilling_rigidity(s))
 
 """
     thickness(section) -> T

@@ -262,14 +262,16 @@ function _shell_fef(t::FEFTable, state::ModelState)
 end
 
 function _shell_fef_global(load, sec, X)
-    R = shell_frame(X...)[1]
-    q = _shell_traction_state(load, sec, R)
-    return _shell_fef_plain(membrane_rigidity(sec), q, X...)
+    qg, ql = _shell_traction_parts(load, sec)
+    return _shell_fef_plain(first(_shell_rigidities(sec)), qg, ql, X...)
 end
 
-# global fixed-end 24-vector of a uniform global traction q: plain-data AD target
-function _shell_fef_plain(A, q, X1, X2, X3, X4)
+# global fixed-end 24-vector of a uniform traction q = qg + Rᵀ·ql (global part qg,
+# part ql in the element's local axes, which follows the element's orientation):
+# the plain-data AD target. One of qg, ql is zero, so q is bitwise the traction.
+function _shell_fef_plain(A, qg, ql, X1, X2, X3, X4)
     R, xy, _ = shell_frame(X1, X2, X3, X4)
+    q = qg + R' * ql
     f24, fb = shell_consistent_load(xy, R * q)
     K16 = _itw_K16(xy, A)
     b = SVector(13, 14, 15, 16)

@@ -251,8 +251,7 @@ positions. Local matrices are built in the element plane
 `T = diag(R, …, R)`.
 """
 shell_stiffness(section::AbstractShellSection, X1, X2, X3, X4) =
-    _shell_K_plain(membrane_rigidity(section), bending_rigidity(section),
-        shear_rigidity(section), drilling_rigidity(section), X1, X2, X3, X4)
+    _shell_K_plain(_shell_rigidities(section)..., X1, X2, X3, X4)
 
 # the kernel on plain data (rigidities + positions): the AD rule's target
 # (ext/AsapShellADExt.jl — local ForwardDiff Jacobian instead of a scalar trace)

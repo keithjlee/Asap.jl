@@ -54,9 +54,16 @@ _shell_traction(load::AreaLoad, el::ShellElement) =
     load.frame === :global ? load.q : local_frame(el)' * load.q
 _shell_traction(load::SelfWeight, el::ShellElement) =
     areal_mass(el.section) * load.factor * load.g
-# state variants (pure path): frame R and section from the design state
-_shell_traction_state(load::AreaLoad, sec, R) = load.frame === :global ? load.q : R' * load.q
-_shell_traction_state(load::SelfWeight, sec, R) = areal_mass(sec) * load.factor * load.g
+# state variant (pure path): the traction as (global part, local part) with the
+# section from the design state; the kernel adds them as qg + Rᵀ·ql
+function _shell_traction_parts(load::AreaLoad, sec)
+    z = zero(load.q)
+    return load.frame === :global ? (load.q, z) : (z, load.q)
+end
+function _shell_traction_parts(load::SelfWeight, sec)
+    qg = areal_mass(sec) * load.factor * load.g
+    return qg, zero(qg)
+end
 
 _shell_traction(load::ElementLoad, el::ShellElement) = throw(ArgumentError(
     "$(nameof(typeof(load))) cannot be applied to a ShellElement — use AreaLoad, SelfWeight or NodeForce"))
