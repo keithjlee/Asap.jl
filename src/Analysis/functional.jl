@@ -70,6 +70,26 @@ _state_sections(el::VariableElement) = el.sections
 # Zygote differentiates the scalar getindex calls cleanly)
 @inline _position(X::AbstractMatrix, i::Int) = SVector(X[1, i], X[2, i], X[3, i])
 
+# Positions of many nodes at once, as static vectors (one per index), or as
+# N-tuples of them (one per column of an N × nel index matrix).
+#
+# PERFORMANCE RULE for the pure path: per-element closures must not index
+# arrays they capture (`state.X`, `state.sections`, `g.rollangles`, …). Under
+# reverse-mode AD every such `getindex` pulls back into a full-size cotangent,
+# so a model with n elements does O(n²) work. Gather the per-element inputs
+# ONCE (these gathers, or one vector-indexed `getindex`) and `map` over the
+# gathered arrays; the reverse rule of these gathers (AsapChainRulesExt)
+# accumulates into a single position cotangent.
+_gather_positions(X::AbstractMatrix, idx::AbstractVector{<:Integer}) =
+    [_position(X, i) for i in idx]
+_gather_positions(X::AbstractMatrix, idx::AbstractMatrix{<:Integer}, ::Val{N}) where {N} =
+    [ntuple(k -> _position(X, idx[k, e]), Val(N)) for e in axes(idx, 2)]
+
+# per-element end-condition overrides (semi-rigid design variables), or the
+# cached ones when the state carries none
+_gather_ends(state, cached::AbstractVector, idx) =
+    state.ends === nothing ? cached : state.ends[idx]
+
 """
     stiffness_entries(cache, state) -> Vector
 
@@ -95,10 +115,9 @@ function _group_entries_all(g::ElementGroup, state::ModelState)
 end
 
 function _group_entries_nnode_all(g::ElementGroup, state::ModelState, ::Val{N}) where {N}
-    reduce(vcat, map(eachindex(g.elements)) do e
-        X = ntuple(k -> _position(state.X, g.inodes[k, e]), Val(N))
-        _group_entries_nnode(g, e, state.sections[g.model_indices[e]], X)
-    end)
+    P = _gather_positions(state.X, g.inodes, Val(N))
+    secs = state.sections[g.model_indices]
+    reduce(vcat, map((e, section, X) -> _group_entries_nnode(g, e, section, X), eachindex(g.elements), secs, P))
 end
 
 function _group_entries_nnode(g::ElementGroup, e::Int, section, X::NTuple)
@@ -114,11 +133,25 @@ _group_entries_nnode(::ElementGroup{<:ShellElement}, e::Int, section, X::NTuple)
 
 # line elements: per-element kernel evaluation from the two endpoint columns
 function _group_entries_all(g::ElementGroup{<:AbstractLineElement}, state::ModelState)
-    reduce(vcat, map(eachindex(g.elements)) do e
-        _group_entries(g, e, state.sections[g.model_indices[e]],
-            _position(state.X, g.i1[e]), _position(state.X, g.i2[e]),
-            state.ends === nothing ? nothing : state.ends[g.model_indices[e]])
-    end)
+    P1, P2 = _gather_positions(state.X, g.i1), _gather_positions(state.X, g.i2)
+    secs = state.sections[g.model_indices]
+    ends = state.ends === nothing ? fill(nothing, length(g.elements)) : state.ends[g.model_indices]
+    reduce(vcat, map((e, section, x1, x2, ec) -> _group_entries(g, e, section, x1, x2, ec),
+        eachindex(g.elements), secs, P1, P2, ends))
+end
+
+# frames: every per-element input (roll angle, end conditions, active slots)
+# arrives through `map`, none by indexing a captured array (see `_gather_positions`)
+function _group_entries_all(g::ElementGroup{<:FrameElement}, state::ModelState)
+    P1, P2 = _gather_positions(state.X, g.i1), _gather_positions(state.X, g.i2)
+    secs = state.sections[g.model_indices]
+    ends = _gather_ends(state, g.endss, g.model_indices)
+    reduce(vcat, map(_frame_entries, secs, ends, P1, P2, g.rollangles, g.slots))
+end
+
+function _frame_entries(section, ec, x1, x2, rollangle, slots)
+    Ke = frame_stiffness(section, ec, x1, x2, rollangle)
+    return Base.length(slots) == 12 ? vec(Ke) : vec(Ke[slots, slots])
 end
 
 """
@@ -133,7 +166,7 @@ function _group_entries_all(g::ElementGroup{<:TrussElement}, state::ModelState)
     V = state.X * g.Cinc'                             # 3 × nel element vectors
     L = sqrt.(sum(abs2, V; dims=1))                   # 1 × nel
     N = V ./ L                                        # unit vectors
-    ea = state.EA === nothing ? map(i -> EA(state.sections[i]), g.model_indices) :
+    ea = state.EA === nothing ? map(EA, state.sections[g.model_indices]) :
          state.EA[g.model_indices]
     c = reshape(ea, 1, :) ./ L                        # 1 × nel  (EA/L)
 
@@ -148,18 +181,11 @@ function _group_entries_all(g::ElementGroup{<:TrussElement}, state::ModelState)
 end
 
 # Per-element active stiffness entries (scatter order), consuming ONLY plain
-# data — no mutable struct reads inside the differentiated closure. Full
-# frames skip slicing entirely, avoiding the expensive generic getindex
-# pullback on SMatrix under Zygote.
+# data — no mutable struct reads inside the differentiated closure. (Frames:
+# `_frame_entries`; full frames skip slicing entirely, avoiding the expensive
+# generic getindex pullback on SMatrix under Zygote.)
 _group_entries(::ElementGroup{<:TrussElement}, e::Int, section, x1, x2, ends) =
     vec(truss_stiffness(section, x1, x2))
-
-function _group_entries(g::ElementGroup{<:FrameElement}, e::Int, section, x1, x2, ends)
-    ec = ends === nothing ? g.endss[e]::EndConditions : ends
-    Ke = frame_stiffness(section, ec, x1, x2, g.rollangles[e])
-    slots = g.slots[e]
-    return Base.length(slots) == 12 ? vec(Ke) : vec(Ke[slots, slots])
-end
 
 function _group_entries(g::ElementGroup{<:VariableElement}, e::Int, sections, x1, x2, ends)
     Ke = stiffness(g.elements[e], sections, x1, x2)   # super-elements keep the struct path
@@ -239,12 +265,8 @@ function assemble_Pf(cache::AnalysisCache, state::ModelState)
 end
 
 function _frame_fef(t::FEFTable, state::ModelState)
-    Q = map(eachindex(t.loads)) do j
-        e = t.elem[j]
-        ends = state.ends === nothing ? t.ends[j] : state.ends[e]
-        element_fef_global(t.loads[j], state.sections[e], ends,
-            _position(state.X, t.i1[j]), _position(state.X, t.i2[j]), t.rollangle[j])
-    end
+    Q = map(element_fef_global, t.loads, state.sections[t.elem], _gather_ends(state, t.ends, t.elem),
+        _gather_positions(state.X, t.i1), _gather_positions(state.X, t.i2), t.rollangle)
     return t.scatter * reduce(vcat, Q)
 end
 
@@ -252,12 +274,7 @@ end
 # element orientation; self-weight follows ρt of the state section) →
 # condensed consistent load → global 24-vector, scattered
 function _shell_fef(t::FEFTable, state::ModelState)
-    Q = map(eachindex(t.sloads)) do j
-        sec = state.sections[t.selem[j]]
-        X = (_position(state.X, t.snodes[1, j]), _position(state.X, t.snodes[2, j]),
-             _position(state.X, t.snodes[3, j]), _position(state.X, t.snodes[4, j]))
-        _shell_fef_global(t.sloads[j], sec, X)
-    end
+    Q = map(_shell_fef_global, t.sloads, state.sections[t.selem], _gather_positions(state.X, t.snodes, Val(4)))
     return t.sscatter * reduce(vcat, Q)
 end
 
@@ -292,12 +309,8 @@ function fef_local(cache::AnalysisCache, state::ModelState)
     t = cache.fef
     T = eltype(state.X)
     isempty(t.loads) && return zeros(T, 12, 0)
-    Q = map(eachindex(t.loads)) do j
-        e = t.elem[j]
-        ends = state.ends === nothing ? t.ends[j] : state.ends[e]
-        condensed_fef(t.loads[j], state.sections[e], ends,
-            _position(state.X, t.i1[j]), _position(state.X, t.i2[j]), t.rollangle[j])
-    end
+    Q = map(condensed_fef, t.loads, state.sections[t.elem], _gather_ends(state, t.ends, t.elem),
+        _gather_positions(state.X, t.i1), _gather_positions(state.X, t.i2), t.rollangle)
     return reshape(reduce(vcat, Q), 12, :)
 end
 

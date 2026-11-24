@@ -167,6 +167,54 @@ function ChainRulesCore.rrule(::typeof(HOST._position), X::AbstractMatrix, i::In
     return y, _position_pullback
 end
 
+# batched gathers (`_gather_positions`): ONE dense position cotangent for all
+# elements, accumulated in a loop. (Per-element `_position` pullbacks would
+# each allocate a full-size cotangent — O(elements × nodes) in reverse mode.)
+_acc3!(dX, i, ::Union{Nothing,ChainRulesCore.AbstractZero}) = dX
+function _acc3!(dX, i, Δ)
+    v = _flatten3(unthunk(Δ))
+    dX[1, i] += v[1]
+    dX[2, i] += v[2]
+    dX[3, i] += v[3]
+    return dX
+end
+_tuple_parts(Δ::Tuple) = Δ
+_tuple_parts(Δ::ChainRulesCore.Tangent) = ChainRulesCore.backing(Δ)
+
+function ChainRulesCore.rrule(::typeof(HOST._gather_positions), X::AbstractMatrix, idx::AbstractVector{<:Integer})
+    y = HOST._gather_positions(X, idx)
+    function _gather_positions_pullback(Δ)
+        Δs = unthunk(Δ)
+        Δs isa ChainRulesCore.AbstractZero && return (NoTangent(), Δs, NoTangent())
+        dX = zeros(eltype(X), size(X))
+        for (j, i) in enumerate(idx)
+            _acc3!(dX, i, Δs[j])
+        end
+        return (NoTangent(), dX, NoTangent())
+    end
+    return y, _gather_positions_pullback
+end
+
+function ChainRulesCore.rrule(::typeof(HOST._gather_positions), X::AbstractMatrix,
+        idx::AbstractMatrix{<:Integer}, v::Val{N}) where {N}
+    y = HOST._gather_positions(X, idx, v)
+    function _gather_positions_pullback(Δ)
+        Δs = unthunk(Δ)
+        Δs isa ChainRulesCore.AbstractZero && return (NoTangent(), Δs, NoTangent(), NoTangent())
+        dX = zeros(eltype(X), size(X))
+        for e in axes(idx, 2)
+            Δe = unthunk(Δs[e])
+            (Δe === nothing || Δe isa ChainRulesCore.AbstractZero) && continue
+            parts = _tuple_parts(Δe)
+            for k in 1:N
+                _acc3!(dX, idx[k, e], parts[k])
+            end
+        end
+        return (NoTangent(), dX, NoTangent(), NoTangent())
+    end
+    return y, _gather_positions_pullback
+end
+
 # static-vector cotangents arrive in several structural wrappings depending
 # on the AD engine's path (natural SVector, Tangent{SVector}(data = ...),
 # nested Tangent{Any, Tuple}); flatten them all to a plain 3-tuple
