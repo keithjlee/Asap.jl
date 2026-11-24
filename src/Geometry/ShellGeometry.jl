@@ -1,0 +1,102 @@
+"""
+    ShellGeo <: AbstractGeo
+
+Plot-ready arrays of the SHELL elements of a solved model (the counterpart of
+[`ModelGeo`](@ref), which covers frames and trusses). Matrices are
+column-per-item, ready for Makie's `mesh`/`poly`/`arrows`.
+
+# Fields
+- `nodes::Matrix{Float64}`: 3 × n_nodes positions (model node order; all
+  nodes, so `quads` index directly)
+- `disp::Matrix{Float64}`: 3 × n_nodes translational displacements
+- `quads::Matrix{Int}`: 4 × n_shells node indices (counter-clockwise)
+- `elements::Vector{Int}`: model element index of each shell
+- `centers`, `normals`: 3 × n_shells element centroids and unit normals
+- `frames::Vector{SMatrix{3,3,Float64,9}}`: local axes (rows e₁, e₂, e₃)
+- `N`, `M`: 3 × n_shells centre resultants `(xx, yy, xy)` in local axes —
+  membrane forces [force/length] and moments [force·length/length]
+- `Q`: 2 × n_shells centre transverse shears [force/length]
+- `N1`, `N2`: principal membrane forces (N1 ≥ N2), `θ`: angle of N1 from e₁ [rad]
+- `thickness::Vector{Float64}`: shell thickness (NaN for rigidity sections)
+
+# Constructor
+    ShellGeo(model; results = model.results, factors = nothing)
+
+`results`/`factors` select a case or combination as in
+[`shell_resultants`](@ref). Use [`nodal_average`](@ref) to turn any
+per-element field into per-node values for smooth contour plots, and
+`nodes .+ s .* disp` for a deformed shape scaled by `s`.
+"""
+struct ShellGeo <: AbstractGeo
+    nodes::Matrix{Float64}
+    disp::Matrix{Float64}
+    quads::Matrix{Int}
+    elements::Vector{Int}
+    centers::Matrix{Float64}
+    normals::Matrix{Float64}
+    frames::Vector{SMatrix{3,3,Float64,9}}
+    N::Matrix{Float64}
+    M::Matrix{Float64}
+    Q::Matrix{Float64}
+    N1::Vector{Float64}
+    N2::Vector{Float64}
+    θ::Vector{Float64}
+    thickness::Vector{Float64}
+end
+
+function ShellGeo(model::Model{Float64}; results = model.results, factors = nothing)
+    res = results::LinearResults{Float64}
+    nodes_ = reduce(hcat, [Vector(n.position) for n in model.nodes])
+    disp = reduce(hcat, [Vector(displacement(res, n)[1:3]) for n in model.nodes])
+    idx = [e for (e, el) in enumerate(model.elements) if el isa ShellElement]
+    ns = length(idx)
+    quads = zeros(Int, 4, ns)
+    centers = zeros(3, ns); normals = zeros(3, ns)
+    frames = Vector{SMatrix{3,3,Float64,9}}(undef, ns)
+    N = zeros(3, ns); M = zeros(3, ns); Q = zeros(2, ns)
+    N1 = zeros(ns); N2 = zeros(ns); θ = zeros(ns); thick = fill(NaN, ns)
+    for (k, e) in enumerate(idx)
+        el = model.elements[e]
+        quads[:, k] = [n.index for n in el.nodes]
+        centers[:, k] = sum(n -> n.position, el.nodes) / 4
+        r = shell_resultants(model, el; results = res, factors = factors)
+        frames[k] = r.frame
+        normals[:, k] = r.frame[3, :]
+        N[:, k] = r.N; M[:, k] = r.M; Q[:, k] = r.Q
+        N1[k], N2[k], θ[k] = principal_forces(r.N)
+        el.section isa ShellSection && (thick[k] = thickness(el.section))
+    end
+    return ShellGeo(nodes_, disp, quads, idx, centers, normals, frames, N, M, Q, N1, N2, θ, thick)
+end
+
+"""
+    nodal_average(g::ShellGeo, values::AbstractVector) -> Vector{Float64}
+
+Average a per-shell-element field (length `n_shells`, e.g. `g.N[1, :]`) to
+the nodes (length `n_nodes`; 0 at nodes no shell touches) — the usual
+smoothing for contour plots. Explicit and opt-in: averaging across
+discontinuities (wall/slab junctions, thickness changes) blurs real jumps.
+"""
+function nodal_average(g::ShellGeo, values::AbstractVector)
+    length(values) == size(g.quads, 2) || throw(DimensionMismatch("one value per shell element"))
+    acc = zeros(size(g.nodes, 2)); cnt = zeros(Int, size(g.nodes, 2))
+    for k in axes(g.quads, 2), a in 1:4
+        acc[g.quads[a, k]] += values[k]
+        cnt[g.quads[a, k]] += 1
+    end
+    return [c > 0 ? s / c : 0.0 for (s, c) in zip(acc, cnt)]
+end
+
+"""
+    principal_forces(N) -> (N1, N2, θ)
+
+Principal membrane forces of `N = (Nxx, Nyy, Nxy)` [force/length]:
+`N1 ≥ N2` and the angle `θ` [rad] of the N1 direction from the local e₁
+axis. Compression trajectories (`N2 < 0`) are the strut directions of a
+strut-and-tie reading of a wall.
+"""
+function principal_forces(N::AbstractVector)
+    c = (N[1] + N[2]) / 2
+    r = sqrt(((N[1] - N[2]) / 2)^2 + N[3]^2)
+    return c + r, c - r, atan(2 * N[3], N[1] - N[2]) / 2
+end

@@ -259,10 +259,15 @@ Base.show(io::IO, d::RigidDiaphragm) = print(io, "RigidDiaphragm(:$(d.id), $(len
 function Base.show(io::IO, ::MIME"text/plain", m::Model)
     nf = count(el -> el isa FrameElement, m.elements)
     nt = count(el -> el isa TrussElement, m.elements)
+    nsh = count(el -> el isa ShellElement, m.elements)
+    nl = count(el -> el isa LinkElement, m.elements)
+    nother = length(m.elements) - nf - nt - nsh - nl
+    kinds = "$nf frame, $nt truss" * (nsh > 0 ? ", $nsh shell" : "") * (nl > 0 ? ", $nl link" : "") *
+            (nother > 0 ? ", $nother other" : "")
     println(io, "Model")
-    println(io, "  $(length(m.nodes)) nodes, $(length(m.elements)) elements " *
-                "($nf frame, $nt truss$(length(m.elements) - nf - nt > 0 ? ", $(length(m.elements) - nf - nt) other" : ""))")
-    println(io, "  $(length(m.loads)) loads, $(length(m.springs)) nodal springs")
+    println(io, "  $(length(m.nodes)) nodes, $(length(m.elements)) elements ($kinds)")
+    println(io, "  $(length(m.loads)) loads, $(length(m.springs)) nodal springs" *
+                (isempty(m.diaphragms) ? "" : ", $(length(m.diaphragms)) rigid diaphragm(s)"))
     if m.cache !== nothing
         p = m.cache.partition
         println(io, "  processed: $(length(p.free)) free / $(length(p.fixed)) fixed / " *

@@ -57,7 +57,7 @@ export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment
 export ShellElement, shell_frame, shell_stiffness, itw_membrane_stiffness
-export shell_resultants, section_cut, LinkElement
+export shell_resultants, shell_envelope, section_cut, LinkElement
 
 # ── springs ─────────────────────────────────────────────────────────────────
 include("Springs/nodal_springs.jl")
@@ -88,8 +88,8 @@ include("Results/results.jl")
 include("Analysis/solve.jl")
 include("Analysis/functional.jl")
 include("Results/recovery.jl")
-include("Results/shell_results.jl")
 include("Analysis/cases.jl")
+include("Results/shell_results.jl")    # after cases.jl: shell_envelope takes CaseResults
 export DofPartition, AnalysisCache
 export process!, solve!, assemble_K!, assemble_loads!
 export CachedSolver
@@ -119,7 +119,8 @@ export to_truss, to_frame
 # ── plot-ready geometry extraction (absorbed from AsapToolkit) ───────────────
 include("Geometry/Displacements.jl")
 include("Geometry/Geometry.jl")
-export Geo, ModelGeo, TrussGeo, NetworkGeo
+include("Geometry/ShellGeometry.jl")
+export Geo, ModelGeo, TrussGeo, NetworkGeo, ShellGeo, nodal_average, principal_forces
 export ElementDisplacements, displacements
 
 # ── display (last: defines Base.show for every user-facing type above) ──────

@@ -130,3 +130,22 @@ function section_cut(model::Model{T}, elements::AbstractVector, cut_nodes::Abstr
     A = SMatrix{3,3,T}(axes)
     return (F = A * F, M = A * M)
 end
+
+"""
+    shell_envelope(model, el::ShellElement, cr::CaseResults, combos; at = (0.0, 0.0)) -> NamedTuple
+
+Component-wise extrema of the stress resultants of `el` at `at` over the load
+combinations `combos` (the shell counterpart of [`envelope`](@ref)): fields
+`Nmax`, `Nmin`, `Mmax`, `Mmin` (3-vectors, local `(xx, yy, xy)`), `Qmax`,
+`Qmin` (2-vectors), each combination evaluated exactly by superposition
+([`combine`](@ref)) with its case factors.
+"""
+function shell_envelope(model::Model{T}, el::ShellElement{T,4}, cr::CaseResults{T},
+    combos::Vector{<:LoadCombination}; at = (0.0, 0.0)) where {T}
+    isempty(combos) && throw(ArgumentError("need at least one combination to envelope"))
+    rs = [shell_resultants(model, el; at = at, results = combine(cr, c), factors = factor_dict(c))
+          for c in combos]
+    pick(f, sym) = reduce((a, b) -> f.(a, b), getproperty.(rs, sym))
+    return (Nmax = pick(max, :N), Nmin = pick(min, :N), Mmax = pick(max, :M),
+            Mmin = pick(min, :M), Qmax = pick(max, :Q), Qmin = pick(min, :Q))
+end

@@ -30,8 +30,48 @@
 | S5a wall mesher + edge loads + 2-node link element | ✅ | `bc682a4` |
 | S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | `deddfa7` |
 | S6 pure path / AD + AsapOptim thickness variable | ✅ design-dependent shell loads; `AsapShellADExt`; AsapOptim `ThicknessVariable` (branch `shells`) | (see `git log`) |
+| S6b feature parity (Keith, 2026-11-23 — before release) | ⏸ code + walkthroughs DONE, **UNCOMMITTED** in Asap — see "Resume S6b" below | AsapOptim `0dc0ae8` |
 | Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ⏳ docs/notes drafted; **awaiting Keith: merge + push + register** | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
+
+### Resume S6b (paused 2026-11-23 at Keith's request)
+
+Asap working tree is UNCOMMITTED (verified piecewise, NOT yet as a whole):
+1. Run the full lockstep (`lockstep.sh` pattern: Asap, AsapOptim, AsapHarmonics).
+2. Strict docs build (`julia --project=docs docs/make.jl`; `api/shells.md` now includes
+   `Geometry/ShellGeometry.jl`), and `julia test/readme_examples.jl`.
+3. Rerun the parity snapshot vs main if analysis code changed (S6b didn't touch the solve path).
+4. Commit: parity code (`ShellGeo`, `shell_envelope`, generic `element_connectivity`, `ModelGeo`
+   line-only, `Model` show, `AsapShellMooncakeExt` + `_cot` adapters in `AsapShellADExt`,
+   `test_shell_parity.jl`), then a SEPARATE commit for `examples/shells/` (5 walkthroughs +
+   `figures.jl` + `figures/*.png` + README; Manifest ignored).
+5. Then the release questions to Keith (merge, bump, register).
+
+All five walkthroughs ran top to bottom on 2026-11-23 (figures in `examples/shells/figures/`).
+AsapOptim `solution_tangents` with shells and diaphragms is committed (`0dc0ae8`, suite green).
+
+### S6b — feature parity checklist (Keith: "full feature parity for shells before 1.3")
+
+Audit 2026-11-23 of user-facing paths on models containing shells:
+- [x] P1 `solution_tangents` (AsapOptim implicit diff) with shells: ThicknessVariable,
+      SpatialVariables on shell nodes, design-dependent shell loads, rigid diaphragms
+- [x] P2 plot extraction: `Geo(model)`/`ModelGeo` currently break on mixed models (assume line
+      elements); line part must skip shells, plus a new `ShellGeo` (quads, displaced
+      positions, per-element and nodal-averaged resultant fields for contouring)
+- [x] P3 `shell_envelope` — resultant extrema over load combinations (frames have `envelope`)
+- [x] P4 `element_connectivity` generic over N-node elements (currently via line-only
+      `connectivity`)
+- [x] P5 `Model` show counts shells/links/diaphragms
+- [x] P6 AD backends: Mooncake through shells (bridge the shell rrules if needed); Enzyme
+      status documented
+- [x] P7 walkthroughs `examples/shells/` (public; own env: Asap path + CairoMakie + kjlMakie):
+      shift+enter friendly, top-to-bottom runnable — shells standalone (wall, slab), mixed
+      frame+wall building with diaphragm, precast joints, thickness gradients/optimization;
+      `figures.jl` figure generators (mesh, deformed shape, resultant contours, pier forces)
+      P6: Mooncake needed `AsapShellMooncakeExt` (its own rule derivation overflows on the
+      shell kernels) plus cotangent adapters (nested `Tangent` in, static-array rdata out);
+      now Mooncake ≡ Zygote to 1e-16 and is FASTER (13 ms vs 49 ms). Enzyme is not verified
+      with shells (Enzyme is broadly broken; see the memory note).
 
 ### Handoff notes
 

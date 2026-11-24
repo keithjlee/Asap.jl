@@ -86,13 +86,31 @@ solve!(storey)
 displacement(storey.results, floor.master)[[1, 2, 6]]   # ux, uy, θz: torsion from the stiffness eccentricity
 ```
 
+## Envelopes and plot extraction
+
+- [`shell_envelope`](@ref) gives the component-wise resultant extrema of an element over load
+  combinations (the shell counterpart of [`envelope`](@ref)).
+- [`ShellGeo`](@ref) extracts plot-ready arrays: quads, displacements, centre resultants and
+  principal forces ([`principal_forces`](@ref)).
+- [`nodal_average`](@ref) smooths any per-element field to the nodes for contour plots.
+- [`Geo`](@ref) / `ModelGeo` cover the frame and truss elements of a mixed model.
+
+## Walkthroughs
+
+`examples/shells/` in the repository has shift+enter walkthroughs with figure generators:
+1. a shear wall with openings;
+2. slabs;
+3. a frame + coupled-wall building with rigid diaphragms;
+4. precast joints;
+5. thickness sensitivities and optimization.
+
 ## Differentiable analysis
 
 Shells take part in the pure path: [`compliance`](@ref)/[`solve`](@ref) on a [`ModelState`](@ref) differentiate with respect to node positions and shell sections (thickness), with shell surface loads re-evaluated per state (self-weight follows `ρt`, pressure follows the element area and orientation).
 
-For fast reverse mode, load ForwardDiff alongside Zygote. The shell kernels' rules (`AsapShellADExt`) evaluate each element's local Jacobian with ForwardDiff instead of tracing it, about 15× faster.
+For fast reverse mode, load ForwardDiff alongside Zygote. The shell kernels' rules (`AsapShellADExt`) evaluate each element's local Jacobian with ForwardDiff instead of tracing it, about 15× faster. Mooncake uses the same rules (`AsapShellMooncakeExt`); its own rule derivation overflows on the shell kernels.
 
-In AsapOptim, `ThicknessVariable(elements, value, lb, ub)` makes a wall or slab thickness a design variable, and `shell_volume(x, p)` gives the material volume.
+In AsapOptim, `ThicknessVariable(elements, value, lb, ub)` makes a wall or slab thickness a design variable, and `shell_volume(x, p)` gives the material volume. `solution_tangents` (implicit differentiation) supports shells and rigid diaphragms.
 
 ```julia
 using Zygote, ForwardDiff

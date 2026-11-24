@@ -7,7 +7,7 @@ Modules = [Asap]
 Pages = ["Materials/shell_sections.jl", "Elements/shell.jl", "Elements/link.jl",
          "Elements/kernels/shell.jl", "Elements/kernels/shell_loads_recovery.jl",
          "Loads/shell_loads.jl", "Results/shell_results.jl", "Generation/WallMesh.jl",
-         "Model/diaphragm.jl", "Analysis/constraints.jl"]
+         "Model/diaphragm.jl", "Analysis/constraints.jl", "Geometry/ShellGeometry.jl"]
 Private = false
 ```
 

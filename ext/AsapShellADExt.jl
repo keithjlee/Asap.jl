@@ -34,10 +34,18 @@ end
 
 _sv3(x) = SVector{3}(x)
 
+# cotangent → flat static vector of length N, whatever the AD engine hands us:
+# an array (Zygote), or a structural Tangent of a static array whose backing
+# holds the `data` tuple (Mooncake's ChainRules interop)
+_cot(::Val{N}, Δ::AbstractArray) where {N} = SVector{N}(vec(Δ))
+_cot(v::Val, Δ::ChainRulesCore.Tangent) = _cot(v, ChainRulesCore.backing(Δ))   # may nest (Mooncake)
+_cot(v::Val, Δ::NamedTuple) = _cot(v, Δ.data)
+_cot(::Val{N}, Δ::Tuple) where {N} = SVector{N}(Δ)
+
 function ChainRulesCore.rrule(::typeof(Asap._shell_K_plain), A, D, S, γt, X1, X2, X3, X4)
     K = Asap._shell_K_plain(A, D, S, γt, X1, X2, X3, X4)
     function shell_K_pullback(ΔK)
-        Δ = SMatrix{24,24}(unthunk(ΔK))
+        Δ = reshape(_cot(Val(576), unthunk(ΔK)), Size(24, 24))
         p0 = Vector(_pack(SMatrix{3,3}(A), SMatrix{3,3}(D), SMatrix{2,2}(S), γt,
             _sv3(X1), _sv3(X2), _sv3(X3), _sv3(X4)))
         h(p) = sum(Δ .* Asap._shell_K_plain(_unpack35(SVector{35}(p))...))
@@ -53,7 +61,7 @@ end
 function ChainRulesCore.rrule(::typeof(Asap._shell_fef_plain), A, q, X1, X2, X3, X4)
     f = Asap._shell_fef_plain(A, q, X1, X2, X3, X4)
     function shell_fef_pullback(Δf)
-        Δ = SVector{24}(unthunk(Δf))
+        Δ = _cot(Val(24), unthunk(Δf))
         p0 = Vector(vcat(_sv3(X1), _sv3(X2), _sv3(X3), _sv3(X4), vec(SMatrix{3,3}(A)), _sv3(q)))
         function h(p)
             v = SVector{24}(p)

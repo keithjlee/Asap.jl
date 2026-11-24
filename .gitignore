@@ -28,3 +28,4 @@ docs/AUTHORING.md
 # Documenter build artifacts
 docs/build/
 docs/Manifest.toml
+examples/**/Manifest.toml
