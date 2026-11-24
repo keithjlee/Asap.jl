@@ -17,7 +17,7 @@ B. the same slab carried only by point supports (four corner columns and a
 
 begin
     using Asap, LinearAlgebra
-    include(joinpath(@__DIR__, "figures.jl"))
+    include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)
 end
 
 #=
@@ -124,4 +124,25 @@ end
 begin
     f = fig_slab(mB; geo = gB, field = :Mxx, title = "flat plate: Mxx — column-strip hogging")
     savefig("02_flatplate_Mxx.png", f)
+end
+
+#=
+## Numbers for the report
+
+`reports/S2_slab_plate.typ` prints these (see `figures.jl`, `report_data`).
+=#
+begin
+    report_data("S2";
+        span = a, thickness = t, pressure = q, E = concrete.E, nu = concrete.ν,
+        thin_thickness = tthin, slenderness_thin = a / tthin, slenderness_real = a / t,
+        D_thin = Dt(tthin), D_real = Dt(t),
+        n_w = 16, n_M = 17,
+        w_centre_thin_mm = 1000 * wc, w_coeff = wc * Dt(tthin) / (q * a^4), w_coeff_ref = 0.00406,
+        M_centre = Mc[1], M_coeff = abs(Mc[1]) / (q * a^2), M_coeff_ref_nu03 = 0.0479, M_coeff_ref = Mref,
+        checkA = checkA,
+        w_centre_real_mm = -1000 * displacement(mA.results, gridA[9, 9])[3],
+        convergence = (ns = ns, thin = thin, real = real_,
+                       thin_ratio = thin ./ 0.00406, real_ratio = real_ ./ 0.00406),
+        flatplate = (n = 24, max_deflection_mm = 1000 * flatplate.max_deflection,
+                     Mxx_min = flatplate.Mxx_range[1], Mxx_max = flatplate.Mxx_range[2]))
 end

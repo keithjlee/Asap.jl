@@ -10,13 +10,13 @@ weight, floor gravity at each level, and a lateral storey force at each
 level. We mesh it, solve it, and read it the way a designer does: drift,
 membrane forces, compression struts, and pier forces at a section cut.
 
-Environment: this folder's Project.toml (Asap by path + plotting).
-    julia --project=examples/shells examples/shells/01_wall_basics.jl
+Environment: `examples/Project.toml` (Asap and AsapOptim by path + plotting).
+    julia --project=examples examples/shells/01_wall_basics.jl
 =#
 
 begin
     using Asap, LinearAlgebra
-    include(joinpath(@__DIR__, "figures.jl"))
+    include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)
 end
 
 #=
@@ -163,4 +163,32 @@ begin
         ylabel = "roof drift [mm]", xscale = log2, title = "mesh convergence")
     savefig("01_wall_convergence.png", f)
     drift
+end
+
+#=
+## Numbers for the report
+
+`reports/S1_wall_basics.typ` prints these (see `figures.jl`, `report_data`).
+=#
+begin
+    corner = shell_resultants(model, corner_el; at = (-1.0, 1.0))
+    sw = areal_mass(wall) * 9.81                     # self-weight per wall area [kN/m²]
+    net_area = L * (H1 + H2) - door[3] * door[4] - window[3] * window[4]
+    above_cut = L * (H1 + H2 - 1.0) - door[3] * (door[4] - 1.0) - window[3] * window[4]
+    report_data("S1";
+        length = L, H1 = H1, H2 = H2, thickness = wall.t,
+        E = concrete.E, nu = concrete.ν, rho = concrete.ρ, cracked_factor = 0.7,
+        door = door, window = window, mesh_size = 0.25,
+        n_elements = length(w.elements), n_nodes = length(w.nodes),
+        n_level1 = length(lvl1), n_roof = length(roof),
+        floor_load = 30.0, storey_forces = (level1 = 120.0, roof = 160.0),
+        self_weight_per_area = sw, self_weight_total = sw * net_area,
+        drifts_mm = (level1 = 1000 * drifts.level1_drift, roof = 1000 * drifts.roof_drift),
+        roof_drift_ratio = drifts.roof_drift_ratio,
+        cut_z = 1.0,
+        piers = (left = piers.left, right = piers.right),
+        pier_shear_sum = FL[1] + FR[1], storey_shear_above_cut = 120.0 + 160.0,
+        pier_axial_sum = FL[3] + FR[3], gravity_above_cut = sw * above_cut + 2 * 30.0 * L,
+        corner = (N = corner.N, M = corner.M, Q = corner.Q),
+        convergence = (sizes = sizes, roof_drift_mm = 1000 .* drift))
 end

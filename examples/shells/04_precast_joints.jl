@@ -18,7 +18,7 @@ you whether it would open, and how much tie force keeps it closed.
 
 begin
     using Asap, LinearAlgebra
-    include(joinpath(@__DIR__, "figures.jl"))
+    include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)
 end
 
 begin
@@ -105,4 +105,25 @@ end
 begin
     f = fig_wall(r.m, r.upper; field = :Nyy, scale = 200.0, title = "upper panel: Nyy (deformed ×200)")
     savefig("04_upper_panel_Nyy.png", f)
+end
+
+#=
+## Numbers for the report
+
+`reports/S4_precast_joints.typ` prints these (see `figures.jl`, `report_data`).
+=#
+begin
+    report_data("S4";
+        length = L, height = H, thickness = panel.t, E = conc.E, nu = conc.ν, rho = conc.ρ,
+        Vtop = Vtop, mesh_size = 0.25, n_links = length(r.joint),
+        n_elements_panel = length(r.lower.elements),
+        k_bearing = 5e7, k_theta = 1e5, k_rigid = 1e10,
+        monolithic_drift_mm = 1000 * stiff.drift,
+        sweep = (k = collect(ks), drift_mm = 1000 .* drifts,
+                 ratio = drifts ./ stiff.drift),
+        realistic = (k_shear = 1e6, drift_mm = 1000 * r.drift, ratio = r.drift / stiff.drift),
+        joint = (s = s, N = N, sum = sum(N), W_upper = Wupper,
+                 max_tension = maximum(N), max_compression = minimum(N),
+                 n_tension = count(>(0), N), tension_total = sum(filter(>(0), N)),
+                 s_max_tension = s[argmax(N)], s_max_compression = s[argmin(N)]))
 end

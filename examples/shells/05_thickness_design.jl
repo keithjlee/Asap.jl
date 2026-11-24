@@ -21,7 +21,7 @@ Fast reverse AD through shells needs ForwardDiff loaded alongside Zygote
 begin
     using Asap, AsapOptim, LinearAlgebra
     using Zygote, ForwardDiff
-    include(joinpath(@__DIR__, "figures.jl"))
+    include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)
 end
 
 begin
@@ -80,7 +80,7 @@ begin
     grads = (zygote = gz, implicit = gi, finite_diff = gfd)
     @show grads
     f = fig_bars(names, -1000 .* gi; ylabel = "−∂drift/∂t [mm per m]",
-        title = "where thickness buys stiffness")
+        title = "where thickness buys stiffness", rotation = π / 8)
     savefig("05_sensitivities.png", f)
 end
 
@@ -139,4 +139,28 @@ begin
     barplot!(ax, [1, 2, 3, 4] .+ 0.18, x; width = 0.34, color = kjl_blue, label = "optimized")
     axislegend(ax; position = :rt)
     savefig("05_thickness.png", f)
+end
+
+#=
+## Numbers for the report
+
+`reports/S5_thickness_design.typ` prints these (see `figures.jl`, `report_data`).
+=#
+begin
+    relerr(g) = maximum(abs.(g .- gfd) ./ abs.(gfd))
+    report_data("S5";
+        E = conc.E, nu = conc.ν, rho = conc.ρ, t0 = t0, storey_height = H,
+        long_length = 3.0, short_length = 1.5, gap = 1.0, mesh_size = 0.5,
+        storey_forces = (level1 = 150.0, roof = 250.0),
+        bounds = (lower = 0.12, upper = 0.6),
+        n_elements = length(long.elements) + length(short.elements),
+        var_elements = [length(storey(long, 1)), length(storey(long, 2)), length(storey(short, 1)), length(storey(short, 2))],
+        names = names,
+        drift0_mm = 1000 * drift(x0), volume0 = volume(x0),
+        grads = (zygote = gz, implicit = gi, finite_diff = gfd, fd_step = h,
+                 relerr_zygote = relerr(gz), relerr_implicit = relerr(gi)),
+        dV = gV,
+        oc = (iters = length(hist) - 1, V = [h.V for h in hist], drift_ratio = [h.δ / δlim for h in hist],
+              x = x, x0 = x0, volume_saving = result.volume_saving, drift_ratio_final = result.drift_ratio_to_limit,
+              volume_final = hist[end].V, drift_mm_final = 1000 * hist[end].δ, drift_limit_mm = 1000 * δlim))
 end

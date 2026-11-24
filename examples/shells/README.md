@@ -12,6 +12,9 @@ Units: kN, m.
 | `04_precast_joints.jl` | Stacked precast panels joined by `LinkElement`s: drift vs joint shear stiffness, joint axial-force distribution (tie demand) |
 | `05_thickness_design.jl` | Design sensitivities (Zygote, implicit `solution_tangents`, finite differences) and an optimality-criteria thickness redistribution with AsapOptim's `ThicknessVariable` |
 
+`../ad/ad_backends_shells.jl` compares Zygote, Enzyme (reverse) and Mooncake through shells on the same
+models (all agree to 1e-16; Enzyme fastest).
+
 `figures.jl` holds the figure generators (`fig_wall`, `fig_principal`,
 `fig_slab`, `fig_3d`, `fig_bars`, `fig_series`) — plain functions of Asap's
 `ShellGeo`/`WallMesh` — and every walkthrough saves its figures to
@@ -20,10 +23,10 @@ Units: kN, m.
 ## Running
 
 ```bash
-julia --project=examples/shells -e 'using Pkg; Pkg.instantiate()'
-julia --project=examples/shells examples/shells/01_wall_basics.jl
+julia --project=examples -e 'using Pkg; Pkg.instantiate()'
+julia --project=examples examples/shells/01_wall_basics.jl
 ```
 
-The environment uses Asap and AsapOptim from this checkout (`[sources]`
+The shared `examples/` environment uses Asap and AsapOptim from this checkout (`[sources]`
 paths), CairoMakie, and the kjlMakie theme. The first run compiles the
 plotting stack (a few minutes); later runs are fast.

@@ -10,19 +10,65 @@ the solved `Model`) that return Makie figures in the kjlMakie house style:
     fig_slab(model; field = :Mxx, elements)         plan view of a slab, contoured
     fig_3d(model; field = :N2, scale)               3D view of shells + frames, deformed
     fig_series(xs, series; xlabel, ylabel, ref)     convergence / parametric curves
+    fig_lines(model; plane, scale, diagram)         2D view of frames/trusses: deformed (exact member curves),
+                                                    coloured by axial force, optional moment diagram
+    fig_member(model, el)                           N / V / M diagrams along one member
 
-`include("figures.jl")` from any walkthrough (it loads the plotting stack).
-Saved figures go to `figures/` next to this file.
+`include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)` from any
+walkthrough (it loads the plotting stack); figures go to `figures/` next to the walkthrough.
+`report_data(name; key = value, …)` writes the numbers a walkthrough's Typst report prints
+to `reports/data/<name>.json`.
 =#
 
 using Asap, LinearAlgebra
 using kjlMakie, CairoMakie
 CairoMakie.activate!()
 set_theme!(kjl_light)
+update_theme!(backgroundcolor = :white)        # PNGs: opaque white, not transparent
 
-const FIGDIR = joinpath(@__DIR__, "figures")
-mkpath(FIGDIR)
-savefig(name, fig) = (save(joinpath(FIGDIR, name), fig; px_per_unit = 2); fig)
+# each walkthrough saves into `figures/` next to itself: call `set_figdir(@__DIR__)`
+const FIGDIR = Ref(joinpath(@__DIR__, "figures"))
+set_figdir(dir) = (FIGDIR[] = joinpath(dir, "figures"); mkpath(FIGDIR[]); FIGDIR[])
+# Saved PNGs are cropped to their content plus a margin: axes with a data aspect (elevations,
+# plans) otherwise leave wide empty bands, which waste page space in the reports.
+function savefig(name, fig; pad = 24)
+    path = joinpath(FIGDIR[], name)
+    save(path, fig; px_per_unit = 2)
+    endswith(name, ".png") && _crop_whitespace!(path; pad)
+    return fig
+end
+function _crop_whitespace!(path; pad = 24)
+    img = Makie.FileIO.load(path)
+    C = Makie.Colors
+    ink = map(c -> min(C.red(c), C.green(c), C.blue(c)) < 0.98, img)
+    rows, cols = findall(vec(any(ink; dims = 2))), findall(vec(any(ink; dims = 1)))
+    (isempty(rows) || isempty(cols)) && return path
+    r = max(first(rows) - pad, 1):min(last(rows) + pad, size(img, 1))
+    c = max(first(cols) - pad, 1):min(last(cols) + pad, size(img, 2))
+    (length(r), length(c)) == size(img) || Makie.FileIO.save(path, img[r, c])
+    return path
+end
+
+# ── report data ──────────────────────────────────────────────────────────────
+# Each walkthrough ends with `report_data("A1"; key = value, …)`: the numbers its
+# Typst report (`reports/`) prints, written to `reports/data/<name>.json`, so no
+# number in a report is typed by hand. Values: numbers, strings, symbols,
+# vectors and (named) tuples of those; non-finite floats are written as null.
+using JSON
+const REPORT_DATA = joinpath(@__DIR__, "reports", "data")
+_jsonable(x::AbstractFloat) = isfinite(x) ? x : nothing
+_jsonable(x::Symbol) = string(x)
+_jsonable(x::Union{AbstractVector,Tuple}) = map(_jsonable, collect(x))
+_jsonable(x::AbstractRange) = _jsonable(collect(x))
+_jsonable(x::NamedTuple) = Dict(string(k) => _jsonable(v) for (k, v) in pairs(x))
+_jsonable(x::AbstractDict) = Dict(string(k) => _jsonable(v) for (k, v) in x)
+_jsonable(x) = x
+function report_data(name::AbstractString; kw...)
+    mkpath(REPORT_DATA)
+    path = joinpath(REPORT_DATA, name * ".json")
+    write(path, JSON.json(_jsonable(NamedTuple(kw)); pretty = true))
+    return path
+end
 
 # ── fields ───────────────────────────────────────────────────────────────────
 
@@ -88,6 +134,19 @@ symmetric_range(v) = (m = maximum(abs, v; init = 0.0); m == 0 ? (-1.0, 1.0) : (-
 # figure size following the wall's aspect ratio (plot area ≈ 420 px tall + colourbar/legend)
 wall_figsize(w::WallMesh) = (round(Int, clamp(420 * w.s[end] / w.z[end], 160, 900)) + 260, 480)
 
+# limits from the plotted points only (the geometry holds every node of the
+# model, so auto-limits would take in other walls), and the axis column sized
+# to the data aspect so a colourbar/legend sits right beside the wall
+function fit_wall_axis!(fig, ax, pts; pad = 0.03)
+    s = extrema(p -> p[1], pts); z = extrema(p -> p[2], pts)
+    ds, dz = s[2] - s[1], z[2] - z[1]
+    m = pad * max(ds, dz)
+    limits!(ax, s[1] - m, s[2] + m, z[1] - m, z[2] + m)
+    colsize!(fig.layout, 1, Aspect(1, (ds + 2m) / (dz + 2m)))
+    resize_to_layout!(fig)
+    return fig
+end
+
 # wall-plane coordinates (s, z) of global points (columns of X)
 wall_sz(w::WallMesh, X::AbstractMatrix) =
     [Point2f(dot(w.along, X[:, i] - w.origin), dot(w.up, X[:, i] - w.origin)) for i in axes(X, 2)]
@@ -116,8 +175,8 @@ function fig_wall(model, w; field = :N2, scale = 0.0, title = "", geo = ShellGeo
     edges = [P[geo.quads[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4]
     linesegments!(ax, reduce(vcat, edges); color = :black, linewidth = 0.4)
     Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)))
-    resize_to_layout!(fig)
-    return fig
+    used = unique(vec(geo.quads[:, ks]))
+    return fit_wall_axis!(fig, ax, vcat(P0[used], P[used]))
 end
 
 """
@@ -150,16 +209,16 @@ function fig_principal(model, w; geo = ShellGeo(model), title = "principal membr
     linesegments!(ax, comp; color = kjl_blue, linewidth = 1.6, label = "compression")
     linesegments!(ax, tens; color = kjl_pink, linewidth = 1.6, label = "tension")
     Legend(fig[1, 2], ax; framevisible = false)
-    resize_to_layout!(fig)
-    return fig
+    return fit_wall_axis!(fig, ax, P0[unique(vec(geo.quads[:, ks]))])
 end
 
 # ── bars and series ──────────────────────────────────────────────────────────
 
-function fig_bars(labels, values; ylabel = "", title = "", color = kjl_blue)
-    fig = Figure(size = (520, 360))
-    ax = Axis(fig[1, 1]; ylabel = ylabel, title = title, xticks = (1:length(labels), labels))
-    barplot!(ax, 1:length(values), values; color = color)
+function fig_bars(labels, values; ylabel = "", title = "", color = kjl_blue, rotation = 0.0)
+    fig = Figure(size = (max(520, 46 * length(labels)), 360))
+    ax = Axis(fig[1, 1]; ylabel = ylabel, title = title, xticks = (1:length(labels), labels),
+        xticklabelrotation = rotation)
+    barplot!(ax, 1:length(values), values; color = color, gap = 0.25)
     hlines!(ax, [0.0]; color = :black, linewidth = 0.5)
     return fig
 end
@@ -202,8 +261,7 @@ function fig_slab(model; field = :Mxx, elements = nothing, title = "", geo = She
     linesegments!(ax, reduce(vcat, [P[geo.quads[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4]);
         color = (:black, 0.3), linewidth = 0.4)
     Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)))
-    resize_to_layout!(fig)
-    return fig
+    return fit_wall_axis!(fig, ax, P[used])
 end
 
 # ── 3D view ──────────────────────────────────────────────────────────────────
@@ -216,7 +274,7 @@ Shells (coloured by `field`, deformed by `scale × u`) and line elements
 undeformed line elements in grey.
 """
 function fig_3d(model; field = :umag, scale = 0.0, title = "", geo = ShellGeo(model),
-    azimuth = 1.1π, elevation = 0.35, colormap = :viridis, size = (760, 640))
+    azimuth = 1.1π, elevation = 0.35, colormap = :viridis, size = (760, 640), linecolor = :frame)
     fig = Figure(size = size)
     ax = Axis3(fig[1, 1]; aspect = :data, title = title, azimuth = azimuth, elevation = elevation)
     X0 = geo.nodes
@@ -241,11 +299,112 @@ function fig_3d(model; field = :umag, scale = 0.0, title = "", geo = ShellGeo(mo
             push!(seg, P[i], P[j])
         end
         scale == 0 || linesegments!(ax, seg0; color = (:gray, 0.5), linewidth = 1)
-        linesegments!(ax, seg; color = kjl_darkgray, linewidth = 2.5)
+        if linecolor === :axial
+            N = [axial_force(model.results, el) for el in lines_]
+            Nmax = max(maximum(abs, N), eps())
+            cols = reduce(vcat, [[n < 0 ? kjl_blue : kjl_pink, n < 0 ? kjl_blue : kjl_pink] for n in N])
+            widths = reduce(vcat, [[0.5 + 4 * abs(n) / Nmax, 0.5 + 4 * abs(n) / Nmax] for n in N])
+            linesegments!(ax, seg; color = cols, linewidth = widths)
+        else
+            linesegments!(ax, seg; color = kjl_darkgray, linewidth = 2.5)
+        end
     end
     return fig
 end
 
 size_shells(g::ShellGeo) = size(g.quads, 2)
 
-println("figures.jl loaded — figures save to ", FIGDIR)
+# ── line elements (frames, trusses) ─────────────────────────────────────────
+
+view2d(X, plane) = plane === :XZ ? Point2f(X[1], X[3]) : plane === :XY ? Point2f(X[1], X[2]) : Point2f(X[2], X[3])
+const PLANE_LABELS = Dict(:XZ => ("x  [length]", "z  [length]"), :XY => ("x  [length]", "y  [length]"),
+    :YZ => ("y  [length]", "z  [length]"))
+
+# deformed polyline of a line element: exact curve for frames, straight for trusses
+function member_curve(model, el, scale; resolution = 20)
+    if el isa FrameElement
+        ed = ElementDisplacements(el, model; resolution = resolution)
+        return [ed.basepositions[:, k] .+ scale .* ed.uglobal[:, k] for k in axes(ed.basepositions, 2)]
+    else
+        u1 = displacement(model.results, el.nodeStart)[1:3]; u2 = displacement(model.results, el.nodeEnd)[1:3]
+        return [el.nodeStart.position .+ scale .* u1, el.nodeEnd.position .+ scale .* u2]
+    end
+end
+
+"""
+    fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = nothing, dscale = nothing, title)
+
+2D view (`plane` = :XZ, :XY or :YZ) of the model's frame and truss members:
+undeformed in grey, deformed by `scale × u` along each member's EXACT
+deflected curve, coloured by axial force (blue compression, pink tension)
+with line width ∝ |N| (or `widths`, one per member, e.g. ∝ area). `diagram = :Mz` / `:My` overlays that bending-moment
+diagram normal to each frame member (scaled by `dscale`).
+"""
+function fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = nothing, dscale = nothing,
+    title = "", size = (760, 460), labels = false, widths = nothing)
+    lines_ = [el for el in model.elements if el isa Union{FrameElement,TrussElement}]
+    fig = Figure(size = size)
+    xl, yl = PLANE_LABELS[plane]
+    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = title, xlabel = xl, ylabel = yl,
+        xautolimitmargin = (0.06, 0.06), yautolimitmargin = (0.15, 0.15))
+    for el in lines_
+        lines!(ax, [view2d(el.nodeStart.position, plane), view2d(el.nodeEnd.position, plane)]; color = (:gray, 0.45), linewidth = 1)
+    end
+    N = [axial_force(model.results, el) for el in lines_]
+    Nmax = maximum(abs, N; init = 0.0); Nmax = Nmax == 0 ? 1.0 : Nmax
+    for (k, (el, n)) in enumerate(zip(lines_, N))
+        pts = [view2d(x, plane) for x in member_curve(model, el, scale)]
+        c = color === :axial ? (n < 0 ? kjl_blue : kjl_pink) : color
+        lw = widths !== nothing ? widths[k] : color === :axial ? 1 + 5 * abs(n) / Nmax : 2
+        lines!(ax, pts; color = c, linewidth = lw)
+    end
+    if diagram !== nothing
+        frames = [el for el in lines_ if el isa FrameElement]
+        Ms = [getproperty(InternalForces(model, el; resolution = 30), diagram) for el in frames]
+        Mmax = maximum(m -> maximum(abs, m), Ms; init = 0.0)
+        span = maximum(el -> norm(el.nodeEnd.position - el.nodeStart.position), frames)
+        ds = dscale === nothing ? 0.25 * span / max(Mmax, eps()) : dscale
+        for (el, M) in zip(frames, Ms)
+            f = InternalForces(model, el; resolution = 30)
+            a, b = view2d(el.nodeStart.position, plane), view2d(el.nodeEnd.position, plane)
+            t = (b - a) / norm(b - a); nrm = Point2f(-t[2], t[1])
+            L = norm(el.nodeEnd.position - el.nodeStart.position)
+            base = [a + (x / L) * (b - a) for x in f.x]
+            curve = [p + ds * m * nrm for (p, m) in zip(base, M)]
+            poly!(ax, vcat(base, reverse(curve)); color = (kjl_green, 0.25))
+            lines!(ax, curve; color = kjl_green, linewidth = 1.2)
+        end
+    end
+    if labels
+        for el in lines_
+            text!(ax, view2d((el.nodeStart.position + el.nodeEnd.position) / 2, plane);
+                text = string(round(axial_force(model.results, el), digits = 1)), fontsize = 9, align = (:center, :bottom))
+        end
+    end
+    color === :axial && Legend(fig[1, 2], [LineElement(color = kjl_blue, linewidth = 3), LineElement(color = kjl_pink, linewidth = 3)] .|> identity,
+        ["compression", "tension"]; framevisible = false)
+    resize_to_layout!(fig)
+    return fig
+end
+
+"""
+    fig_member(model, el; title)
+
+Axial force, shear and bending-moment diagrams along one member (exact
+recovery: `InternalForces`, stations at load breakpoints).
+"""
+function fig_member(model, el; title = "")
+    f = InternalForces(model, el; resolution = 60)
+    fig = Figure(size = (620, 560))
+    for (row, (y, lab, c)) in enumerate(((f.N, "N  [force]", kjl_darkgray), (f.Vy, "Vy  [force]", kjl_turquoise),
+                                          (f.Mz, "Mz  [force·length]", kjl_green)))
+        ax = Axis(fig[row, 1]; ylabel = lab, xlabel = row == 3 ? "x along member  [length]" : "",
+            title = row == 1 ? title : "")
+        band!(ax, f.x, zeros(length(y)), y; color = (c, 0.25))
+        lines!(ax, f.x, y; color = c, linewidth = 2)
+        hlines!(ax, [0.0]; color = :black, linewidth = 0.5)
+    end
+    return fig
+end
+
+println("figures.jl loaded")

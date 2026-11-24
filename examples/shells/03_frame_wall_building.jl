@@ -20,7 +20,7 @@ wall and the frames, pier forces, coupling-beam forces.
 
 begin
     using Asap, LinearAlgebra
-    include(joinpath(@__DIR__, "figures.jl"))
+    include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)
 end
 
 #=
@@ -218,4 +218,31 @@ begin
     heel = pierA.elements[1]                       # bottom-left element of pier A
     env = shell_envelope(model, heel, cr, combos)
     @show env.Nmin env.Nmax
+end
+
+#=
+## Numbers for the report
+
+`reports/S3_frame_wall_building.typ` prints these (see `figures.jl`, `report_data`).
+=#
+begin
+    secinfo(s) = (A = s.A, Ix = s.Ix, Iy = s.Iy, J = s.J)
+    report_data("S3";
+        plan_x = 12.0, plan_y = 8.0, wall_x = 6.0, column_spacing = 4.0, storey_height = H, n_storeys = length(levels),
+        E = conc.E, nu = conc.ν, rho = conc.ρ,
+        column = secinfo(col), beam = secinfo(beam), coupling_beam = secinfo(cbeam),
+        wall_thickness = wallsec.t, pier_length = 2.5, door_width = 1.0, wall_mesh_size = 0.5,
+        n_wall_elements = length(wallels), n_frames = length(frames), n_columns = 2 * length(colxy),
+        n_coupling = length(cbeams), n_slaves = [length(d.nodes) for d in floors],
+        beam_line_load = 15.0, storey_forces = (level1 = 150.0, roof = 250.0), eccentricity = 0.05,
+        torsion_EX = [0.05 * 8.0 * V for V in (150.0, 250.0)], torsion_EY = [0.05 * 12.0 * V for V in (150.0, 250.0)],
+        drifts = (EX_mm = drifts.EX_mm, EY_mm = drifts.EY_mm,
+                  EX_ratio_roof = drifts.EX_ratio_roof, EY_ratio_roof = drifts.EY_ratio_roof),
+        stiffness_ratio = drifts.EX_mm[2] / drifts.EY_mm[2],
+        share = share, applied_EY = 150.0 + 250.0,
+        piers = (A = piers.A, B = piers.B),
+        coupling = [(level = c.level, shear = c.shear, end_moment = c.end_moment) for c in coupling],
+        coupling_shear_sum = sum(c.shear for c in coupling),
+        envelope = (combos = ["1.2 D + 1.0 EY", "0.9 D − 1.0 EY"],
+                    Nmin = env.Nmin, Nmax = env.Nmax, Mmin = env.Mmin, Mmax = env.Mmax))
 end
