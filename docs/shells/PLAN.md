@@ -30,25 +30,9 @@
 | S5a wall mesher + edge loads + 2-node link element | ✅ | `bc682a4` |
 | S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | `deddfa7` |
 | S6 pure path / AD + AsapOptim thickness variable | ✅ design-dependent shell loads; `AsapShellADExt`; AsapOptim `ThicknessVariable` (branch `shells`) | (see `git log`) |
-| S6b feature parity (Keith, 2026-11-23 — before release) | ⏸ code + walkthroughs DONE, **UNCOMMITTED** in Asap — see "Resume S6b" below | AsapOptim `0dc0ae8` |
-| Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ⏳ docs/notes drafted; **awaiting Keith: merge + push + register** | |
+| S6b feature parity (Keith, 2026-11-23 — before release) | ✅ P1–P7; lockstep green (Asap 3067), docs + README pass | `0826a8e`, `e7e85da`; AsapOptim `0dc0ae8` |
+| Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ⏳ everything ready; **awaiting Keith: merge + bump + push + register** | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
-
-### Resume S6b (paused 2026-11-23 at Keith's request)
-
-Asap working tree is UNCOMMITTED (verified piecewise, NOT yet as a whole):
-1. Run the full lockstep (`lockstep.sh` pattern: Asap, AsapOptim, AsapHarmonics).
-2. Strict docs build (`julia --project=docs docs/make.jl`; `api/shells.md` now includes
-   `Geometry/ShellGeometry.jl`), and `julia test/readme_examples.jl`.
-3. Rerun the parity snapshot vs main if analysis code changed (S6b didn't touch the solve path).
-4. Commit: parity code (`ShellGeo`, `shell_envelope`, generic `element_connectivity`, `ModelGeo`
-   line-only, `Model` show, `AsapShellMooncakeExt` + `_cot` adapters in `AsapShellADExt`,
-   `test_shell_parity.jl`), then a SEPARATE commit for `examples/shells/` (5 walkthroughs +
-   `figures.jl` + `figures/*.png` + README; Manifest ignored).
-5. Then the release questions to Keith (merge, bump, register).
-
-All five walkthroughs ran top to bottom on 2026-11-23 (figures in `examples/shells/figures/`).
-AsapOptim `solution_tangents` with shells and diaphragms is committed (`0dc0ae8`, suite green).
 
 ### S6b — feature parity checklist (Keith: "full feature parity for shells before 1.3")
 
