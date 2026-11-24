@@ -25,32 +25,32 @@ Warm medians of 3 gradient evaluations, in ms; *n* = number of design variables;
 
 | Case | What is differentiated | n | Ref | Mode | Error | Enzyme 1.13 | Zygote 1.13 | Enzyme 1.12 | Zygote 1.12 |
 |---|---|---|---|---|---|---|---|---|---|
-| truss_area | member areas, planar truss | 14 | Zygote | rev | 8.8e-16 | 0.083 | 0.286 | 0.09 | 0.414 |
-| | | | | fwd | 2.8e-15 | 0.119 | 0.278 | 0.114 | 0.393 |
-| truss_shape | top-chord node heights | 3 | Zygote | rev | 6.4e-16 | 0.09 | 0.311 | 0.1 | 0.429 |
-| | | | | fwd | 1.1e-15 | 0.059 | 0.35 | 0.054 | 0.399 |
-| spaceframe | member areas, 8 × 8 space truss | 512 | Zygote | rev | 1.0e-14 | 0.861 | 1.18 | 0.877 | 1.25 |
-| | | | | fwd | 1.5e-14 | 168 | 1.92 | 584 | 35.9 |
-| frame_lineload | frame section with line load + self-weight (design-dependent FEFs) | 3 | Zygote | rev | 7.7e-15 | 0.119 | 0.696 | 0.125 | 0.968 |
-| | | | | fwd | 4.1e-15 | 0.109 | 0.651 | 0.112 | 1.11 |
-| frame_joints | semi-rigid connection stiffness (`JointVariable`) | 1 | Zygote | rev | 1.9e-16 | 0.512 | 0.973 | 0.547 | 1.31 |
-| | | | | fwd | 3.8e-16 | 0.468 | 0.967 | 0.452 | 1.17 |
-| springs | spring-support stiffness | 1 | Zygote | rev | 8.1e-16 | 0.091 | 0.371 | 0.112 | 0.521 |
-| | | | | fwd | 1.4e-15 | 0.065 | 0.397 | 0.063 | 0.576 |
-| variable_element | haunched `VariableElement` model | 9 | FD | rev | 1.6e-09 | 0.126 | — | 0.152 | — |
-| | | | | fwd | 1.6e-09 | 0.239 | — | 0.281 | — |
-| diaphragm | frame with a rigid diaphragm | 2 | Zygote | rev | 7.6e-15 | 0.244 | 0.545 | 0.14 | 0.738 |
-| | | | | fwd | 6.4e-15 | 0.079 | 0.508 | 0.091 | 0.763 |
-| shells | shell thickness (`ThicknessVariable`) | 2 | Zygote | rev | 0.0e+00 | 8.47 | 13.5 | 8.7 | 15.3 |
-| | | | | fwd | 1.0e-14 | 1.01 | 13.3 | 1.1 | 14.4 |
+| truss_area | member areas, planar truss | 14 | Zygote | rev | 8.8e-16 | 0.094 | 0.301 | 0.093 | 0.519 |
+| | | | | fwd | 2.8e-15 | 0.122 | 0.317 | 0.126 | 0.477 |
+| truss_shape | top-chord node heights | 3 | Zygote | rev | 6.4e-16 | 0.091 | 0.301 | 0.101 | 0.418 |
+| | | | | fwd | 1.1e-15 | 0.054 | 0.328 | 0.056 | 0.462 |
+| spaceframe | member areas, 8 × 8 space truss | 512 | Zygote | rev | 1.0e-14 | 0.909 | 1.22 | 1.11 | 1.4 |
+| | | | | fwd | 1.5e-14 | 200 | 2.48 | 546 | 1.22 |
+| frame_lineload | frame section with line load + self-weight (design-dependent FEFs) | 3 | Zygote | rev | 7.7e-15 | 0.122 | 0.521 | 0.312 | 0.904 |
+| | | | | fwd | 4.1e-15 | 0.094 | 0.56 | 0.113 | 0.776 |
+| frame_joints | semi-rigid connection stiffness (`JointVariable`) | 1 | Zygote | rev | 1.9e-16 | 0.484 | 0.828 | 0.602 | 1.17 |
+| | | | | fwd | 3.8e-16 | 0.451 | 0.812 | 0.541 | 1.16 |
+| springs | spring-support stiffness | 1 | Zygote | rev | 2.0e-16 | 0.09 | 0.278 | 0.104 | 0.355 |
+| | | | | fwd | 1.4e-15 | 0.054 | 0.311 | 0.057 | 0.396 |
+| variable_element | haunched `VariableElement` model | 9 | FD | rev | 1.6e-09 | 0.122 | — | 0.156 | — |
+| | | | | fwd | 1.6e-09 | 0.264 | — | 0.456 | — |
+| diaphragm | frame with a rigid diaphragm | 2 | Zygote | rev | 7.6e-15 | 0.128 | 0.386 | 0.127 | 0.456 |
+| | | | | fwd | 6.4e-15 | 0.082 | 0.389 | 0.14 | 0.472 |
+| shells | shell thickness (`ThicknessVariable`) | 2 | Zygote | rev | 0.0e+00 | 6.38 | 8.08 | 6.92 | 8.95 |
+| | | | | fwd | 1.0e-14 | 1.11 | 8.07 | 1.2 | 9.09 |
 
-First-call (compile) time per process: 26–54 s for most cases, up to 95 s for shells in reverse mode.
+First-call (compile) time per process: 28–59 s for most cases, up to 84 s for shells in reverse mode.
 
 ## Reading the table
 
-- **Reverse mode is the default for gradients.** It is faster than Zygote in every case, by 1.4× (spaceframe) to 7.7× (frame line loads on 1.12). Zygote frame gradients use the 1.3 frame rules (`AsapFrameADExt`), which narrowed the gap.
+- **Reverse mode is the default for gradients.** It is faster than Zygote in every case, by 1.3× (shells, spaceframe) to 5.6× (truss areas on 1.12). The 1.3 Zygote rules (`AsapFrameADExt`, and the linear-cost group rules in `AsapChainRulesExt`) narrowed the gap; on these small models the group rules matter little, their gain grows with model size.
 - **Forward mode costs one pass per variable**, so it wins only for a handful of variables
-  (shells: 1.1 ms against 8 ms in reverse mode) and loses badly at 512 (168–584 ms). For
+  (shells: 1.1 ms against 6.4 ms in reverse mode) and loses badly at 512 (200–546 ms). For
   Jacobians of many outputs with respect to few inputs, forward mode is the right tool.
 - **Zygote cannot differentiate `VariableElement` models** ("Mutating arrays is not supported").
   Enzyme can. This predates 1.3.
@@ -64,9 +64,18 @@ assertion, threw `ReadOnlyMemoryError` at spaceframe scale on 1.11, and an older
 compilation. With 0.13.221, forward mode works on 1.12, and spaceframe-scale forward mode works on
 1.12 and 1.13. Julia 1.11 was not rerun, so its two failures are untested.
 
-These results are from the final 1.3 code (rerun 2026-11-24). An intermediate pure-path refactor
-passed the Asap suite but failed this matrix (Enzyme reverse threw; forward returned wrong
-derivatives silently) and was reverted: rerun the matrix after any pure-path change.
+These results are from the final 1.3 code (rerun 2026-11-24, after the linear-cost Zygote rules and
+the split shell rules). The matrix has caught two regressions that the Asap suite missed, both
+reverted before commit:
+
+- a pure-path refactor (gather + `map` over abstractly typed arrays): Enzyme reverse threw, and
+  forward returned wrong derivatives silently;
+- factoring the frame stiffness lines of `_group_entries` into a helper function: Enzyme reverse
+  failed type analysis on `frame_joints` ("Cannot deduce type of load").
+
+Rerun the matrix after any change to code on the pure path, however small. The shell rules
+bridged into Enzyme (`_shell_K_plain`, `_shell_fef_plain`) got faster in the same change, so
+shell reverse mode went from 8.5 to 6.4 ms.
 
 One Asap fix was needed for 1.12. `AsapEnzymeExt` and `AsapShellEnzymeExt` register their rules with
 `@eval` in `__init__`. While `AsapShellEnzymeExt` precompiled, it loaded `AsapEnzymeExt`, whose

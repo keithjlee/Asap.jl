@@ -108,7 +108,7 @@ displacement(storey.results, floor.master)[[1, 2, 6]]   # ux, uy, θz: torsion f
 
 Shells take part in the pure path: [`compliance`](@ref)/[`solve`](@ref) on a [`ModelState`](@ref) differentiate with respect to node positions and shell sections (thickness), with shell surface loads re-evaluated per state (self-weight follows `ρt`, pressure follows the element area and orientation).
 
-For fast reverse mode, load ForwardDiff alongside Zygote. The shell kernels' rules (`AsapShellADExt`) evaluate each element's local Jacobian with ForwardDiff instead of tracing it, about 15× faster. Mooncake (`AsapShellMooncakeExt`) and Enzyme reverse mode (`AsapShellEnzymeExt`) use the same rules; both fail on the shell kernels natively. All backends agree to 1e-16; Enzyme is the fastest (see `examples/ad/ad_backends_shells.jl`).
+For fast reverse mode, load ForwardDiff alongside Zygote. The shell kernels' rules (`AsapShellADExt`) evaluate each element's derivative with ForwardDiff instead of tracing it, many times faster. Mooncake (`AsapShellMooncakeExt`) and Enzyme reverse mode (`AsapShellEnzymeExt`) use the same rules; both fail on the shell kernels natively. All backends agree to 1e-16; Enzyme is the fastest, with Zygote close behind (see `examples/ad/ad_backends_shells.jl`).
 
 In AsapOptim, `ThicknessVariable(elements, value, lb, ub)` makes a wall or slab thickness a design variable, and `shell_volume(x, p)` gives the material volume. `solution_tangents` (implicit differentiation) supports shells and rigid diaphragms.
 

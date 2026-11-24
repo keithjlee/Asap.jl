@@ -38,8 +38,9 @@ Gradients flow with respect to node positions, section properties, and semi-rigi
 
 For fast Zygote gradients, load ForwardDiff as well. The frame and shell kernels then get reverse
 rules that evaluate each element's derivative with ForwardDiff (`AsapFrameADExt`,
-`AsapShellADExt`) instead of tracing the small static-matrix kernels scalar by scalar (frames: about
-4× faster at 120 elements). Without ForwardDiff, the gradients are the same, just slower. See
+`AsapShellADExt`) instead of tracing the small static-matrix kernels scalar by scalar. Without
+ForwardDiff, the gradients are the same, just slower. Either way a Zygote gradient costs a fixed
+multiple of the solve at any model size (frames about 13×, shells about 20×); see
 `examples/ad/reverse_scaling.jl` for timings against model size.
 
 ## Element loads follow the design

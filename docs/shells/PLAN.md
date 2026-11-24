@@ -32,7 +32,7 @@
 | S6 pure path / AD + AsapOptim thickness variable | ✅ design-dependent shell loads; `AsapShellADExt`; AsapOptim `ThicknessVariable` (branch `shells`) | (see `git log`) |
 | S6b feature parity (Keith, 2026-11-23 — before release) | ✅ P1–P7; lockstep green (Asap 3067), docs + README pass | `0826a8e`, `e7e85da`; AsapOptim `0dc0ae8` |
 | S6c examples for ALL scenarios + Enzyme across Asap (Keith, 2026-11-23 evening) | ✅ walkthroughs + Typst reports + Enzyme matrix (1.13 + 1.12, 18/18) | see below |
-| S6d reverse-mode performance (overnight 2026-11-23/24) | ✅ AsapFrameADExt (frames 1.7–3.8×); gather refactor REVERTED (broke Enzyme); bitwise primal vs v1.2 | release notes "Performance" |
+| S6d reverse-mode performance (2026-11-23/24) | ✅ AsapFrameADExt; gather refactor REVERTED (broke Enzyme); linear-cost RuleConfig group rules + split shell rules (vs v1.2 frames 8.8–11.7×; vs kernel rules only frames 2.4–6.9×, shells 2.4–4.7×); bitwise primal vs v1.2; Enzyme 36/36 | release notes "Performance" |
 | Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ⏳ everything ready; **awaiting Keith: merge + bump + push + register** | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
 
@@ -434,9 +434,19 @@ Keith: "carry forward with any cleanup of the code, any performance gains". Prof
   reverse throws, FORWARD SILENTLY WRONG. Caught only by the Enzyme matrix rerun.
 - Verified on the final code: Asap suite, lockstep, Enzyme matrix 1.13 + 1.12, regression vs v1.2.0
   (primal + ForwardDiff gradients bitwise, Zygote ≤ 6e-15).
-- OPEN — Enzyme-safe O(n²) fix. Candidate: a ChainRules rule with a RuleConfig on the per-group
-  entries function (`_group_entries_all(g, state)`): primal = today's closure code (Enzyme keeps
-  seeing it), pullback = loop over elements calling the plain-kernel VJPs and accumulating straight
-  into ONE dX (sections/ends cotangents via `rrule_via_ad` on the accessors). Zygote-only by
-  construction. Must pass the full Enzyme matrix and the regression.
-- OPEN — shell kernel pullbacks ~240 µs/element (ForwardDiff chunk 4 over 35 inputs).
+- DONE (2026-11-24, Keith: "get the safer shell implementation for Enzyme and Zygote performance
+  done before release") — Enzyme-safe linear-cost Zygote: RuleConfig rrules in AsapChainRulesExt on
+  the per-element maps (`_group_entries_all` for frame groups, `_group_entries_nnode_all` for shell
+  groups, `_frame_fef`, `_shell_fef`, `fef_local`). Primal code unchanged (one helper,
+  `_frame_entries`, factored out); the pullback calls `rrule_via_ad` per element on its own gathered
+  arguments and accumulates ONE dX / sections / ends cotangent. Enzyme and Mooncake import only
+  config-free kernel rules, so they never see these. `_natural` converts structural
+  `Tangent{SMatrix}` fields back to arrays.
+- DONE — shell kernel pullbacks: separate ForwardDiff passes per input group (membrane rigidities,
+  plate rigidities, load, positions). Only the position group carries dual geometry: stiffness
+  pullback 200 → 125 µs, compile ~85 → 43 s. `_shell_rigidities(sec)` (one rule for `ShellSection`:
+  one width-4 dual pass over E, G, ν, t, instead of a 35 µs Zygote trace of four accessors).
+  `_shell_fef_plain(A, qg, ql, X…)` takes the traction as global + local parts (the kernel forms
+  qg + Rᵀql, bitwise the old traction), so Zygote no longer traces `shell_frame` per loaded element.
+- FIXED (pre-existing) — Zygote through `ShellRigiditySection(sec; m11 …)`: the same-type
+  `SMatrix{3,3,T}(::SMatrix)` conversion has no clean pullback; skipped via `_smat`.
