@@ -23,17 +23,17 @@
 | Phase | Status | Commit |
 |---|---|---|
 | S0 derivation dossier | ✅ membrane transcribed from ITW report; MITC4 written, primary-PDF recheck open | — |
-| S1 n-node analysis-layer generalization | ✅ bitwise parity with main; lockstep green | `e5a8ce2` |
-| S2 `ShellSection` + ITW drilling membrane | ✅ enhanced variant (DERIVATION §2.1) — Keith OK'd 2026-11-23 | `4e9677f` |
-| S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | `2b67b1e` |
-| S4 area loads, resultants, `section_cut` | ✅ | `da60f78` |
-| S5a wall mesher + edge loads + 2-node link element | ✅ | `bc682a4` |
-| S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | `deddfa7` |
+| S1 n-node analysis-layer generalization | ✅ bitwise parity with main; lockstep green | `2edd773` |
+| S2 `ShellSection` + ITW drilling membrane | ✅ enhanced variant (DERIVATION §2.1) — Keith OK'd 2026-11-23 | `e350a96` |
+| S3 MITC4 plate → full `ShellElement` | ✅ plates + Scordelis–Lo converge (DERIVATION §3) | `988c42c` |
+| S4 area loads, resultants, `section_cut` | ✅ | `a24d950` |
+| S5a wall mesher + edge loads + 2-node link element | ✅ | `71d5e02` |
+| S5b rigid diaphragm constraints | ✅ exact transformation; torsion hand-calc to 1e-9 | `cc5b6e6` |
 | S6 pure path / AD + AsapOptim thickness variable | ✅ design-dependent shell loads; `AsapShellADExt`; AsapOptim `ThicknessVariable` (branch `shells`) | (see `git log`) |
-| S6b feature parity (Keith, 2026-11-23 — before release) | ✅ P1–P7; lockstep green (Asap 3067), docs + README pass | `0826a8e`, `e7e85da`; AsapOptim `0dc0ae8` |
-| S6c examples for ALL scenarios + Enzyme across Asap (Keith, 2026-11-23 evening) | ✅ walkthroughs + Typst reports + Enzyme matrix (1.13 + 1.12, 18/18) | see below |
+| S6b feature parity (Keith, 2026-11-23 — before release) | ✅ P1–P7; lockstep green (Asap 3067), docs + README pass | `31a0335`, `2e1e3f2`; AsapOptim `0dc0ae8` |
+| S6c examples for ALL scenarios + Enzyme across Asap (Keith, 2026-11-23 evening) | ✅ walkthroughs + PDF reports + Enzyme matrix (1.13 + 1.12, 18/18) | see below |
 | S6d reverse-mode performance (2026-11-23/24) | ✅ AsapFrameADExt; gather refactor REVERTED (broke Enzyme); linear-cost RuleConfig group rules + split shell rules (vs v1.2 frames 8.8–11.7×; vs kernel rules only frames 2.4–6.9×, shells 2.4–4.7×); bitwise primal vs v1.2; Enzyme 36/36 | release notes "Performance" |
-| Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ⏳ everything ready; **awaiting Keith: merge + bump + push + register** | |
+| Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ✅ 2026-11-24: merged to `main`, v1.3.0 (AsapOptim 1.3.0); registration via `@JuliaRegistrator` | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
 
 ### S6c — walkthroughs for every scenario + Enzyme verification (Keith: before release)
@@ -427,9 +427,9 @@ Keith: "carry forward with any cleanup of the code, any performance gains". Prof
   (kernel 0.8 µs) and the element-load pullback 256 µs (kernel 0.1 µs) — Zygote tracing 12×12 SMatrix
   kernels. Shell gradient per element grew with model size (650 → 1266 µs, 96 → 1536 el): O(n²) from
   captured-array indexing in the per-element closures.
-- KEPT `af97018` — `AsapFrameADExt`: local ForwardDiff rules on plain-data frame kernels (bitwise
+- KEPT `76039d0` — `AsapFrameADExt`: local ForwardDiff rules on plain-data frame kernels (bitwise
   primal). Frames 62.8 → 16.7 ms (120 el), 436 → 256 ms (665 el).
-- REVERTED `32f23aa` → `f8aa055` — gather + `map` over gathered arrays fixed the O(n²) for Zygote
+- REVERTED `10a9047` → `47a78bc` — gather + `map` over gathered arrays fixed the O(n²) for Zygote
   (shells 2.5×, frames to 11–13× with the rules) but Enzyme mishandles `map` over `Vector{Any}`:
   reverse throws, FORWARD SILENTLY WRONG. Caught only by the Enzyme matrix rerun.
 - Verified on the final code: Asap suite, lockstep, Enzyme matrix 1.13 + 1.12, regression vs v1.2.0
