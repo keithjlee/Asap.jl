@@ -50,15 +50,7 @@ Units in every walkthrough: kN, m. Asap itself is units-agnostic.
 
 ## Reports — `reports/`
 
-One Typst report per walkthrough (`A1_truss_2d.typ` … `D2_ad_backends_shells.typ`) plus `main.typ`, all
-of them in one document. Each walkthrough ends with a `report_data("<id>"; …)` block (`figures.jl`) that
-writes the numbers its report prints to `reports/data/<id>.json`, so no number in a report is typed by
-hand and rerunning a walkthrough refreshes its report.
-
-```bash
-examples/reports/build.sh                                       # every report + main.pdf
-cd examples/reports && typst compile --root .. A1_truss_2d.typ  # one report
-```
-
-The reports use the `kjl-typst` Typst template, a local package (not on Typst Universe).
+One PDF report per walkthrough (`A1_truss_2d.pdf` … `D2_ad_backends_shells.pdf`) and `main.pdf`, all
+of them in one document. Each walkthrough ends with a `report_data("<id>"; …)` block (`figures.jl`)
+that records the numbers its report prints, so no number in a report is typed by hand.
 

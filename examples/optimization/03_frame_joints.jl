@@ -88,7 +88,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/O3_frame_joints.typ` prints these (see `figures.jl`, `report_data`).
+`reports/O3_frame_joints.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     report_data("O3";

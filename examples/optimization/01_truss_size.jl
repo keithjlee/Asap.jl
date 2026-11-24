@@ -87,7 +87,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/O1_truss_size.typ` prints these (see `figures.jl`, `report_data`).
+`reports/O1_truss_size.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     report_data("O1";

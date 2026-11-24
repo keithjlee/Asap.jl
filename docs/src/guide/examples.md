@@ -24,5 +24,5 @@ julia --project=examples examples/analysis/01_truss_2d.jl
 ```
 
 See `examples/README.md` for the full index.
-Each walkthrough also has a Typst report in `examples/reports/`, which prints the numbers the
-walkthrough writes to `examples/reports/data/` when it runs.
+Each walkthrough also has a PDF report in `examples/reports/` (and all of them in `main.pdf`); the
+numbers it prints are the ones the walkthrough records when it runs.

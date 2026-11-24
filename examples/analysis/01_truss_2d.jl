@@ -129,7 +129,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/A1_truss_2d.typ` prints these (see `figures.jl`, `report_data`).
+`reports/A1_truss_2d.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     report_data("A1";

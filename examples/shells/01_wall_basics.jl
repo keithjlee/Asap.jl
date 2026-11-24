@@ -168,7 +168,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/S1_wall_basics.typ` prints these (see `figures.jl`, `report_data`).
+`reports/S1_wall_basics.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     corner = shell_resultants(model, corner_el; at = (-1.0, 1.0))

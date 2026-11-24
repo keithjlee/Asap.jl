@@ -105,7 +105,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/A4_frame_3d_building.typ` prints these (see `figures.jl`, `report_data`).
+`reports/A4_frame_3d_building.pdf` prints these (see `figures.jl`, `report_data`).
 Statics check: the support reactions of each case against its total load.
 =#
 begin

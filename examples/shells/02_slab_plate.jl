@@ -129,7 +129,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/S2_slab_plate.typ` prints these (see `figures.jl`, `report_data`).
+`reports/S2_slab_plate.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     report_data("S2";

@@ -110,7 +110,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/S4_precast_joints.typ` prints these (see `figures.jl`, `report_data`).
+`reports/S4_precast_joints.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     report_data("S4";

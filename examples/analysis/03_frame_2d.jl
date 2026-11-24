@@ -96,7 +96,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/A3_frame_2d.typ` prints these (see `figures.jl`, `report_data`).
+`reports/A3_frame_2d.pdf` prints these (see `figures.jl`, `report_data`).
 Hand checks: statics of the reactions; the pinned girder is a simply supported
 beam (UDL w plus P at L/4), and its columns are two equal cantilevers sharing
 the eave load.

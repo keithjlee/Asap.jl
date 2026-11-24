@@ -144,7 +144,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/S5_thickness_design.typ` prints these (see `figures.jl`, `report_data`).
+`reports/S5_thickness_design.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     relerr(g) = maximum(abs.(g .- gfd) ./ abs.(gfd))

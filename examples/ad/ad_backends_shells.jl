@@ -60,13 +60,14 @@ end
 #=
 ## Numbers for the report
 
-`reports/D2_ad_backends_shells.typ` prints these. This script does not load
+`reports/D2_ad_backends_shells.pdf` prints these. This script does not load
 `figures.jl` (no plots), so it writes the JSON directly.
 =#
 begin
     using JSON
     _fin(x) = x isa AbstractFloat && !isfinite(x) ? nothing : x
-    write(joinpath(@__DIR__, "..", "reports", "data", "D2.json"), JSON.json(Dict(
+    mkpath(joinpath(@__DIR__, "..", "reports-src", "data"))
+    write(joinpath(@__DIR__, "..", "reports-src", "data", "D2.json"), JSON.json(Dict(
         "julia" => string(VERSION), "cpu" => Sys.CPU_NAME, "threads" => Threads.nthreads(),
         "versions" => Dict("enzyme" => string(pkgversion(Enzyme)), "zygote" => string(pkgversion(Zygote)),
             "mooncake" => string(pkgversion(Mooncake)), "differentiationinterface" => string(pkgversion(DifferentiationInterface))),

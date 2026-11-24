@@ -106,7 +106,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/O2_truss_shape.typ` prints these (see `figures.jl`, `report_data`).
+`reports/O2_truss_shape.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     report_data("O2";

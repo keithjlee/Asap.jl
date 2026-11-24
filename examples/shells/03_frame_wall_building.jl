@@ -223,7 +223,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/S3_frame_wall_building.typ` prints these (see `figures.jl`, `report_data`).
+`reports/S3_frame_wall_building.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     secinfo(s) = (A = s.A, Ix = s.Ix, Iy = s.Iy, J = s.J)

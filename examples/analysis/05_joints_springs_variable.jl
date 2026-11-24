@@ -118,7 +118,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/A5_joints_springs_variable.typ` prints these (see `figures.jl`, `report_data`).
+`reports/A5_joints_springs_variable.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     # exact midspan moments from the member's force state (the sampled stations miss x = 6 m)

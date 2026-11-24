@@ -80,7 +80,7 @@ end
 #=
 ## Numbers for the report
 
-`reports/A2_spaceframe_3d.typ` prints these (see `figures.jl`, `report_data`).
+`reports/A2_spaceframe_3d.pdf` prints these (see `figures.jl`, `report_data`).
 =#
 begin
     selfweight = sum(el -> ρA(el.section) * 9.81 * length(el), roof.elements)

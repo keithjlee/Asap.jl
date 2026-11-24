@@ -16,8 +16,9 @@ the solved `Model`) that return Makie figures in the kjlMakie house style:
 
 `include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)` from any
 walkthrough (it loads the plotting stack); figures go to `figures/` next to the walkthrough.
-`report_data(name; key = value, …)` writes the numbers a walkthrough's Typst report prints
-to `reports/data/<name>.json`.
+`report_data(name; key = value, …)` writes the numbers a walkthrough's report prints
+to `reports-src/data/<name>.json` (the report sources are not distributed; the PDFs are in
+`reports/`).
 =#
 
 using Asap, LinearAlgebra
@@ -51,11 +52,11 @@ end
 
 # ── report data ──────────────────────────────────────────────────────────────
 # Each walkthrough ends with `report_data("A1"; key = value, …)`: the numbers its
-# Typst report (`reports/`) prints, written to `reports/data/<name>.json`, so no
-# number in a report is typed by hand. Values: numbers, strings, symbols,
+# report (`reports/<id>_*.pdf`) prints, written to `reports-src/data/<name>.json`,
+# so no number in a report is typed by hand. Values: numbers, strings, symbols,
 # vectors and (named) tuples of those; non-finite floats are written as null.
 using JSON
-const REPORT_DATA = joinpath(@__DIR__, "reports", "data")
+const REPORT_DATA = joinpath(@__DIR__, "reports-src", "data")
 _jsonable(x::AbstractFloat) = isfinite(x) ? x : nothing
 _jsonable(x::Symbol) = string(x)
 _jsonable(x::Union{AbstractVector,Tuple}) = map(_jsonable, collect(x))
