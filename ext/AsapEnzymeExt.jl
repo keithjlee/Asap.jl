@@ -37,6 +37,11 @@ using SparseArrays
 # which is not reliably active while THIS extension precompiles — register
 # the imported rules at load time instead.
 function __init__()
+    # never while precompiling a DEPENDENT package (e.g. AsapShellEnzymeExt loads this
+    # one during its own precompilation): evaluating into a closed module then
+    # breaks incremental compilation (a hard error on Julia 1.12). The rules are
+    # registered when the extension is actually loaded.
+    ccall(:jl_generating_output, Cint, ()) == 1 && return nothing
     @eval begin
         Enzyme.@import_rrule(typeof(Asap.solve_free), SparseMatrixCSC{Float64,Int}, Vector{Float64})
         Enzyme.@import_rrule(typeof(Asap.solve_free), SparseMatrixCSC{Float64,Int}, Matrix{Float64})

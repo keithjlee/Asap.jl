@@ -19,6 +19,11 @@ using Asap, Enzyme, ChainRulesCore, ForwardDiff, StaticArrays
 # registered at load time: Enzyme's @import_rrule lives in ITS ChainRulesCore
 # extension, which is not reliably active while this extension precompiles
 function __init__()
+    # never while precompiling a DEPENDENT package (e.g. AsapShellEnzymeExt loads this
+    # one during its own precompilation): evaluating into a closed module then
+    # breaks incremental compilation (a hard error on Julia 1.12). The rules are
+    # registered when the extension is actually loaded.
+    ccall(:jl_generating_output, Cint, ()) == 1 && return nothing
     @eval begin
         Enzyme.@import_rrule(typeof(Asap._shell_K_plain), SMatrix{3,3,Float64,9}, SMatrix{3,3,Float64,9},
             SMatrix{2,2,Float64,4}, Float64, SVector{3,Float64}, SVector{3,Float64}, SVector{3,Float64}, SVector{3,Float64})
