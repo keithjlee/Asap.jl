@@ -161,9 +161,25 @@ the `section` and the `ends`.
 """
 function condensed_fef(load::ElementLoad, section::AbstractSection, ends::EndConditions,
     x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
-    q = fixed_end_forces(load, section, ends, x1, x2, rollangle)
-    return condense_fef(q, section, element_length(x1, x2), ends)
+    return _fef_local_plain(load, _fef_rigidities(section), _end_springs(ends),
+        _sv3(x1), _sv3(x2), rollangle)
 end
+
+# plain-data form (see `_frame_K_plain`): the load kernels read only EIx, EIy
+# (condensation) and ρA (self-weight) from the section; the reverse rules in
+# ext/AsapFrameADExt.jl target these
+@inline _fef_rigidities(s::AbstractSection) = SVector(EIx(s), EIy(s), ρA(s))
+
+function _fef_local_plain(load::ElementLoad, r::SVector{3}, k::SVector{8},
+    x1::SVector{3}, x2::SVector{3}, rollangle::Real)
+    sec = RigiditySection(zero(r[1]), r[1], r[2], zero(r[1]), r[3])
+    ends = _end_conditions(k)
+    q = fixed_end_forces(load, sec, ends, x1, x2, rollangle)
+    return condense_fef(q, sec, element_length(x1, x2), ends)
+end
+
+_fef_global_plain(load::ElementLoad, r::SVector{3}, k::SVector{8}, x1::SVector{3}, x2::SVector{3}, rollangle::Real) =
+    _rotate12(local_frame(x1, x2, rollangle)', _fef_local_plain(load, r, k, x1, x2, rollangle))
 
 """
     element_fef_global(load, section, ends, x1, x2, rollangle) -> SVector{12}
@@ -175,8 +191,8 @@ and differentiable; the stateful assembler and the pure path
 """
 function element_fef_global(load::ElementLoad, section::AbstractSection, ends::EndConditions,
     x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
-    q̃ = condensed_fef(load, section, ends, x1, x2, rollangle)
-    return _rotate12(local_frame(x1, x2, rollangle)', q̃)
+    return _fef_global_plain(load, _fef_rigidities(section), _end_springs(ends),
+        _sv3(x1), _sv3(x2), rollangle)
 end
 
 function _apply_load!(cache::AnalysisCache, load::NodeForce, inactive)

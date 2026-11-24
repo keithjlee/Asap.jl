@@ -1,3 +1,7 @@
+# included by every shell test file (each also runs standalone); load once
+if !isdefined(@__MODULE__, :_SHELL_TEST_UTILS_LOADED)
+const _SHELL_TEST_UTILS_LOADED = true
+
 # Shared helpers for the shell test files (membrane-only planar problems).
 
 # structured membrane mesh in the XY plane: `xy(i, j)` gives node (i, j) for
@@ -122,3 +126,5 @@ function scordelis_lo(n)
     solve!(m)
     return -displacement(m.results, grid[n+1, n+1])[3]
 end
+
+end # load-once guard

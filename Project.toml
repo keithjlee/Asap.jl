@@ -21,6 +21,7 @@ AsapChainRulesExt = "ChainRulesCore"
 AsapEnzymeExt = ["Enzyme", "ChainRulesCore"]
 AsapForwardDiffExt = "ForwardDiff"
 AsapShellADExt = ["ChainRulesCore", "ForwardDiff"]
+AsapFrameADExt = ["ChainRulesCore", "ForwardDiff"]
 AsapShellMooncakeExt = ["Mooncake", "ChainRulesCore", "ForwardDiff"]
 AsapShellEnzymeExt = ["Enzyme", "ChainRulesCore", "ForwardDiff"]
 AsapLinearSolveExt = "LinearSolve"
