@@ -1,5 +1,5 @@
 """
-    FrameElement{T, S<:AbstractSection{T}} <: AbstractElement{T}
+    FrameElement{T, S<:AbstractSection{T}} <: AbstractLineElement{T}
 
 A 3D frame (beam-column) element: carries axial force, biaxial bending,
 transverse shear, and torsion between two nodes. The successor of the
@@ -42,7 +42,7 @@ julia> semirigid = FrameElement(n1, n2, sec,
            EndConditions(EndSprings(Inf, Inf, 5e4, 5e4), rigid_end()), :connection)
 ```
 """
-mutable struct FrameElement{T,S<:AbstractSection{T}} <: AbstractElement{T}
+mutable struct FrameElement{T,S<:AbstractSection{T}} <: AbstractLineElement{T}
     nodeStart::Node{T}
     nodeEnd::Node{T}
     section::S
@@ -114,7 +114,7 @@ stiffness(el::FrameElement, section::AbstractSection,
     frame_stiffness(section, el.ends, x1, x2, el.rollangle)
 
 """
-    TrussElement{T, S<:AbstractSection{T}} <: AbstractElement{T}
+    TrussElement{T, S<:AbstractSection{T}} <: AbstractLineElement{T}
 
 An axial-only (two-force) element: resists elongation along its axis and
 nothing else. Its [`dof_signature`](@ref) touches only the six nodal
@@ -132,7 +132,7 @@ frame elements mix freely in one model.
 # Constructor
     TrussElement(nodeStart, nodeEnd, section, id = :element)
 """
-mutable struct TrussElement{T,S<:AbstractSection{T}} <: AbstractElement{T}
+mutable struct TrussElement{T,S<:AbstractSection{T}} <: AbstractLineElement{T}
     nodeStart::Node{T}
     nodeEnd::Node{T}
     section::S
@@ -181,21 +181,21 @@ stiffness(el::TrussElement, section::AbstractSection,
 
 The element's start and end positions.
 """
-endpoints(el::AbstractElement) = (el.nodeStart.position, el.nodeEnd.position)
+endpoints(el::AbstractLineElement) = (el.nodeStart.position, el.nodeEnd.position)
 
 """
     midpoint(el) -> SVector{3}
 
 Position of the element's midpoint.
 """
-midpoint(el::AbstractElement) = (el.nodeStart.position + el.nodeEnd.position) / 2
+midpoint(el::AbstractLineElement) = (el.nodeStart.position + el.nodeEnd.position) / 2
 
 """
     length(el) -> T
 
 Length of the element [length].
 """
-Base.length(el::AbstractElement) = element_length(el.nodeStart.position, el.nodeEnd.position)
+Base.length(el::AbstractLineElement) = element_length(el.nodeStart.position, el.nodeEnd.position)
 
 """
     local_frame(el; tol = 1e-6) -> SMatrix{3,3}

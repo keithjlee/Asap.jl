@@ -1,7 +1,7 @@
 # Every code block from README.md, run in sequence — no untested examples.
 using Pkg
 Pkg.activate(; temp=true, io=devnull)
-Pkg.develop([PackageSpec(path="/Users/keithlee/Documents/dev/Asap")]; io=devnull)
+Pkg.develop([PackageSpec(path=joinpath(@__DIR__, ".."))]; io=devnull)
 Pkg.add(["Zygote", "LinearSolve"]; io=devnull)
 using Asap, LinearAlgebra
 
@@ -194,5 +194,21 @@ update_q!(net, 4.0)
 crown = FDMnode([1.0, 1.0, 0.0], Bool[false, false, true])
 @assert crown.fixity == Bool[false, false, true]
 println("FDM OK")
+
+# shells, walls and diaphragms ----------------------------------------------
+concrete = Material(3.0e7, 2.4, 0.2)
+w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 6.0, 3.0, ShellSection(concrete, 0.2);
+              openings = [(2.0, 0.0, 1.0, 2.1)], z_lines = [1.0], size = 0.5)
+top = [w.grid[i, end] for i in eachindex(w.s)]
+floor = RigidDiaphragm(top)
+wallmodel = Model(w.nodes, AbstractElement{Float64}[w.elements...],
+    AbstractLoad{Float64}[[SelfWeight(el; g = [0.0, 0, -9.81]) for el in w.elements]...,
+                          NodeForce(floor.master, [60.0, 0, 0])]; diaphragms = [floor])
+solve!(wallmodel)
+piers = [wall_cut(w, 1.0; s_range = r) for r in ((0.0, 2.0), (3.0, 6.0))]
+shears = [section_cut(wallmodel, e, c).F[1] for (e, c) in piers]
+@assert sum(shears) ≈ 60.0 rtol = 1e-10
+@assert length(shell_resultants(wallmodel, w.elements[1]).N) == 3
+println("shells OK")
 
 println("ALL README EXAMPLES PASS")

@@ -29,13 +29,16 @@ Topology:
 
 Physics (pure kernels of positions and properties — shared by the in-place
 and AD assembly paths):
-- `stiffness(el, x1, x2)` — element stiffness in GLOBAL coordinates as an
-  `SMatrix{n,n}`, `n = ndofs(el)`. `x1`, `x2` are the global position
-  vectors of the element's endpoints — for everyday use,
+- `stiffness(el, x...)` — element stiffness in GLOBAL coordinates as an
+  `SMatrix{n,n}`, `n = ndofs(el)`, given the global position vector of
+  every connected node in `nodes(el)` order. Line elements take
+  `stiffness(el, x1, x2)` — for everyday use,
   `stiffness(el, el.nodeStart.position, el.nodeEnd.position)`. Positions
   are explicit arguments (rather than read from the nodes) so the kernel is
   a pure function: in the differentiable path they come from `ModelState.X`
-  and gradients flow through the same implementation.
+  and gradients flow through the same implementation. The in-place
+  assembler calls it through `element_stiffness(el)` (the element's
+  current node positions).
 
 Future hooks (declared now so dynamics/nonlinearity reuse the assembly
 machinery; implementations arrive with those analyses):
@@ -43,6 +46,22 @@ machinery; implementations arrive with those analyses):
 - `geometric_stiffness(el, x1, x2, N)`
 """
 abstract type AbstractElement{T<:Real} end
+
+"""
+    AbstractLineElement{T} <: AbstractElement{T}
+
+Supertype of two-node line elements (`TrussElement`, `FrameElement`,
+`VariableElement`): elements with a `nodeStart`/`nodeEnd`, a length, an
+axis-based local frame, and member-style force recovery. Utilities that only
+make sense for members — [`endpoints`](@ref), [`midpoint`](@ref),
+`length(el)`, [`connectivity`](@ref), line-element loads — dispatch on this
+type, so surface elements fail with a `MethodError` instead of silently
+reading the wrong fields.
+
+Their stiffness kernel is `stiffness(el, x1, x2)` with the two endpoint
+positions passed explicitly (see [`AbstractElement`](@ref)).
+"""
+abstract type AbstractLineElement{T<:Real} <: AbstractElement{T} end
 
 function nodes end
 function dof_signature end
@@ -64,6 +83,14 @@ Total number of DOF slots the element maps to: six per connected node plus
 any internal DOFs.
 """
 ndofs(el::AbstractElement) = 6 * length(nodes(el)) + n_internal_dofs(el)
+
+"""
+    element_stiffness(el) -> SMatrix
+
+Global element stiffness at the element's CURRENT node positions — the
+in-place assembler's entry point to the pure `stiffness(el, x...)` kernel.
+"""
+element_stiffness(el::AbstractElement) = stiffness(el, map(n -> n.position, nodes(el))...)
 
 """
     mass(el, x1, x2)

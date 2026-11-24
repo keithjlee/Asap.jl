@@ -1,0 +1,408 @@
+{
+ "enzyme": "0.13.221",
+ "zygote": "0.7.20",
+ "differentiationinterface": "0.7.22",
+ "recorded": "2026-11-24",
+ "runs": {
+  "1.13.4": [
+   {
+    "case": "truss_area",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 8.836342675462356e-16,
+    "enzyme_ms": 0.094,
+    "zygote_ms": 0.301,
+    "first_call_s": 44.1,
+    "n": 14,
+    "reference": "zygote"
+   },
+   {
+    "case": "truss_area",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 2.8129779668517265e-15,
+    "enzyme_ms": 0.122,
+    "zygote_ms": 0.317,
+    "first_call_s": 30.5,
+    "n": 14,
+    "reference": "zygote"
+   },
+   {
+    "case": "truss_shape",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 6.359401845526216e-16,
+    "enzyme_ms": 0.091,
+    "zygote_ms": 0.301,
+    "first_call_s": 41.9,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "truss_shape",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.1459385953098215e-15,
+    "enzyme_ms": 0.054,
+    "zygote_ms": 0.328,
+    "first_call_s": 28.3,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_lineload",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 7.70567893728053e-15,
+    "enzyme_ms": 0.122,
+    "zygote_ms": 0.521,
+    "first_call_s": 50.8,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_lineload",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 4.149212994204946e-15,
+    "enzyme_ms": 0.094,
+    "zygote_ms": 0.56,
+    "first_call_s": 35.5,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_joints",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 1.8822949586989338e-16,
+    "enzyme_ms": 0.484,
+    "zygote_ms": 0.828,
+    "first_call_s": 50.4,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_joints",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 3.7645899173978677e-16,
+    "enzyme_ms": 0.451,
+    "zygote_ms": 0.812,
+    "first_call_s": 32.4,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "springs",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 2.023226358942622e-16,
+    "enzyme_ms": 0.09,
+    "zygote_ms": 0.278,
+    "first_call_s": 48.1,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "springs",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.4162584512598355e-15,
+    "enzyme_ms": 0.054,
+    "zygote_ms": 0.311,
+    "first_call_s": 30.7,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "variable_element",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 1.5799693147039329e-09,
+    "enzyme_ms": 0.122,
+    "zygote_ms": null,
+    "first_call_s": 49.8,
+    "n": 9,
+    "reference": "fd"
+   },
+   {
+    "case": "variable_element",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.579969051616914e-09,
+    "enzyme_ms": 0.264,
+    "zygote_ms": null,
+    "first_call_s": 37.8,
+    "n": 9,
+    "reference": "fd"
+   },
+   {
+    "case": "diaphragm",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 7.566481616424764e-15,
+    "enzyme_ms": 0.128,
+    "zygote_ms": 0.386,
+    "first_call_s": 49.8,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "diaphragm",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 6.439979940524389e-15,
+    "enzyme_ms": 0.082,
+    "zygote_ms": 0.389,
+    "first_call_s": 33.8,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "shells",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 0.0,
+    "enzyme_ms": 6.376,
+    "zygote_ms": 8.078,
+    "first_call_s": 76.4,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "shells",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 9.95458866780594e-15,
+    "enzyme_ms": 1.114,
+    "zygote_ms": 8.072,
+    "first_call_s": 48.9,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "spaceframe",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 1.0072609254032539e-14,
+    "enzyme_ms": 0.909,
+    "zygote_ms": 1.224,
+    "first_call_s": 43.2,
+    "n": 512,
+    "reference": "zygote"
+   },
+   {
+    "case": "spaceframe",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.5094663098850666e-14,
+    "enzyme_ms": 199.61,
+    "zygote_ms": 2.478,
+    "first_call_s": 33.0,
+    "n": 512,
+    "reference": "zygote"
+   }
+  ],
+  "1.12.7": [
+   {
+    "case": "truss_area",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 8.836342675462356e-16,
+    "enzyme_ms": 0.093,
+    "zygote_ms": 0.519,
+    "first_call_s": 51.5,
+    "n": 14,
+    "reference": "zygote"
+   },
+   {
+    "case": "truss_area",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 2.8129779668517265e-15,
+    "enzyme_ms": 0.126,
+    "zygote_ms": 0.477,
+    "first_call_s": 33.0,
+    "n": 14,
+    "reference": "zygote"
+   },
+   {
+    "case": "truss_shape",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 6.359401845526216e-16,
+    "enzyme_ms": 0.101,
+    "zygote_ms": 0.418,
+    "first_call_s": 49.2,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "truss_shape",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.1459385953098215e-15,
+    "enzyme_ms": 0.056,
+    "zygote_ms": 0.462,
+    "first_call_s": 31.3,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_lineload",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 7.705693172019292e-15,
+    "enzyme_ms": 0.312,
+    "zygote_ms": 0.904,
+    "first_call_s": 59.1,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_lineload",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 4.149212994204946e-15,
+    "enzyme_ms": 0.113,
+    "zygote_ms": 0.776,
+    "first_call_s": 39.2,
+    "n": 3,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_joints",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 1.8822949586989338e-16,
+    "enzyme_ms": 0.602,
+    "zygote_ms": 1.166,
+    "first_call_s": 58.6,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "frame_joints",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 3.7645899173978677e-16,
+    "enzyme_ms": 0.541,
+    "zygote_ms": 1.158,
+    "first_call_s": 36.0,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "springs",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 8.092905435770488e-16,
+    "enzyme_ms": 0.104,
+    "zygote_ms": 0.355,
+    "first_call_s": 54.1,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "springs",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.4162584512598355e-15,
+    "enzyme_ms": 0.057,
+    "zygote_ms": 0.396,
+    "first_call_s": 34.9,
+    "n": 1,
+    "reference": "zygote"
+   },
+   {
+    "case": "variable_element",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 1.5799693147039329e-09,
+    "enzyme_ms": 0.156,
+    "zygote_ms": null,
+    "first_call_s": 57.8,
+    "n": 9,
+    "reference": "fd"
+   },
+   {
+    "case": "variable_element",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.579969051616914e-09,
+    "enzyme_ms": 0.456,
+    "zygote_ms": null,
+    "first_call_s": 43.8,
+    "n": 9,
+    "reference": "fd"
+   },
+   {
+    "case": "diaphragm",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 7.566481616424764e-15,
+    "enzyme_ms": 0.127,
+    "zygote_ms": 0.456,
+    "first_call_s": 57.2,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "diaphragm",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 6.439979940524389e-15,
+    "enzyme_ms": 0.14,
+    "zygote_ms": 0.472,
+    "first_call_s": 37.0,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "shells",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 0.0,
+    "enzyme_ms": 6.923,
+    "zygote_ms": 8.952,
+    "first_call_s": 84.0,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "shells",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 9.81267226012305e-15,
+    "enzyme_ms": 1.196,
+    "zygote_ms": 9.092,
+    "first_call_s": 56.3,
+    "n": 2,
+    "reference": "zygote"
+   },
+   {
+    "case": "spaceframe",
+    "mode": "reverse",
+    "status": "OK",
+    "rel_err": 1.0190121661506307e-14,
+    "enzyme_ms": 1.11,
+    "zygote_ms": 1.402,
+    "first_call_s": 48.1,
+    "n": 512,
+    "reference": "zygote"
+   },
+   {
+    "case": "spaceframe",
+    "mode": "forward",
+    "status": "OK",
+    "rel_err": 1.4213570871979453e-14,
+    "enzyme_ms": 545.767,
+    "zygote_ms": 1.223,
+    "first_call_s": 33.6,
+    "n": 512,
+    "reference": "zygote"
+   }
+  ]
+ }
+}

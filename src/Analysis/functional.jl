@@ -58,7 +58,7 @@ function extract_state(model::Model{T}) where {T}
     #freshness contract as the in-place assembler)
     model.cache === nothing || _refresh_spring_nzvec!(model.cache, model)
     sections = Any[_state_sections(el) for el in model.elements]
-    ea = [s isa AbstractVector ? zero(T) : T(EA(s)) for s in sections]   # (super-elements: unused)
+    ea = [s isa AbstractSection ? T(EA(s)) : zero(T) for s in sections]  # (super-elements, shells: unused)
     return ModelState{T}(reduce(hcat, (collect(n.position) for n in model.nodes)),
         sections, ea, nothing)
 end
@@ -85,8 +85,35 @@ function stiffness_entries(cache::AnalysisCache, state::ModelState)
     return reduce(vcat, parts)
 end
 
-# default: per-element kernel evaluation
+# generic N-node default (surface elements and other non-line types):
+# per-element kernel evaluation at the state's positions of ALL its nodes.
+# Element types specialize `_group_entries_nnode` to consume plain data only
+# (the default reads the element struct — fine for prototypes, not for
+# reverse-mode AD at scale).
 function _group_entries_all(g::ElementGroup, state::ModelState)
+    return _group_entries_nnode_all(g, state, Val(size(g.inodes, 1)))
+end
+
+function _group_entries_nnode_all(g::ElementGroup, state::ModelState, ::Val{N}) where {N}
+    reduce(vcat, map(eachindex(g.elements)) do e
+        X = ntuple(k -> _position(state.X, g.inodes[k, e]), Val(N))
+        _group_entries_nnode(g, e, state.sections[g.model_indices[e]], X)
+    end)
+end
+
+function _group_entries_nnode(g::ElementGroup, e::Int, section, X::NTuple)
+    Ke = stiffness(g.elements[e], X...)
+    slots = g.slots[e]
+    return Base.length(slots) == size(Ke, 1) ? vec(Ke) : vec(Ke[slots, slots])
+end
+
+# shells: the kernel takes only (section, positions) — no element-struct reads
+# inside the differentiated closure; every slot is active (no slicing)
+_group_entries_nnode(::ElementGroup{<:ShellElement}, e::Int, section, X::NTuple) =
+    vec(shell_stiffness(section, X...))
+
+# line elements: per-element kernel evaluation from the two endpoint columns
+function _group_entries_all(g::ElementGroup{<:AbstractLineElement}, state::ModelState)
     reduce(vcat, map(eachindex(g.elements)) do e
         _group_entries(g, e, state.sections[g.model_indices[e]],
             _position(state.X, g.i1[e]), _position(state.X, g.i2[e]),
@@ -205,14 +232,52 @@ stateful `cache.Pf` to rounding.
 """
 function assemble_Pf(cache::AnalysisCache, state::ModelState)
     t = cache.fef
-    isempty(t.loads) && return cache.Pf
+    isempty(t.loads) && isempty(t.sloads) && return cache.Pf
+    isempty(t.sloads) && return t.static + _frame_fef(t, state)
+    isempty(t.loads) && return t.static + _shell_fef(t, state)
+    return t.static + _frame_fef(t, state) + _shell_fef(t, state)
+end
+
+function _frame_fef(t::FEFTable, state::ModelState)
     Q = map(eachindex(t.loads)) do j
         e = t.elem[j]
         ends = state.ends === nothing ? t.ends[j] : state.ends[e]
         element_fef_global(t.loads[j], state.sections[e], ends,
             _position(state.X, t.i1[j]), _position(state.X, t.i2[j]), t.rollangle[j])
     end
-    return t.static + t.scatter * reduce(vcat, Q)
+    return t.scatter * reduce(vcat, Q)
+end
+
+# shell surface loads at the state: traction (local pressure follows the
+# element orientation; self-weight follows ρt of the state section) →
+# condensed consistent load → global 24-vector, scattered
+function _shell_fef(t::FEFTable, state::ModelState)
+    Q = map(eachindex(t.sloads)) do j
+        sec = state.sections[t.selem[j]]
+        X = (_position(state.X, t.snodes[1, j]), _position(state.X, t.snodes[2, j]),
+             _position(state.X, t.snodes[3, j]), _position(state.X, t.snodes[4, j]))
+        _shell_fef_global(t.sloads[j], sec, X)
+    end
+    return t.sscatter * reduce(vcat, Q)
+end
+
+function _shell_fef_global(load, sec, X)
+    qg, ql = _shell_traction_parts(load, sec)
+    return _shell_fef_plain(first(_shell_rigidities(sec)), qg, ql, X...)
+end
+
+# global fixed-end 24-vector of a uniform traction q = qg + Rᵀ·ql (global part qg,
+# part ql in the element's local axes, which follows the element's orientation):
+# the plain-data AD target. One of qg, ql is zero, so q is bitwise the traction.
+function _shell_fef_plain(A, qg, ql, X1, X2, X3, X4)
+    R, xy, _ = shell_frame(X1, X2, X3, X4)
+    q = qg + R' * ql
+    f24, fb = shell_consistent_load(xy, R * q)
+    K16 = _itw_K16(xy, A)
+    b = SVector(13, 14, 15, 16)
+    corr = K16[_SONE12, b] * (K16[b, b] \ fb)
+    Δ = vcat(corr, zero(eltype(corr)))[_IDX_MEMBRANE]
+    return _rotate24(R', -(f24 - Δ))
 end
 
 """
@@ -242,7 +307,7 @@ end
 function _design_loads(cache::AnalysisCache, loads::Symbol)
     loads === :design || loads === :frozen ||
         throw(ArgumentError("loads must be :design or :frozen, got :$loads"))
-    return loads === :design && !isempty(cache.fef.loads)
+    return loads === :design && !(isempty(cache.fef.loads) && isempty(cache.fef.sloads))
 end
 
 # the reduced solve, behind a function barrier: each caller branch passes a
@@ -252,6 +317,14 @@ end
 function _pure_solve(K, F, solver)
     # the default keeps the 2-arg call — Enzyme's imported rules match it
     return solver === nothing ? solve_free(K, F) : solve_free(solver, K, F)
+end
+
+# reduced solve through the diaphragm map: u_free = C·(CᵀKC)⁻¹·CᵀF — K̂'s values
+# are a sparse linear map of K's (differentiable); C is frozen at the last
+# solve!/process! (offsets constant under AD)
+function _constrained_solve(cm::ConstraintMap, K, F, solver)
+    Khat = _reduce_K(cm, K)
+    return cm.C * _pure_solve(Khat, cm.C' * F, solver)
 end
 
 """
@@ -280,6 +353,10 @@ function solve(model::Model{T}, state::ModelState; solver = nothing, loads::Symb
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
     free = cache.partition.free
+    if cache.constraint !== nothing
+        F = _design_loads(cache, loads) ? (cache.P - assemble_Pf(cache, state))[free] : (cache.P - cache.Pf)[free]
+        return cache.free_embed * _constrained_solve(cache.constraint, K, F, solver)
+    end
     if _design_loads(cache, loads)
         uf = _pure_solve(K, (cache.P - assemble_Pf(cache, state))[free], solver)
     else
@@ -300,6 +377,10 @@ function compliance(model::Model{T}, state::ModelState; solver = nothing, loads:
     cache = model.cache::AnalysisCache{T}
     K = assemble_K(cache, state)
     free = cache.partition.free
+    if cache.constraint !== nothing
+        F = _design_loads(cache, loads) ? (cache.P - assemble_Pf(cache, state))[free] : (cache.P - cache.Pf)[free]
+        return sum(F .* _constrained_solve(cache.constraint, K, F, solver))
+    end
     if _design_loads(cache, loads)
         F = (cache.P - assemble_Pf(cache, state))[free]
         # sum∘broadcast, not LinearAlgebra.dot: dot lowers to BLAS, which

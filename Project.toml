@@ -20,6 +20,10 @@ Mooncake = "da2b9cff-9c12-43a0-ae48-6db2b0edb7d6"
 AsapChainRulesExt = "ChainRulesCore"
 AsapEnzymeExt = ["Enzyme", "ChainRulesCore"]
 AsapForwardDiffExt = "ForwardDiff"
+AsapShellADExt = ["ChainRulesCore", "ForwardDiff"]
+AsapFrameADExt = ["ChainRulesCore", "ForwardDiff"]
+AsapShellMooncakeExt = ["Mooncake", "ChainRulesCore", "ForwardDiff"]
+AsapShellEnzymeExt = ["Enzyme", "ChainRulesCore", "ForwardDiff"]
 AsapLinearSolveExt = "LinearSolve"
 AsapMooncakeExt = ["Mooncake", "ChainRulesCore"]
 

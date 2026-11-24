@@ -25,8 +25,9 @@ struct ElementGroup{E<:AbstractElement}
     # fields inside an AD closure makes Zygote build/accumulate tangents for
     # the entire object graph per access (catastrophic at scale) — the pure
     # path must consume only these
-    i1::Vector{Int}                  # start-node indices
-    i2::Vector{Int}                  # end-node indices
+    i1::Vector{Int}                  # start-node indices (first node of `nodes(el)`)
+    i2::Vector{Int}                  # end-node indices (last node of `nodes(el)`)
+    inodes::Matrix{Int}              # all node indices, N × nel (column e = `nodes(el)` order)
     rollangles::Vector{Float64}              # roll angles (0 for truss)
     endss::Vector{Any}               # EndConditions per element (immutable; unused for truss)
     Cinc::SparseMatrixCSC{Float64,Int}   # group incidence (nel × nnodes): −1 at i1, +1 at i2
@@ -57,6 +58,10 @@ contribute a constant `static` vector, frozen at the model's stored values.
   stacked per-load global 12-vectors to global DOFs
 - `static::Vector{T}`: full-space FEF contribution of loads NOT tracked per
   state (`VariableElement` loads)
+- `sloads`, `selem`, `snodes`, `sscatter`: the SHELL surface loads
+  (`AreaLoad`, `SelfWeight` on `ShellElement`s), re-evaluated per state:
+  model element index, the 4 node indices (4 × n), and the
+  `n_global × 24·n` scatter of their global 24-vectors
 """
 struct FEFTable{T}
     loads::Vector{Any}
@@ -67,10 +72,14 @@ struct FEFTable{T}
     ends::Vector{Any}
     scatter::SparseMatrixCSC{T,Int}
     static::Vector{T}
+    sloads::Vector{Any}
+    selem::Vector{Int}
+    snodes::Matrix{Int}
+    sscatter::SparseMatrixCSC{T,Int}
 end
 
 FEFTable{T}(n_global::Int) where {T} = FEFTable{T}(Any[], Int[], Int[], Int[], T[], Any[],
-    spzeros(T, n_global, 0), zeros(T, n_global))
+    spzeros(T, n_global, 0), zeros(T, n_global), Any[], Int[], zeros(Int, 4, 0), spzeros(T, n_global, 0))
 
 """
     AnalysisCache{T}
@@ -93,10 +102,14 @@ reused across solves:
   pattern and requires re-processing)
 - `P`, `Pf::Vector{T}`: full-space nodal-load and fixed-end-force vectors
 - `q_local::Vector{Vector{Vector{T}}}`: per element, per SEGMENT, the
-  accumulated LOCAL condensed fixed-end force 12-vector (primitive elements
-  have one segment) — needed for element force recovery
+  accumulated LOCAL condensed fixed-end force vector (6 entries per node:
+  12 for line elements; primitive elements have one segment) — needed for
+  element force recovery
 - `factorization`: cached factorization of `K` (set on first solve; numeric
   refactorization reuses the symbolic analysis since the pattern is frozen)
+- `constraint`: the rigid-diaphragm transformation ([`ConstraintMap`](@ref
+  Asap.ConstraintMap)) or `nothing`; when present every solve works on the
+  reduced system `CᵀKC·û = CᵀF`, `u_free = C·û`
 - `fef::FEFTable{T}`: the applied element loads as plain data, so the pure
   path can re-evaluate fixed-end forces at any design state
   ([`assemble_Pf`](@ref)); rebuilt by every `assemble_loads!`
@@ -119,6 +132,7 @@ mutable struct AnalysisCache{T}
     spring_nzvec::Vector{T}              # spring diagonal contributions in nzval layout
     free_embed::SparseMatrixCSC{T,Int}   # n_global × n_free — u = free_embed · u_free
     fef::FEFTable{T}                     # element loads as plain data (rebuilt by assemble_loads!)
+    constraint::Union{Nothing,ConstraintMap{T}}   # rigid diaphragms (u_free = C·û), or nothing
 end
 
 # active slots of an element (positions 1:12 where the signature is true)
@@ -200,15 +214,16 @@ function build_cache(model::Model{T}) where {T}
             push!(nzmaps, m)
         end
         els = Vector{E}([model.elements[i] for i in idxs])
-        i1 = [el.nodeStart.index for el in els]
-        i2 = [el.nodeEnd.index for el in els]
+        inodes = _node_index_matrix(els)
+        i1 = inodes[1, :]
+        i2 = inodes[end, :]
         rollangles = [el isa FrameElement || el isa VariableElement ? Float64(el.rollangle) : 0.0 for el in els]
         endss = Any[el isa FrameElement || el isa VariableElement ? el.ends :
                     EndConditions(:fixedfixed) for el in els]
         ne = Base.length(els)
         Cinc = sparse([1:ne; 1:ne], [i1; i2], [fill(-1.0, ne); fill(1.0, ne)],
             ne, Base.length(model.nodes))
-        push!(groups, ElementGroup{E}(els, idxs, slots_all, gdofs_all, nzmaps, i1, i2, rollangles, endss, Cinc))
+        push!(groups, ElementGroup{E}(els, idxs, slots_all, gdofs_all, nzmaps, i1, i2, inodes, rollangles, endss, Cinc))
     end
 
     spring_entries = Tuple{Int,Int,Int}[]
@@ -248,8 +263,21 @@ function build_cache(model::Model{T}) where {T}
 
     return AnalysisCache{T}(part, groups, K, spring_entries,
         zeros(T, part.n_global), zeros(T, part.n_global),
-        [[zeros(T, 12) for _ in 1:n_segments(el)] for el in model.elements], nothing,
-        scatter, spring_nzvec, free_embed, FEFTable{T}(part.n_global))
+        [[zeros(T, 6 * length(nodes(el))) for _ in 1:n_segments(el)] for el in model.elements], nothing,
+        scatter, spring_nzvec, free_embed, FEFTable{T}(part.n_global),
+        build_constraint(model, part, K))
+end
+
+# N × nel node-index matrix of a concretely-typed element vector (every
+# element of one concrete type has the same node count N)
+function _node_index_matrix(els::Vector{E}) where {E<:AbstractElement}
+    isempty(els) && return zeros(Int, 0, 0)
+    N = length(nodes(first(els)))
+    M = Matrix{Int}(undef, N, length(els))
+    @inbounds for (e, el) in enumerate(els), (k, n) in enumerate(nodes(el))
+        M[k, e] = n.index
+    end
+    return M
 end
 
 # closure looking up the nzval position of entry (i, j) in a CSC matrix

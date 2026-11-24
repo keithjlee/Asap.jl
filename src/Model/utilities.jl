@@ -20,33 +20,17 @@ end
 Get the Cel = [n_element × n_element] adjacency matrix for a given model, where Cel[i, j] = 1 if element i shares a node with element j, and is 0 otherwise.
 """
 function element_connectivity(model::Model)
-
-    #element-node connectivity [ne × nn]
-    C = connectivity(model)
-
-    #initialize element-element connectivity matrix [ne × ne]
     n_elements = length(model.elements)
-    Cel = spzeros(Int64, n_elements, n_elements)
-
-
-    for irow in axes(C, 1)
-        i_nodes = findall(C[irow, :] .!= 0)
-
-        for icol in i_nodes
-            col = C[:, icol]
-
-            i_connected = findall(col .!= 0)
-
-            for i_element in i_connected
-                if i_element == irow
-                    continue
-                else
-                    Cel[irow, i_element] = 1
-                end
-            end
-        end
+    # node → elements touching it (any element type: nodes(el))
+    touching = Dict{Int,Vector{Int}}()
+    for (e, el) in enumerate(model.elements), n in nodes(el)
+        push!(get!(touching, n.index, Int[]), e)
     end
-
-    return Cel
-
+    I_ = Int[]; J_ = Int[]
+    for (_, els) in touching, a in els, b in els
+        a == b && continue
+        push!(I_, a); push!(J_, b)
+    end
+    Cel = sparse(I_, J_, ones(Int64, length(I_)), n_elements, n_elements)
+    return min.(Cel, 1)   # an element pair sharing two nodes still counts once
 end

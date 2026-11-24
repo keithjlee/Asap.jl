@@ -1,10 +1,10 @@
 """
     AsapChainRulesExt
 
-The complete custom-rule surface of Asap's differentiable path — exactly
-two reverse rules. Everything else in the pure pipeline (element kernels,
-scatter, embeddings) is mutation-free StaticArrays/SparseArrays arithmetic
-that AD engines differentiate natively.
+The custom-rule surface of Asap's differentiable path. Correctness needs
+only the first two rules; everything else in the pure pipeline (element
+kernels, scatter, embeddings) is mutation-free StaticArrays/SparseArrays
+arithmetic that AD engines differentiate natively.
 
 1. `sparse_from_pattern`: constructing a sparse matrix from a frozen
    pattern and a value vector. Reverse: project the (dense or sparse)
@@ -17,6 +17,11 @@ that AD engines differentiate natively.
 `solve_free` also carries the matching FORWARD rule (`frule`): the
 implicit-function theorem `K u̇ = Ḟ − K̇ u`, one extra back-substitution
 per tangent on the forward factorization.
+
+The rest are for Zygote: constructor rules for types with custom inner
+constructors, a performance rule for the truss kernel, the position seam,
+and the linear-cost rules on the per-element maps (end of file; RuleConfig
+rules that Enzyme and Mooncake never see).
 
 Loaded automatically as a package extension whenever ChainRulesCore is in
 the environment (`[weakdeps]`/`[extensions]` in Project.toml) — zero cost
@@ -247,5 +252,183 @@ ChainRulesCore.frule((_, ΔK, ΔF), ::typeof(HOST.solve_free),
 ChainRulesCore.frule((_, _, ΔK, ΔF), ::typeof(HOST.solve_free), solver,
     K::SparseMatrixCSC, F::AbstractVecOrMat) =
     _solve_free_forward(solver, K, F, ΔK, ΔF)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Linear-cost reverse rules for the per-element maps (Zygote; any RuleConfig
+# reverse engine)
+# ─────────────────────────────────────────────────────────────────────────────
+# The pure path evaluates one closure per element that indexes the captured
+# state arrays (`_position(state.X, i)`, `state.sections[e]`, `state.ends[e]`,
+# `t.loads[j]`). Under Zygote each such index pulls back into a FULL-size
+# cotangent array, so one gradient costs O(n²) in the number of elements.
+#
+# These rules leave the primal code exactly as it is and, in the pullback,
+# differentiate each element's kernel on its own gathered arguments
+# (`rrule_via_ad`, so the kernel rules of AsapFrameADExt/AsapShellADExt apply),
+# accumulating straight into ONE cotangent per state field.
+#
+# They take a RuleConfig on purpose: Enzyme (`@import_rrule`) and Mooncake
+# (`@from_rrule`) only ever import config-free rules for named kernels, so they
+# keep differentiating the unchanged primal natively. Restructuring the primal
+# itself (gather + `map` over `Vector{Any}`) fixed Zygote but made Enzyme
+# reverse throw and Enzyme forward silently wrong (docs/shells/PLAN.md S6d).
+
+const _RevCfg = RuleConfig{>:HasReverseMode}
+
+# Cotangent of `state` from per-element units. `item(j)` returns
+# `(f, s, nodes, e, ec, m)`: the kernel `f(section, positions::Tuple, ends)`
+# (capturing only small constants), the section index `s` into
+# `state.sections`, the node indices, the index `e` into `state.ends` (0 when
+# the ends are the model's constants), the ends value, and the block length.
+function _itemwise_tangent(config, state::ModelState, n::Int, item, Δ::AbstractVector)
+    dX = zero(state.X)
+    dS = Vector{Any}(undef, length(state.sections))
+    fill!(dS, ZeroTangent())
+    dE = state.ends === nothing ? ZeroTangent() : fill!(Vector{Any}(undef, length(state.ends)), ZeroTangent())
+    off = 0
+    for j in 1:n
+        f, s, nodes, e, ec, m = item(j)
+        xs = map(i -> HOST._position(state.X, i), nodes)
+        _, pb = rrule_via_ad(config, f, state.sections[s], xs, ec)
+        _, Δs, Δx, Δe = pb(Δ[off+1:off+m])
+        off += m
+        dS[s] = _add(dS[s], Δs)
+        _accum_positions!(dX, nodes, Δx)
+        e > 0 && (dE[e] = _add(dE[e], Δe))
+    end
+    return Tangent{typeof(state)}(X = dX, sections = dS, ends = dE)
+end
+
+_add(a, b) = a + _natural(unthunk(b))
+_add(a, ::AbstractZero) = a
+
+# `rrule_via_ad` hands static-array fields of a struct cotangent back as
+# structural `Tangent{SMatrix}(data = …)`; user code upstream (e.g. `S .* fS`
+# in a section constructor) needs the natural array, as plain Zygote gives it
+_natural(Δ) = Δ
+_natural(Δ::Tangent{P}) where {P<:StaticArray} =
+    (d = ChainRulesCore.backing(Δ).data; d isa AbstractZero ? d : P(map(unthunk, d)))
+function _natural(Δ::Tangent{P,<:NamedTuple}) where {P}
+    nt = map(x -> _natural(unthunk(x)), ChainRulesCore.backing(Δ))
+    return Tangent{P,typeof(nt)}(nt)
+end
+
+_accum_positions!(dX, nodes, ::AbstractZero) = dX
+_accum_positions!(dX, nodes, Δx::Tangent) = _accum_positions!(dX, nodes, ChainRulesCore.backing(Δx))
+function _accum_positions!(dX, nodes, Δx::Tuple)
+    for (k, i) in enumerate(nodes)
+        Δk = unthunk(Δx[k])
+        Δk isa AbstractZero && continue
+        v = _flatten3(Δk)
+        dX[1, i] += v[1]; dX[2, i] += v[2]; dX[3, i] += v[3]
+    end
+    return dX
+end
+
+_cotvec(Δ) = (d = unthunk(Δ); d isa AbstractZero ? d : collect(vec(d)))
+
+const _F64State = ModelState{<:Base.IEEEFloat}
+
+# one frame's active stiffness entries from plain arguments: the same two lines
+# as `Asap._group_entries` for frames. Deliberately NOT factored out of the
+# primal: Enzyme's type analysis failed on that helper (frame_joints reverse,
+# "Cannot deduce type of load"), so the primal stays exactly as Enzyme knows it
+function _frame_entries(section, ec, x1, x2, rollangle, slots)
+    Ke = Asap.frame_stiffness(section, ec, x1, x2, rollangle)
+    return length(slots) == 12 ? vec(Ke) : vec(Ke[slots, slots])
+end
+
+# frame stiffness entries of one group
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._group_entries_all),
+        g::HOST.ElementGroup{<:Asap.FrameElement}, state::_F64State)
+    V = HOST._group_entries_all(g, state)
+    own = state.ends === nothing
+    function item(e)
+        mi, θ, slots = g.model_indices[e], g.rollangles[e], g.slots[e]
+        f = (sec, xs, ec) -> _frame_entries(sec, ec, xs[1], xs[2], θ, slots)
+        return f, mi, (g.i1[e], g.i2[e]), own ? 0 : mi, own ? g.endss[e] : state.ends[mi], length(slots)^2
+    end
+    function frame_group_pullback(ΔV)
+        Δ = _cotvec(ΔV)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(g.elements), item, Δ))
+    end
+    return V, frame_group_pullback
+end
+
+# shell stiffness entries of one group
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._group_entries_nnode_all),
+        g::HOST.ElementGroup{<:Asap.ShellElement}, state::_F64State, v::Val{4})
+    V = HOST._group_entries_nnode_all(g, state, v)
+    shellK = (sec, xs, ec) -> vec(Asap.shell_stiffness(sec, xs...))
+    item(e) = (shellK, g.model_indices[e], ntuple(k -> g.inodes[k, e], 4), 0, nothing, 576)
+    function shell_group_pullback(ΔV)
+        Δ = _cotvec(ΔV)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent(), NoTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(g.elements), item, Δ), NoTangent())
+    end
+    return V, shell_group_pullback
+end
+
+# design-dependent frame element loads (global, scattered) and their local q̃
+function _frame_fef_item(t, state)
+    own = state.ends === nothing
+    return function (j)
+        load, e, θ = t.loads[j], t.elem[j], t.rollangle[j]
+        return load, e, (t.i1[j], t.i2[j]), own ? 0 : e, own ? t.ends[j] : state.ends[e], θ
+    end
+end
+
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._frame_fef),
+        t::HOST.FEFTable, state::_F64State)
+    y = HOST._frame_fef(t, state)
+    base = _frame_fef_item(t, state)
+    function item(j)
+        load, s, nodes, e, ec, θ = base(j)
+        f = (sec, xs, ec) -> Asap.element_fef_global(load, sec, ec, xs[1], xs[2], θ)
+        return f, s, nodes, e, ec, 12
+    end
+    function frame_fef_pullback(Δy)
+        Δ = _cotvec(Δy)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.loads), item, t.scatter' * Δ))
+    end
+    return y, frame_fef_pullback
+end
+
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(Asap.fef_local),
+        cache::HOST.AnalysisCache, state::_F64State)
+    y = Asap.fef_local(cache, state)
+    t = cache.fef
+    base = _frame_fef_item(t, state)
+    function item(j)
+        load, s, nodes, e, ec, θ = base(j)
+        f = (sec, xs, ec) -> Asap.condensed_fef(load, sec, ec, xs[1], xs[2], θ)
+        return f, s, nodes, e, ec, 12
+    end
+    function fef_local_pullback(Δy)
+        Δ = _cotvec(Δy)
+        (Δ isa AbstractZero || isempty(t.loads)) && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.loads), item, Δ))
+    end
+    return y, fef_local_pullback
+end
+
+# design-dependent shell surface loads
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._shell_fef),
+        t::HOST.FEFTable, state::_F64State)
+    y = HOST._shell_fef(t, state)
+    function item(j)
+        load = t.sloads[j]
+        f = (sec, xs, ec) -> HOST._shell_fef_global(load, sec, xs)
+        return f, t.selem[j], ntuple(k -> t.snodes[k, j], 4), 0, nothing, 24
+    end
+    function shell_fef_pullback(Δy)
+        Δ = _cotvec(Δy)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.sloads), item, t.sscatter' * Δ))
+    end
+    return y, shell_fef_pullback
+end
 
 end # module

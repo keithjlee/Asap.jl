@@ -1,0 +1,18 @@
+RESULT truss_area reverse OK rel_err=8.836342675462356e-16 enzyme_ms=0.093 zygote_ms=0.519 first_s=51.5 n=14 ref=zygote
+RESULT truss_area forward OK rel_err=2.8129779668517265e-15 enzyme_ms=0.126 zygote_ms=0.477 first_s=33.0 n=14 ref=zygote
+RESULT truss_shape reverse OK rel_err=6.359401845526216e-16 enzyme_ms=0.101 zygote_ms=0.418 first_s=49.2 n=3 ref=zygote
+RESULT truss_shape forward OK rel_err=1.1459385953098215e-15 enzyme_ms=0.056 zygote_ms=0.462 first_s=31.3 n=3 ref=zygote
+RESULT frame_lineload reverse OK rel_err=7.705693172019292e-15 enzyme_ms=0.312 zygote_ms=0.904 first_s=59.1 n=3 ref=zygote
+RESULT frame_lineload forward OK rel_err=4.149212994204946e-15 enzyme_ms=0.113 zygote_ms=0.776 first_s=39.2 n=3 ref=zygote
+RESULT frame_joints reverse OK rel_err=1.8822949586989338e-16 enzyme_ms=0.602 zygote_ms=1.166 first_s=58.6 n=1 ref=zygote
+RESULT frame_joints forward OK rel_err=3.7645899173978677e-16 enzyme_ms=0.541 zygote_ms=1.158 first_s=36.0 n=1 ref=zygote
+RESULT springs reverse OK rel_err=8.092905435770488e-16 enzyme_ms=0.104 zygote_ms=0.355 first_s=54.1 n=1 ref=zygote
+RESULT springs forward OK rel_err=1.4162584512598355e-15 enzyme_ms=0.057 zygote_ms=0.396 first_s=34.9 n=1 ref=zygote
+RESULT variable_element reverse OK rel_err=1.5799693147039329e-9 enzyme_ms=0.156 zygote_ms=NaN first_s=57.8 n=9 ref=fd (zygote: Mutating arrays is not supported -- called setindex!(Matrix{)
+RESULT variable_element forward OK rel_err=1.579969051616914e-9 enzyme_ms=0.456 zygote_ms=NaN first_s=43.8 n=9 ref=fd (zygote: Mutating arrays is not supported -- called setindex!(Matrix{)
+RESULT diaphragm reverse OK rel_err=7.566481616424764e-15 enzyme_ms=0.127 zygote_ms=0.456 first_s=57.2 n=2 ref=zygote
+RESULT diaphragm forward OK rel_err=6.439979940524389e-15 enzyme_ms=0.14 zygote_ms=0.472 first_s=37.0 n=2 ref=zygote
+RESULT shells reverse OK rel_err=0.0 enzyme_ms=6.923 zygote_ms=8.952 first_s=84.0 n=2 ref=zygote
+RESULT shells forward OK rel_err=9.81267226012305e-15 enzyme_ms=1.196 zygote_ms=9.092 first_s=56.3 n=2 ref=zygote
+RESULT spaceframe reverse OK rel_err=1.0190121661506307e-14 enzyme_ms=1.11 zygote_ms=1.402 first_s=48.1 n=512 ref=zygote
+RESULT spaceframe forward OK rel_err=1.4213570871979453e-14 enzyme_ms=545.767 zygote_ms=1.223 first_s=33.6 n=512 ref=zygote

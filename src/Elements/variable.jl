@@ -1,5 +1,5 @@
 """
-    VariableElement{T} <: AbstractElement{T}
+    VariableElement{T} <: AbstractLineElement{T}
 
 A **super-element**: one user-facing member whose cross-section varies
 along its length as a chain of prismatic segments. The successor of the
@@ -43,7 +43,7 @@ julia> haunched = VariableElement(n1, n2, [deep, mid, shallow], [0.2, 0.5], :gir
 julia> stepped = VariableElement(n1, n2, [big, small], :column)  # break at 0.5
 ```
 """
-mutable struct VariableElement{T} <: AbstractElement{T}
+mutable struct VariableElement{T} <: AbstractLineElement{T}
     nodeStart::Node{T}
     nodeEnd::Node{T}
     sections::Vector{AbstractSection{T}}

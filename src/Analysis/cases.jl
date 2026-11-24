@@ -84,7 +84,14 @@ function solve_cases!(model::Model{T}; cases::Vector{Symbol}=load_cases(model),
     cache = model.cache::AnalysisCache{T}
 
     assemble_K!(cache, model)
-    fc = _ensure_factorization!(cache, solver)
+    cm = cache.constraint
+    if cm === nothing
+        fc = _ensure_factorization!(cache, solver)
+    else
+        _refresh_constraint!(cm, model)
+        _reduce_K!(cm, cache.K)
+        fc = _ensure_factorization!(cache, solver; K = cm.Khat)
+    end
     free = cache.partition.free
 
     # all case load vectors first, then ONE multi-RHS backsolve
@@ -93,7 +100,8 @@ function solve_cases!(model::Model{T}; cases::Vector{Symbol}=load_cases(model),
         assemble_loads!(cache, model; case=case)
         F[:, j] = cache.P .- cache.Pf
     end
-    UF = _backsolve(fc.solver, fc, F[free, :])
+    UF = cm === nothing ? _backsolve(fc.solver, fc, F[free, :]) :
+         cm.C * _backsolve(fc.solver, fc, cm.C' * F[free, :])
 
     results = LinearResults{T}[]
     for (j, case) in enumerate(cases)

@@ -44,7 +44,7 @@ end
 
 function _assemble_group!(nz::Vector{T}, g::ElementGroup{E}) where {T,E}
     @inbounds for (e, el) in enumerate(g.elements)
-        Ke = stiffness(el, el.nodeStart.position, el.nodeEnd.position)
+        Ke = element_stiffness(el)
         slots = g.slots[e]
         m = g.nzmap[e]
         n = length(slots)
@@ -89,6 +89,7 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
 
     inactive = Set(cache.partition.inactive)
     tracked = Any[]
+    stracked = Any[]
     static = zeros(T, length(cache.Pf))
 
     for load in model.loads
@@ -97,17 +98,21 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
             before = copy(cache.Pf)
             _apply_load!(cache, load, inactive)
             static .+= cache.Pf .- before
+        elseif load isa ElementLoad && load.element isa ShellElement
+            _apply_load!(cache, load, inactive)
+            push!(stracked, load)
         else
             _apply_load!(cache, load, inactive)
             load isa ElementLoad && push!(tracked, load)
         end
     end
-    cache.fef = _build_fef_table(T, tracked, length(cache.Pf), static)
+    cache.fef = _build_fef_table(T, tracked, length(cache.Pf), static, stracked)
     return cache.P, cache.Pf
 end
 
 # the plain-data table of state-tracked element loads (FrameElement only)
-function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::Vector{T}) where {T}
+function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::Vector{T},
+    sloads::Vector{Any} = Any[]) where {T}
     n = length(loads)
     elem = Vector{Int}(undef, n); i1 = similar(elem); i2 = similar(elem)
     roll = Vector{T}(undef, n); ends = Vector{Any}(undef, n)
@@ -125,7 +130,23 @@ function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::
         end
     end
     scatter = sparse(I_, J_, ones(T, length(I_)), n_global, 12n)
-    return FEFTable{T}(loads, elem, i1, i2, roll, ends, scatter, static)
+    ns = length(sloads)
+    selem = Vector{Int}(undef, ns)
+    snodes = Matrix{Int}(undef, 4, ns)
+    SI = Int[]; SJ = Int[]
+    for (j, load) in enumerate(sloads)
+        el = load.element::ShellElement
+        selem[j] = el.index
+        for k in 1:4
+            snodes[k, j] = el.nodes[k].index
+        end
+        g = element_global_dofs(el)
+        for k in 1:24
+            push!(SI, g[k]); push!(SJ, 24(j - 1) + k)
+        end
+    end
+    sscatter = sparse(SI, SJ, ones(T, length(SI)), n_global, 24ns)
+    return FEFTable{T}(loads, elem, i1, i2, roll, ends, scatter, static, sloads, selem, snodes, sscatter)
 end
 
 """
@@ -140,9 +161,25 @@ the `section` and the `ends`.
 """
 function condensed_fef(load::ElementLoad, section::AbstractSection, ends::EndConditions,
     x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
-    q = fixed_end_forces(load, section, ends, x1, x2, rollangle)
-    return condense_fef(q, section, element_length(x1, x2), ends)
+    return _fef_local_plain(load, _fef_rigidities(section), _end_springs(ends),
+        _sv3(x1), _sv3(x2), rollangle)
 end
+
+# plain-data form (see `_frame_K_plain`): the load kernels read only EIx, EIy
+# (condensation) and ρA (self-weight) from the section; the reverse rules in
+# ext/AsapFrameADExt.jl target these
+@inline _fef_rigidities(s::AbstractSection) = SVector(EIx(s), EIy(s), ρA(s))
+
+function _fef_local_plain(load::ElementLoad, r::SVector{3}, k::SVector{8},
+    x1::SVector{3}, x2::SVector{3}, rollangle::Real)
+    sec = RigiditySection(zero(r[1]), r[1], r[2], zero(r[1]), r[3])
+    ends = _end_conditions(k)
+    q = fixed_end_forces(load, sec, ends, x1, x2, rollangle)
+    return condense_fef(q, sec, element_length(x1, x2), ends)
+end
+
+_fef_global_plain(load::ElementLoad, r::SVector{3}, k::SVector{8}, x1::SVector{3}, x2::SVector{3}, rollangle::Real) =
+    _rotate12(local_frame(x1, x2, rollangle)', _fef_local_plain(load, r, k, x1, x2, rollangle))
 
 """
     element_fef_global(load, section, ends, x1, x2, rollangle) -> SVector{12}
@@ -154,8 +191,8 @@ and differentiable; the stateful assembler and the pure path
 """
 function element_fef_global(load::ElementLoad, section::AbstractSection, ends::EndConditions,
     x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
-    q̃ = condensed_fef(load, section, ends, x1, x2, rollangle)
-    return _rotate12(local_frame(x1, x2, rollangle)', q̃)
+    return _fef_global_plain(load, _fef_rigidities(section), _end_springs(ends),
+        _sv3(x1), _sv3(x2), rollangle)
 end
 
 function _apply_load!(cache::AnalysisCache, load::NodeForce, inactive)
@@ -185,6 +222,7 @@ end
 
 function _apply_load!(cache::AnalysisCache{T}, load::ElementLoad{T}, inactive) where {T}
     el = load.element
+    el isa ShellElement && return _apply_shell_load!(cache, load, el)
     el isa Union{FrameElement,VariableElement} ||
         error("element loads require a FrameElement or VariableElement " *
               "(a $(nameof(typeof(el))) cannot carry transverse load) — " *
@@ -206,6 +244,21 @@ function _apply_element_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
     @inbounds for i in 1:12
         cache.Pf[g[i]] += Qg[i]
     end
+end
+
+# shells: uniform traction → consistent (condensed) local load; q̃ = −f is
+# stored locally for force recovery and rotated blockwise into Pf
+function _apply_shell_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
+    el::ShellElement{T,4}) where {T}
+    X = map(n -> n.position, el.nodes)
+    q̃, R = shell_load_vector(el.section, X..., SVector{3,T}(_shell_traction(load, el)))
+    cache.q_local[el.index][1] .+= q̃
+    Qg = _rotate24(R', q̃)
+    g = element_global_dofs(el)
+    @inbounds for i in 1:24
+        cache.Pf[g[i]] += Qg[i]
+    end
+    return nothing
 end
 
 """

@@ -29,6 +29,8 @@ function process!(model::Model{T}) where {T}
         end
     end
     model.cache = build_cache(model)
+    cm = model.cache.constraint
+    cm === nothing || _refresh_constraint!(cm, model)
     return model
 end
 
@@ -119,8 +121,16 @@ function solve!(model::Model{T}; reprocess::Bool=false, solver=nothing) where {T
     part = cache.partition
     F = cache.P[part.free] .- cache.Pf[part.free]
 
-    fc = _ensure_factorization!(cache, solver)
-    uf = _backsolve(fc.solver, fc, F)
+    cm = cache.constraint
+    if cm === nothing
+        fc = _ensure_factorization!(cache, solver)
+        uf = _backsolve(fc.solver, fc, F)
+    else
+        _refresh_constraint!(cm, model)
+        _reduce_K!(cm, cache.K)
+        fc = _ensure_factorization!(cache, solver; K = cm.Khat)
+        uf = cm.C * _backsolve(fc.solver, fc, cm.C' * F)
+    end
 
     u = zeros(T, part.n_global)
     u[part.free] = uf
@@ -260,12 +270,12 @@ solver → numeric-only refactorization on the frozen pattern; first solve or
 a different solver → fresh symbolic + numeric factorization, remembered for
 subsequent solves.
 """
-function _ensure_factorization!(cache::AnalysisCache, solver)
+function _ensure_factorization!(cache::AnalysisCache, solver; K::SparseMatrixCSC = cache.K)
     fc = cache.factorization
     if fc isa FactorizationCache && (solver === nothing || solver === fc.solver)
-        return _refactorize!(fc.solver, fc, cache.K)
+        return _refactorize!(fc.solver, fc, K)
     end
-    fc = _factorize(solver, cache.K)
+    fc = _factorize(solver, K)
     cache.factorization = fc
     return fc
 end
@@ -311,6 +321,20 @@ function _post_process(cache::AnalysisCache{T}, model::Model{T}, u::Vector{T},
     end
 
     return LinearResults{T}(u, reactions, forces, compliance)
+end
+
+# generic N-node fallback (element types without a local-frame recovery of
+# their own): GLOBAL nodal forces Kₑ·uₑ — 6 per node in `nodes(el)` order.
+# Element loads are not supported on such elements (their q_local stays 0).
+function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
+    el::AbstractElement, u::Vector{T}) where {T}
+    Ke = element_stiffness(el)
+    g = element_global_dofs(el)
+    f_global = Ke * u[g]
+    @inbounds for i in eachindex(g)
+        isfixed[g[i]] && (reactions[g[i]] += f_global[i])
+    end
+    return Vector{T}(f_global)
 end
 
 # primitive elements: one 12-vector of local end forces

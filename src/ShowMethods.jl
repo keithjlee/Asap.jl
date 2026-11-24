@@ -113,6 +113,68 @@ end
 # Elements
 # ─────────────────────────────────────────────────────────────────────────────
 
+# shell sections
+
+_fmt3(M) = join((join((string(round(M[i, j]; sigdigits = 5)) for j in axes(M, 2)), "  ") for i in axes(M, 1)), "; ")
+
+function Base.show(io::IO, ::MIME"text/plain", s::ShellSection)
+    println(io, "ShellSection  (homogeneous isotropic shell)")
+    println(io, "  t = $(s.t)  [length]  (thickness)")
+    println(io, "  material: E = $(s.material.E), G = $(s.material.G), ρ = $(s.material.ρ), ν = $(s.material.ν)")
+    println(io, "  rigidities (what the stiffness matrix consumes):")
+    println(io, "    A  = [$(_fmt3(membrane_rigidity(s)))]  [force/length]   (membrane, N = A·ε)")
+    println(io, "    D  = [$(_fmt3(bending_rigidity(s)))]  [force·length]   (bending, M = D·κ)")
+    println(io, "    S  = [$(_fmt3(shear_rigidity(s)))]  [force/length]   (transverse shear, Q = S·γ)")
+    println(io, "    γt = $(drilling_rigidity(s))  [force/length]   (drilling penalty)")
+    print(io,   "    ρt = $(areal_mass(s))  [mass/length²]   (mass per unit area)")
+end
+
+Base.show(io::IO, s::ShellSection) = print(io, "ShellSection(t=$(s.t))")
+
+function Base.show(io::IO, ::MIME"text/plain", s::ShellRigiditySection)
+    println(io, "ShellRigiditySection  (effective rigidities stored directly)")
+    println(io, "  A  = [$(_fmt3(s.A))]  [force/length]   (membrane, N = A·ε)")
+    println(io, "  D  = [$(_fmt3(s.D))]  [force·length]   (bending, M = D·κ)")
+    println(io, "  S  = [$(_fmt3(s.S))]  [force/length]   (transverse shear, Q = S·γ)")
+    println(io, "  γt = $(s.γt)  [force/length]   (drilling penalty)")
+    print(io,   "  ρt = $(s.ρt)  [mass/length²]   (mass per unit area)")
+end
+
+Base.show(io::IO, s::ShellRigiditySection) = print(io, "ShellRigiditySection(A₁₁=$(s.A[1,1]), D₁₁=$(s.D[1,1]))")
+
+function Base.show(io::IO, ::MIME"text/plain", el::ShellElement{T,N}) where {T,N}
+    println(io, "ShellElement{$N} :$(el.id)  (flat shell: drilling membrane + MITC plate)")
+    for (k, n) in enumerate(el.nodes)
+        println(io, "  node $k: $(collect(n.position))")
+    end
+    R = local_frame(el)
+    println(io, "  area   = $(area(el))  [length²]")
+    println(io, "  normal = $(collect(R[3, :]))  (local e₃; right-hand rule over the node order)")
+    print(io,   "  section: ", el.section)
+end
+
+Base.show(io::IO, el::ShellElement{T,N}) where {T,N} = print(io, "ShellElement{$N}(:$(el.id))")
+
+function Base.show(io::IO, ::MIME"text/plain", el::LinkElement)
+    println(io, "LinkElement :$(el.id)  (zero-length 6-spring connection)")
+    println(io, "  at $(collect(el.nodeStart.position))")
+    println(io, "  k₁, k₂, k₃    = $(collect(el.k[SOneTo(3)]))  [force/length]       (along link axes)")
+    print(io,   "  kθ₁, kθ₂, kθ₃ = $(collect(el.k[SVector(4, 5, 6)]))  [force·length/rad]  (about link axes)")
+end
+
+Base.show(io::IO, el::LinkElement) = print(io, "LinkElement(:$(el.id))")
+
+function Base.show(io::IO, ::MIME"text/plain", m::WallMesh)
+    println(io, "WallMesh  ($(length(m.elements)) shell elements, $(length(m.nodes)) nodes)")
+    println(io, "  origin = $(collect(m.origin))  [length]")
+    println(io, "  along  = $(collect(m.along))   (wall length direction, local e₁)")
+    println(io, "  up     = $(collect(m.up))   (wall height direction)")
+    println(io, "  length = $(m.s[end]), height = $(m.z[end])  [length]")
+    print(io,   "  grid   = $(length(m.s)) × $(length(m.z)) lines (openings removed)")
+end
+
+Base.show(io::IO, m::WallMesh) = print(io, "WallMesh($(length(m.elements)) elements)")
+
 function Base.show(io::IO, ::MIME"text/plain", el::FrameElement)
     sym = release_symbol(el.ends)
     conn = sym === nothing ? "semi-rigid connections" : "connections :$sym"
@@ -185,13 +247,27 @@ Base.show(io::IO, sp::NodalSpring) =
 # Model & results
 # ─────────────────────────────────────────────────────────────────────────────
 
+function Base.show(io::IO, ::MIME"text/plain", d::RigidDiaphragm)
+    ax = ("X", "Y", "Z")[d.axis]
+    println(io, "RigidDiaphragm :$(d.id)  (rigid in-plane floor, normal $ax)")
+    println(io, "  slaves = $(length(d.nodes)) nodes  (in-plane DOFs follow the master rigidly)")
+    print(io,   "  master at $(collect(d.master.position))  (apply storey forces/torques here)")
+end
+
+Base.show(io::IO, d::RigidDiaphragm) = print(io, "RigidDiaphragm(:$(d.id), $(length(d.nodes)) nodes)")
+
 function Base.show(io::IO, ::MIME"text/plain", m::Model)
     nf = count(el -> el isa FrameElement, m.elements)
     nt = count(el -> el isa TrussElement, m.elements)
+    nsh = count(el -> el isa ShellElement, m.elements)
+    nl = count(el -> el isa LinkElement, m.elements)
+    nother = length(m.elements) - nf - nt - nsh - nl
+    kinds = "$nf frame, $nt truss" * (nsh > 0 ? ", $nsh shell" : "") * (nl > 0 ? ", $nl link" : "") *
+            (nother > 0 ? ", $nother other" : "")
     println(io, "Model")
-    println(io, "  $(length(m.nodes)) nodes, $(length(m.elements)) elements " *
-                "($nf frame, $nt truss$(length(m.elements) - nf - nt > 0 ? ", $(length(m.elements) - nf - nt) other" : ""))")
-    println(io, "  $(length(m.loads)) loads, $(length(m.springs)) nodal springs")
+    println(io, "  $(length(m.nodes)) nodes, $(length(m.elements)) elements ($kinds)")
+    println(io, "  $(length(m.loads)) loads, $(length(m.springs)) nodal springs" *
+                (isempty(m.diaphragms) ? "" : ", $(length(m.diaphragms)) rigid diaphragm(s)"))
     if m.cache !== nothing
         p = m.cache.partition
         println(io, "  processed: $(length(p.free)) free / $(length(p.fixed)) fixed / " *

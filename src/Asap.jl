@@ -29,9 +29,12 @@ const globalZ = SVector(0.0, 0.0, 1.0)
 # ── materials & sections ────────────────────────────────────────────────────
 include("Materials/materials.jl")
 include("Materials/sections.jl")
+include("Materials/shell_sections.jl")
 export Material, Steel_Nmm, Steel_kNm
 export AbstractSection, Section, RigiditySection
 export EA, EIx, EIy, GJ, ρA
+export AbstractShellSection, ShellSection, ShellRigiditySection
+export membrane_rigidity, bending_rigidity, shear_rigidity, drilling_rigidity, areal_mass, thickness
 
 # ── nodes ───────────────────────────────────────────────────────────────────
 include("Nodes/node.jl")
@@ -43,13 +46,18 @@ export EndSprings, EndConditions, rigid_end, pinned_end, RELEASES, release_symbo
 
 include("Elements/kernels/transformation.jl")
 include("Elements/kernels/stiffness.jl")
+include("Elements/kernels/shell.jl")
 include("Elements/interface.jl")
 include("Elements/frame.jl")
 include("Elements/variable.jl")
-export AbstractElement, FrameElement, TrussElement, VariableElement
+include("Elements/shell.jl")
+include("Elements/link.jl")
+export AbstractElement, AbstractLineElement, FrameElement, TrussElement, VariableElement
 export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment
+export ShellElement, shell_frame, shell_stiffness, itw_membrane_stiffness
+export shell_resultants, shell_envelope, section_cut, LinkElement
 
 # ── springs ─────────────────────────────────────────────────────────────────
 include("Springs/nodal_springs.jl")
@@ -58,16 +66,22 @@ export NodalSpring
 # ── loads ───────────────────────────────────────────────────────────────────
 include("Loads/loads.jl")
 include("Elements/kernels/fixed_end_forces.jl")
+include("Loads/shell_loads.jl")
+include("Elements/kernels/shell_loads_recovery.jl")
 export AbstractLoad, NodeLoad, ElementLoad
 export NodeForce, NodeMoment, DistributedLoad, LineLoad, TrapezoidLoad, PointLoad, PointMoment, SelfWeight
 export fixed_end_forces, condense_fef
+export AreaLoad
 
 # ── model ───────────────────────────────────────────────────────────────────
+include("Model/diaphragm.jl")
 include("Model/model.jl")
 export Model, node_positions, connectivity, volume
+export RigidDiaphragm
 
 # ── analysis ────────────────────────────────────────────────────────────────
 include("Analysis/dofs.jl")
+include("Analysis/constraints.jl")   # ConstraintMap is a field type of AnalysisCache
 include("Analysis/symbolic.jl")
 include("Analysis/assemble.jl")
 include("Results/results.jl")
@@ -75,6 +89,7 @@ include("Analysis/solve.jl")
 include("Analysis/functional.jl")
 include("Results/recovery.jl")
 include("Analysis/cases.jl")
+include("Results/shell_results.jl")    # after cases.jl: shell_envelope takes CaseResults
 export DofPartition, AnalysisCache
 export process!, solve!, assemble_K!, assemble_loads!
 export CachedSolver
@@ -94,15 +109,18 @@ include("FDM/FDM.jl")
 
 # ── parametric structure generators (absorbed from AsapToolkit) ──────────────
 include("Generation/Generators.jl")
+include("Generation/WallMesh.jl")
 export Frame, SpaceFrame, Warren2D, Pratt2D, SpaceFrameBeam, BakerTruss,
     TrussFrame, GridNetwork, GridFrame
+export WallMesh, mesh_wall, wall_cut, edge_loads
 export XGroundStructure, DenseGroundStructure, BoundedGroundStructure
 export to_truss, to_frame
 
 # ── plot-ready geometry extraction (absorbed from AsapToolkit) ───────────────
 include("Geometry/Displacements.jl")
 include("Geometry/Geometry.jl")
-export Geo, ModelGeo, TrussGeo, NetworkGeo
+include("Geometry/ShellGeometry.jl")
+export Geo, ModelGeo, TrussGeo, NetworkGeo, ShellGeo, nodal_average, principal_forces
 export ElementDisplacements, displacements
 
 # ── display (last: defines Base.show for every user-facing type above) ──────

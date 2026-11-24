@@ -35,14 +35,15 @@ end
 "first global DOF slot of a node (its Tx); the node owns 6 consecutive slots"
 node_dof_start(node::Node) = 6 * (node.index - 1)
 
-"global DOF indices of the element's slots (nodal, then any internal blocks)"
+"global DOF indices of the element's slots: 6 per node in `nodes(el)` order (then any internal blocks)"
 function element_global_dofs(el::AbstractElement)
-    g = Vector{Int}(undef, 12)
-    s1 = node_dof_start(el.nodeStart)
-    s2 = node_dof_start(el.nodeEnd)
-    @inbounds for i in 1:6
-        g[i] = s1 + i
-        g[6+i] = s2 + i
+    ns = nodes(el)
+    g = Vector{Int}(undef, 6 * length(ns))
+    @inbounds for (k, n) in enumerate(ns)
+        s = node_dof_start(n)
+        for i in 1:6
+            g[6*(k-1)+i] = s + i
+        end
     end
     return g
 end
@@ -80,7 +81,7 @@ function partition_dofs(model::Model)
     for el in model.elements
         sig = dof_signature(el)
         g = element_global_dofs(el)
-        @inbounds for i in 1:12
+        @inbounds for i in eachindex(g)
             sig[i] && (active[g[i]] = true)
         end
     end
@@ -91,6 +92,11 @@ function partition_dofs(model::Model)
         @inbounds for i in 1:6
             sp.stiffness[i] > 0 && (active[s+i] = true)
         end
+    end
+    for d in model.diaphragms      # the master carries the diaphragm's in-plane DOFs
+        s = node_dof_start(d.master)
+        b, c = _inplane_axes(d.axis)
+        active[s+b] = active[s+c] = active[s+3+d.axis] = true
     end
 
     free = Int[]

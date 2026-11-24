@@ -198,7 +198,31 @@ the single kernel shared by the in-place and AD assembly paths.
 """
 function frame_stiffness(section::AbstractSection, ends::EndConditions,
     x1::AbstractVector{<:Real}, x2::AbstractVector{<:Real}, rollangle::Real)
+    return _frame_K_plain(_stiffness_rigidities(section), _end_springs(ends),
+        _sv3(x1), _sv3(x2), rollangle)
+end
+
+# ── plain-data form of the frame kernels ────────────────────────────────────
+# The kernels on plain static vectors (rigidities, end springs, positions) —
+# the targets of the reverse-mode rules in ext/AsapFrameADExt.jl (a local
+# ForwardDiff Jacobian of the SAME kernel instead of a scalar Zygote trace).
+# Section and end conditions are rebuilt as a `RigiditySection` /
+# `EndConditions` holding the identical accessor values, so the arithmetic —
+# and the result, bitwise — is the same as calling the kernel on the
+# original structs.
+
+# (EA, EIx, EIy, GJ) [force], [force·length²] — what `local_stiffness` reads
+@inline _stiffness_rigidities(s::AbstractSection) = SVector(EA(s), EIx(s), EIy(s), GJ(s))
+
+# the eight end-spring stiffnesses (start kx, kt, ky, kz; end kx, kt, ky, kz)
+@inline _end_springs(e::EndConditions) =
+    SVector(e.e1.kx, e.e1.kt, e.e1.ky, e.e1.kz, e.e2.kx, e.e2.kt, e.e2.ky, e.e2.kz)
+@inline _end_conditions(k::SVector{8}) =
+    EndConditions(EndSprings(k[1], k[2], k[3], k[4]), EndSprings(k[5], k[6], k[7], k[8]))
+
+function _frame_K_plain(r::SVector{4}, k::SVector{8}, x1::SVector{3}, x2::SVector{3}, rollangle::Real)
     L = element_length(x1, x2)
     Λ = local_frame(x1, x2, rollangle)
-    return transform_to_global(local_stiffness(section, L, ends), Λ)
+    sec = RigiditySection(r[1], r[2], r[3], r[4], zero(r[1]))
+    return transform_to_global(local_stiffness(sec, L, _end_conditions(k)), Λ)
 end

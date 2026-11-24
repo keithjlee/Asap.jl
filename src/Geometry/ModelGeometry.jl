@@ -5,6 +5,9 @@ Plot-ready arrays extracted from a solved frame `Model`: node positions,
 nodal displacements, element connectivity, per-element end-force ranges
 (P, Vy, Vz, Tx, My, Mz with their maxima), section properties, and element
 vectors. Construct with `Geo(model)` or `ModelGeo(model)`.
+
+Covers the model's frame and truss elements (in model order); surface
+elements are skipped — extract them with [`ShellGeo`](@ref).
 """
 struct ModelGeo <: AbstractGeo
     nodes::Vector{Vector{Float64}}
@@ -47,44 +50,45 @@ struct ModelGeo <: AbstractGeo
         disp = [displacement(results, node)[1:3] for node in model.nodes]
         disp_xy = [d[1:2] for d in disp]
 
-        indices = [[element.nodeStart.index, element.nodeEnd.index] for element in model.elements]
-        indices_flat = vcat(indices...)
+        lines = AbstractElement[el for el in model.elements if el isa Union{FrameElement,TrussElement}]
+        indices = [[element.nodeStart.index, element.nodeEnd.index] for element in lines]
+        indices_flat = isempty(indices) ? Int[] : vcat(indices...)
 
-        forcevectors = [element_forces(results, element) for element in model.elements]
+        forcevectors = [element_forces(results, element) for element in lines]
 
-        P = vcat([forces[[1,7]] .* [-1, 1] for forces in forcevectors]...)
-        max_abs_P = maximum(abs.(P))
+        P = isempty(forcevectors) ? Float64[] : vcat([forces[[1,7]] .* [-1, 1] for forces in forcevectors]...)
+        max_abs_P = maximum(abs, P; init = 0.0)
 
-        Vy = vcat([forces[[2,8]] .* [-1, 1] for forces in forcevectors]...)
-        max_abs_Vy = maximum(abs.(Vy))
+        Vy = isempty(forcevectors) ? Float64[] : vcat([forces[[2,8]] .* [-1, 1] for forces in forcevectors]...)
+        max_abs_Vy = maximum(abs, Vy; init = 0.0)
 
-        Vz = vcat([forces[[3,9]] .* [-1, 1] for forces in forcevectors]...)
-        max_abs_Vz = maximum(abs.(Vz))
+        Vz = isempty(forcevectors) ? Float64[] : vcat([forces[[3,9]] .* [-1, 1] for forces in forcevectors]...)
+        max_abs_Vz = maximum(abs, Vz; init = 0.0)
 
-        Tx = vcat([forces[[4,10]] .* [-1, 1] for forces in forcevectors]...)
-        max_abs_Tx = maximum(abs.(Tx))
+        Tx = isempty(forcevectors) ? Float64[] : vcat([forces[[4,10]] .* [-1, 1] for forces in forcevectors]...)
+        max_abs_Tx = maximum(abs, Tx; init = 0.0)
 
-        My = vcat([forces[[5,11]] .* [-1, 1] for forces in forcevectors]...)
-        max_abs_My = maximum(abs.(My))
+        My = isempty(forcevectors) ? Float64[] : vcat([forces[[5,11]] .* [-1, 1] for forces in forcevectors]...)
+        max_abs_My = maximum(abs, My; init = 0.0)
 
-        Mz = vcat([forces[[6,12]] .* [-1, 1] for forces in forcevectors]...)
-        max_abs_Mz = maximum(abs.(Mz))
+        Mz = isempty(forcevectors) ? Float64[] : vcat([forces[[6,12]] .* [-1, 1] for forces in forcevectors]...)
+        max_abs_Mz = maximum(abs, Mz; init = 0.0)
 
-        sections = getproperty.(model.elements, :section)
+        sections = [el.section for el in lines]
 
-        areas = getproperty.(sections, :A)
-        max_area = maximum(areas)
+        areas = Float64[s.A for s in sections]
+        max_area = maximum(areas; init = 0.0)
 
-        Ix = getproperty.(sections, :Ix)
-        max_Ix = maximum(Ix)
+        Ix = Float64[s.Ix for s in sections]
+        max_Ix = maximum(Ix; init = 0.0)
 
-        Iy = getproperty.(sections, :Iy)
-        max_Iy = maximum(Iy)
+        Iy = Float64[s.Iy for s in sections]
+        max_Iy = maximum(Iy; init = 0.0)
 
-        J = getproperty.(sections, :J)
-        max_J = maximum(J)
+        J = Float64[s.J for s in sections]
+        max_J = maximum(J; init = 0.0)
 
-        element_vectors = [Vector(local_frame(element)[1, :]) for element in model.elements]
+        element_vectors = [Vector(local_frame(element)[1, :]) for element in lines]
         element_vectors_xy = [evec[1:2] for evec in element_vectors]
 
         return new(
@@ -114,7 +118,7 @@ struct ModelGeo <: AbstractGeo
             max_Iy,
             J,
             max_J,
-            length.(model.elements),
+            Float64[length(el) for el in lines],
             element_vectors,
             element_vectors_xy
         )

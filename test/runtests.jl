@@ -30,6 +30,7 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_ad.jl")
     include("newcore/test_design_loads.jl")
     include("newcore/test_forward.jl")
+    include("newcore/test_frame_ad_rules.jl")      # after test_forward: needs ForwardDiff loaded
     include("characterization/test_publication.jl")
 
     # AsapToolkit oracles: consumed by the Phase 3 recovery tests
@@ -43,4 +44,14 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_generation.jl")
     include("newcore/test_solvers.jl")
     include("newcore/test_fdm.jl")
+    include("newcore/test_nnode.jl")
+    include("newcore/test_shell_membrane.jl")
+    include("newcore/test_shell_plate.jl")
+    include("newcore/test_shell_loads_results.jl")
+    include("newcore/test_shell_mesh_links.jl")
+    include("newcore/test_diaphragm.jl")
+    include("newcore/test_shell_ad.jl")
+    include("newcore/test_group_ad_rules.jl")      # linear-cost Zygote group rules
+    include("newcore/test_shell_parity.jl")
+    include("newcore/test_shell_mitc4_bd85.jl")
 end
