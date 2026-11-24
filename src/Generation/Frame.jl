@@ -80,7 +80,10 @@ Generate a 3D frame model.
 - `dy::Real` Secondary span length
 - `nz::Integer` Number of stories
 - `dz::Real` Story height
-- `joistSpacing::Real` Approx. center spacing between secondary spans
+- `joistSpacing::Real` Approx. center spacing between secondary spans. The generator
+  places `n = round(dx / joistSpacing)` joist lines per bay COUNTING both column lines,
+  so the joists end up `dx / (n − 1)` apart (e.g. `dx = 6`, `joistSpacing = 2` → one
+  joist at midspan, 3 apart; legacy behaviour, kept)
 - `columnSection::Section` Section of column elements
 - `primarySection::Section` Section of primary beams
 - `joistSection::Section` Section of secondary beams

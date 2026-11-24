@@ -11,7 +11,7 @@ solved on construction.
 - `dz::Real` layer offset (roof thickness) [length]
 - `section::AbstractSection` cross section applied to all members
 - `support::Symbol` support layout: `:corner`, `:x`, `:y`, or `:xy`
-- `load::Vector` nodal load applied to top-layer nodes [force]
+- `load::Vector` nodal load applied to every unsupported node, both layers [force]
 - `base::Vector` origin offset of the generated grid [length]
 - `ibottom`, `itop::Matrix{Int64}` node indices of the bottom/top layers
 - `isquares::Matrix{Vector{Int64}}` node indices of each top-layer module
@@ -52,8 +52,10 @@ end
 
 Generate a spaceframe truss model of planar bay spacing dx, dy, with nx, ny nodes in each direction, with roof thickness dz. Options for support include:
 - `:corner` pinned supports at the 4 corner bays (total of 16 pinned supports)
-- `:x` pinned supports along exterior nodes parallel to the global X direction
-- `:y` pinned supports along exterior nodes parallel to the global Y direction
+- `:x` pinned supports along the two bottom-layer edges at the ends of the X span
+  (x = min and x = max; the edges run parallel to Y, so the grid spans in X)
+- `:y` pinned supports along the two bottom-layer edges at the ends of the Y span
+  (y = min and y = max; the grid spans in Y)
 - `:xy` pinned supports along all exterior nodes
 """
 function SpaceFrame(nx::Integer,
