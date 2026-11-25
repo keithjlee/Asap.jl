@@ -7,7 +7,7 @@ general shell surfaces. Mixes freely with frames and trusses in one `Model`;
 shared nodes connect them with full 6-DOF continuity (the drilling DOF lets
 an in-plane beam transfer moment into a wall).
 
-Two shapes, mixing freely in one mesh (see `docs/shells/DERIVATION.md`):
+Two shapes, mixing freely in one mesh:
 
 - `N = 4`, quadrilateral: the Ibrahimbegović–Taylor–Wilson drilling membrane
   combined with the MITC4 plate.

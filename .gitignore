@@ -35,3 +35,9 @@ examples/**/Manifest.toml
 # Typst sources of the example reports: kept locally (own git repo), only the PDFs are published
 examples/reports-src/
 docs/PLAN_CASES.md
+
+# working records kept local: derivations, release notes, Enzyme status (the D1 report PDF is public)
+docs/shells/DERIVATION.md
+docs/releases/
+examples/ad/ENZYME_STATUS.md
+examples/ad/results/

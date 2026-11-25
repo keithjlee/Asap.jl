@@ -11,7 +11,7 @@ Asap's [`ShellElement`](@ref) is a flat shell in two shapes, which mix freely in
 
 Shells mix freely with frames and trusses, and the drilling DOF lets an in-plane beam transfer moment into a wall at a shared node.
 
-The formulation and its verification (patch tests, MacNeal–Harder, Timoshenko & Woinowsky-Krieger plates, the Scordelis–Lo roof) are documented in `docs/shells/DERIVATION.md` in the repository.
+The elements are verified on patch tests, the MacNeal–Harder benchmarks, Timoshenko & Woinowsky-Krieger plates and the Scordelis–Lo roof; the test suite runs every one of them.
 
 ## Sections
 

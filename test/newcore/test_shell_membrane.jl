@@ -1,6 +1,6 @@
 # Shell S2: ShellSection + the drilling membrane — Ibrahimbegović–Taylor–Wilson
 # (ITW 1990, D-type) with two complementary Taylor-corrected incompatible modes
-# (default) or as published (`enhanced = false`). docs/shells/DERIVATION.md §2.
+# (default) or as published (`enhanced = false`).
 #
 # Oracles: exact solutions (pure bending, patch test) and fine-mesh references
 # computed through this pipeline AND cross-checked against an independent

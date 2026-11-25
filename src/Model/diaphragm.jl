@@ -16,8 +16,7 @@ For a diaphragm normal to global axis `a` with in-plane axes `(b, c)`
     u_c,s = u_c,m + θ_a,m · r_b
     θ_a,s = θ_a,m
 
-Imposed exactly by transformation (`u = C·û`), not by penalty springs — see
-`docs/shells/DERIVATION.md` §5.
+Imposed exactly by transformation (`u = C·û`), not by penalty springs.
 
 # Fields
 - `nodes::Vector{Node{T}}`: slave nodes (the floor's nodes)

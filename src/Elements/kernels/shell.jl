@@ -2,7 +2,6 @@
 Flat-shell element kernels — pure functions of node positions and section
 rigidities (shared by the in-place and differentiable assembly paths).
 
-Formulations and every sign convention: docs/shells/DERIVATION.md.
   membrane: Ibrahimbegović–Taylor–Wilson (1990) drilling quad, D-type
             (3×3 Gauss on K with a condensed bubble; 1-point drilling penalty)
   plate:    MITC4 (Dvorkin & Bathe 1984; Bathe & Dvorkin 1985)
@@ -149,8 +148,7 @@ edge modes already span the NORMAL edge quadratics; these two add the
 complementary tangential ones, which the Poisson strain of in-plane bending
 needs: the enhanced element is exact in pure bending on rectangles (the
 published element is 2.6 % stiff at ν = 0.3) and more accurate on coarse
-wall meshes. `enhanced = false` reproduces the element as published. See
-`docs/shells/DERIVATION.md` §2.1 for the benchmark comparison.
+wall meshes. `enhanced = false` reproduces the element as published.
 """
 function itw_membrane_stiffness(xy, A::AbstractMatrix, γt::Real; enhanced::Bool = true)
     c = _q4_edge_vectors(xy)

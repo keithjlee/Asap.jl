@@ -67,7 +67,7 @@ grid.
   or `:free` to leave it unsupported); reused nodes keep their own fixity
 
 The structured grid keeps every element rectangular — the regime where the
-membrane is exact in pure bending (see `docs/shells/DERIVATION.md`).
+membrane is exact in pure bending.
 """
 function mesh_wall(origin::AbstractVector, along::AbstractVector, up::AbstractVector,
     length::Real, height::Real, section::AbstractShellSection{T};

@@ -394,7 +394,7 @@ Repeated solves reuse the factorization's symbolic analysis (numeric-only refact
 # Documentation map
 
 - **[keithjlee.com/Asap.jl](https://keithjlee.com/Asap.jl/stable/)** — the full documentation site: guide pages for every feature (with executed examples), the v0.2 → v1.0 migration guide, and the complete API reference.
-- `docs/releases/` — release notes, including the v0.2.x → v1.0 breaking-change summary
+- [Release notes](https://github.com/keithjlee/Asap.jl/releases) — one per registered version, on the GitHub releases page
 - Every exported function and type carries a full docstring (`?Section`, `?dof_signature`, …), and every type has an engineer-readable REPL display.
 
 # Verification

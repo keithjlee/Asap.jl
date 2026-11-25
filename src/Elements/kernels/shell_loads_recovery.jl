@@ -1,7 +1,6 @@
 #=
 Shell element loads (consistent nodal loads) and stress-resultant recovery —
 pure kernels of the local geometry, rigidities and local displacements.
-See docs/shells/DERIVATION.md §2 (membrane interpolation) and §4.
 =#
 
 # the 16×16 membrane matrix BEFORE condensation: (u,v,ψ)×4, bubble (2),

@@ -44,7 +44,7 @@ Units in every walkthrough: kN, m. Asap itself is units-agnostic.
 - `enzyme_matrix.jl` + `run_enzyme_matrix.sh`: Enzyme (reverse and forward) against Zygote
   (or finite differences) on every scenario class — trusses, frames with element loads,
   semi-rigid joints, springs, variable elements, shells, rigid diaphragms, a large space truss.
-  Results are in `ad/ENZYME_STATUS.md`.
+  Results are in the D1 report (`reports/D1_enzyme_matrix.pdf`).
 - `ad_backends_shells.jl`: Zygote vs Enzyme vs Mooncake timings through shell models.
 - `reverse_scaling.jl`: reverse-mode (Zygote) cost against model size for frames and shells, with
   the v1.2 → 1.3 numbers for frames.

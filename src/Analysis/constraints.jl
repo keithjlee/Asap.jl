@@ -3,7 +3,6 @@ Multipoint constraints (rigid diaphragms) as a linear map AFTER assembly:
 u_free = C·û, K̂ = CᵀKC, F̂ = CᵀF. K̂ is linear in K's entries, so
 nzval(K̂) = M·nzval(K) with a sparse M built from C. Element assembly,
 force recovery and reactions are untouched (they work on the full u).
-docs/shells/DERIVATION.md §5.
 =#
 
 """

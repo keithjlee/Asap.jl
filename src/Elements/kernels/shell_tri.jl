@@ -11,7 +11,7 @@ coordinates and the section rigidities, like the quad kernels in shell.jl.
 Node order: counter-clockwise about the element normal. Local per-node DOFs
 as for the quad: membrane (u, v, ψ), plate (w, θx, θy), with ψ = θz the
 drilling rotation and the plate using the normal's rotations
-β = (βx, βy) = (θy, −θx). Formulas and benchmarks: docs/shells/DERIVATION.md §7.
+β = (βx, βy) = (θy, −θx).
 =#
 
 # ─────────────────────────────────────────────────────────────────────────────
