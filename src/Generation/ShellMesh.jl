@@ -384,7 +384,7 @@ circle_polygon(center, radius::Real; n::Int = 32) =
     [(center[1] + radius * cospi(2k / n), center[2] + radius * sinpi(2k / n)) for k in 0:n-1]
 
 """
-    mesh_polygon(outline, section; holes = [], h = nothing, max_area = nothing,
+    mesh_polygon(outline, section; holes = [], segments = [], h = nothing, max_area = nothing,
                  min_angle = 25, points = [], origin = [0, 0, 0], e1 = [1, 0, 0],
                  e2 = [0, 1, 0], fixity = :free, id = :panel, seed = 1, reuse = Node[]) -> ShellMesh
 
@@ -402,6 +402,12 @@ target edge length `h`). **Requires DelaunayTriangulation.jl**
   vertex, with a vertex on an edge, or along a shared edge (a notch drawn as a
   hole, adjacent openings drawn as two) — but must not cross the outline or
   overlap each other (refused with an `ArgumentError`)
+- `segments`: interior lines that must be followed by element edges, as point
+  pairs `(a, b)`: section cuts through the material ([`section_cut`](@ref)
+  needs nodes on the cut line), interior load or bearing lines. Their nodes
+  are found with [`nodes_on_segment`](@ref). A segment may end on the outline,
+  a hole or another segment, but must not cross them (split it at the
+  crossing point instead)
 - `points`: extra interior points that must become nodes (point loads)
 - `origin`, `e1`, `e2`, `fixity`, `id`: as in [`shell_mesh`](@ref)
 - `seed`: the triangulator inserts points in random order; the seeded generator

@@ -180,7 +180,7 @@ end
             q = N.fixed_end_forces(load, sec, ends, x1, x2, rollangle)
             q̃ = N.condense_fef(q, sec, L, ends)
 
-            # DELIBERATE DEVIATION (documented in docs/MODERNIZATION.md):
+            # DELIBERATE DEVIATION from legacy:
             # legacy q_local(::PointLoad) splits the axial component 50/50
             # regardless of load position; the consistent (and statically
             # exact) distribution is by lever rule: −P·(1−ξ) / −P·ξ. All

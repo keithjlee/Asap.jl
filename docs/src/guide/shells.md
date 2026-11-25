@@ -45,6 +45,10 @@ For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygo
 - [`elements_in`](@ref): elements in a region (a bearing plate's patch load, a zone to read stresses from);
 - [`total_reaction`](@ref): the resultant of the reactions over a node group, e.g. one bearing.
 
+To integrate the force across a line through the material (a nib/beam interface, the level a hanger tie crosses), pass the line to `mesh_polygon` as one of its `segments`: element edges then follow it, and [`section_cut`](@ref) with the elements on one side and [`nodes_on_segment`](@ref) gives the exact force and moment across it. Summing the cut one node at a time along the line gives the force profile across it, whose tension part is a strut-and-tie model's tie (walkthrough 7, a dapped end).
+
+A flexible bearing (an elastomeric pad) presses with a nearly uniform pressure and cannot pull. Holding the pad's nodes fixed makes it rigid and bilateral instead. To model the pad, apply the reaction as an `edge_loads` pressure and hold the panel only against rigid-body motion (one pin, one roller): the load set balances by itself, and the supports' reactions measure how exactly.
+
 ```julia
 using DelaunayTriangulation      # activates mesh_polygon
 outline = [(0.0, 0.0), (0.5, 0.0), (5.5, 0.0), (6.0, 0.0), (6.0, 3.0), (0.0, 3.0)]

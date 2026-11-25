@@ -2,9 +2,8 @@
 #
 # The regression backbone is the Phase 0 characterization data (exact
 # numerics pinned from the legacy v0.2.x implementation and from the
-# DiffAnalysis_2024 publication environment) — see docs/MODERNIZATION.md.
-# Deliberate deviations from legacy behavior are documented there and
-# asserted explicitly where they occur.
+# DiffAnalysis_2024 publication environment). Deliberate deviations from
+# legacy behavior are asserted explicitly where they occur.
 
 using Asap
 using Test
@@ -58,4 +57,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_shell_tri_element.jl")     # S7d: triangles in models
     include("newcore/test_shell_mesh_general.jl")    # S7e/f: general meshes, D-region workflow
     include("newcore/test_shell_tri_ad.jl")          # S7g: triangles on the differentiable path
+    include("newcore/test_case_loads.jl")            # load cases on the pure path
 end

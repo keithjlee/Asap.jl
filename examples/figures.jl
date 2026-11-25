@@ -219,8 +219,73 @@ function element_size(g::ShellGeo, ks)
     return sort(a)[cld(length(a), 2)]
 end
 
+# ── close-ups and cut lines (in-plane coordinates of a planar mesh) ──────────
+# `window = ((x0, x1), (z0, z1))` shows that part of a drawing: everything is drawn and the axis
+# clips it, so a close-up of a long member ends cleanly at the window edge.
+_inwin(p, win, m = 0.0) = win === nothing ||
+    (win[1][1] - m <= p[1] <= win[1][2] + m && win[2][1] - m <= p[2] <= win[2][2] + m)
+
+# fitstructure! for a given window: true aspect, `padpt` points of margin on every side
+function _fitwindow!(fig, ax, win; width, maxheight, padpt = 4)
+    win === nothing && return fitstructure!(fig, ax; width, maxheight, padpt)
+    (x0, x1), (z0, z1) = win
+    aw = min(width, maxheight * (x1 - x0) / (z1 - z0))
+    m = padpt * (x1 - x0) / aw
+    limits!(ax, x0 - m, x1 + m, z0 - m, z1 + m)
+    ax.aspect = nothing; ax.width = aw; ax.height = aw * (z1 - z0 + 2m) / (x1 - x0 + 2m)
+    resize_to_layout!(fig)
+    return fig
+end
+
+# plot-area height a drawing of points `P` (or `window`) gets at `width` (colourbar placement)
+function _plotheight(P, win; width, maxheight)
+    xs, zs = win === nothing ? (extrema(p -> p[1], P), extrema(p -> p[2], P)) : win
+    return min(width * (zs[2] - zs[1]) / max(xs[2] - xs[1], eps()), maxheight)
+end
+
+# the part of segment AB inside `win` (nothing if none)
+function _clipseg(A, B, win)
+    win === nothing && return (A, B)
+    t0, t1 = 0f0, 1f0; d = B - A
+    for (p, q) in ((-d[1], A[1] - win[1][1]), (d[1], win[1][2] - A[1]),
+                   (-d[2], A[2] - win[2][1]), (d[2], win[2][2] - A[2]))
+        if p == 0
+            q < 0 && return nothing
+        else
+            r = q / p
+            p < 0 ? (t0 = max(t0, r)) : (t1 = min(t1, r))
+        end
+    end
+    return t0 > t1 ? nothing : (A + t0 * d, A + t1 * d)
+end
+
+# text on a white glyph halo (CairoMakie strokes over the fill: halo copy first, then the text)
+function _halotext!(ax, at; text, align, offset = (0, 0), fontsize = 8)
+    text!(ax, at; text, align, offset, fontsize, color = :white, strokecolor = :white, strokewidth = 2.5)
+    text!(ax, at; text, align, offset, fontsize, color = kjl_black)
+end
+
+# Cut lines drawn over a planar drawing: each a NamedTuple `(seg = ((x1, z1), (x2, z2)), label,
+# at, align, offset)`; only `seg` is required. The label goes at `at` (default: beside the line,
+# just inside its second end, so it stays within the drawing). Black dashed (reference lines over
+# a field), labels on a halo.
+function _cuts!(ax, cuts)
+    cuts === nothing && return
+    for c in cuts
+        A, B = Point2f(c.seg[1]...), Point2f(c.seg[2]...)
+        lines!(ax, [A, B]; color = kjl_black, linewidth = 0.8, linestyle = :dash)
+        haskey(c, :label) || continue
+        d = (B - A) / norm(B - A)
+        horiz = abs(d[1]) > abs(d[2])
+        al = get(c, :align, horiz ? (d[1] > 0 ? :right : :left, :bottom) : (:left, d[2] > 0 ? :top : :bottom))
+        off = get(c, :offset, horiz ? (-2sign(d[1]), 3) : (4, -2sign(d[2])))
+        _halotext!(ax, Point2f(get(c, :at, c.seg[2])...); text = c.label, align = al, offset = off)
+    end
+end
+
 # a contoured shell drawing: mesh coloured by `vals`, element edges, colourbar beside it
-function _contour_figure(P0, P, quads, ks, vals, field; title, colormap, colorrange, width, maxheight)
+function _contour_figure(P0, P, quads, ks, vals, field; title, colormap, colorrange, width, maxheight,
+    window = nothing, cuts = nothing)
     # keep only this drawing's nodes: the geometry holds every node of the model, and mesh!
     # (hence the limits) would take them all in
     used = sort!(unique(vec(quads[:, ks])))
@@ -239,9 +304,20 @@ function _contour_figure(P0, P, quads, ks, vals, field; title, colormap, colorra
         rasterize = MESH_RASTER)
     linesegments!(ax, quad_edges(P, quads, ks); color = (kjl_black, fine ? 0.08 : 0.35), linewidth = fine ? 0.2 : 0.3)
     fine && linesegments!(ax, outline_edges(P, quads, ks); color = kjl_black, linewidth = 0.6)
-    Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)))
+    _cuts!(ax, cuts)
+    label = get(FIELD_LABELS, field, string(field))
+    # a vertical colourbar needs the plot to be taller than its label (~5.4 pt per printed
+    # character, markup excluded); a long, shallow drawing gets a horizontal one underneath
+    tall = _plotheight(P, window; width = width - 62, maxheight) > 5.4 * length(replace(label, r"[_^{}]" => ""))
+    if tall
+        Colorbar(fig[1, 2], m; label)
+    else
+        Colorbar(fig[2, 1], m; label, vertical = false, flipaxis = false, tellwidth = false,
+            height = 6, width = Relative(0.6))
+        rowgap!(fig.layout, 1, 4)
+    end
     structurestyle!(ax; scale = true, unit = "m")
-    fitstructure!(fig, ax; width = width - 62, maxheight = maxheight, padpt = 4)
+    _fitwindow!(fig, ax, window; width = tall ? width - 62 : width - 10, maxheight, padpt = 4)
     return fig
 end
 
@@ -254,13 +330,19 @@ the nodes over this wall's elements (forces red − / white 0 / blue +; displace
 orange); the undeformed mesh in light gray.
 """
 function fig_wall(model, w; field = :N2, scale = 0.0, title = "", geo = ShellGeo(model),
-    colormap = nothing, colorrange = nothing, width = W_PLAN, maxheight = 1.1width)
+    colormap = nothing, colorrange = nothing, width = W_PLAN, maxheight = 1.1width,
+    window = nothing, cuts = nothing)
     ks = shell_columns(geo, model, w.elements)
     vals = field_scale(field) .* nodal_field(geo, field, ks)
     P0 = wall_sz(w, geo.nodes)
     P = wall_sz(w, geo.nodes .+ scale .* geo.disp)
+    if colorrange === nothing && window !== nothing             # range from what the window shows
+        sel = vals[[i for i in unique(vec(geo.quads[:, ks])) if _inwin(P[i], window)]]
+        cm, colorrange = field_colormap(field, sel)
+        colormap === nothing && (colormap = cm)
+    end
     return _contour_figure(scale == 0 ? nothing : P0, P, geo.quads, ks, vals, field;
-        title, colormap, colorrange, width, maxheight)
+        title, colormap, colorrange, width, maxheight, window, cuts)
 end
 
 """
@@ -287,17 +369,20 @@ dark gray with arrows into the panel) are lists of segments `((x1, z1), (x2, z2)
 in-plane coordinates — a pad or a column is a segment.
 """
 function fig_principal(model, w; geo = ShellGeo(model), title = "principal membrane forces", maxlen = nothing,
-    width = W_PLAN, maxheight = 1.1width, bearings = nothing, loads = nothing)
+    width = W_PLAN, maxheight = 1.1width, bearings = nothing, loads = nothing, window = nothing, cuts = nothing)
     ks = shell_columns(geo, model, w.elements)
-    Nmax = maximum(k -> max(abs(geo.N1[k]), abs(geo.N2[k])), ks)
-    kd = ks                                                    # elements that get a trajectory
-    cell = element_size(geo, ks)
-    if length(ks) > FINE_MESH                                  # fine mesh: one element per coarse cell
-        C = wall_sz(w, geo.centers[:, ks])
+    # a close-up samples, scales and sizes from what its window shows
+    kw = window === nothing ? ks : [k for k in ks if _inwin(wall_sz(w, geo.centers[:, k:k])[1], window, element_size(geo, ks))]
+    Nmax = maximum(k -> max(abs(geo.N1[k]), abs(geo.N2[k])), kw)
+    kd = kw                                                    # elements that get a trajectory
+    cell = element_size(geo, kw)
+    if length(kw) > FINE_MESH                                  # fine mesh: one element per coarse cell
+        C = wall_sz(w, geo.centers[:, kw])
         xs = extrema(p -> p[1], C); zs = extrema(p -> p[2], C)
-        cell = max(xs[2] - xs[1], zs[2] - zs[1]) / 28
+        ext = sort([xs[2] - xs[1], zs[2] - zs[1]])
+        cell = min(ext[2] / 28, ext[1] / 8)                 # ≥ 8 rows across a long, thin panel
         best = Dict{Tuple{Int,Int},Tuple{Float64,Int}}()
-        for (c, k) in zip(C, ks)
+        for (c, k) in zip(C, kw)
             i, j = floor(Int, (c[1] - xs[1]) / cell), floor(Int, (c[2] - zs[1]) / cell)
             d = hypot(c[1] - xs[1] - (i + 0.5) * cell, c[2] - zs[1] - (j + 0.5) * cell)
             (haskey(best, (i, j)) && best[(i, j)][1] <= d) || (best[(i, j)] = (d, k))
@@ -327,8 +412,10 @@ function fig_principal(model, w; geo = ShellGeo(model), title = "principal membr
     # line width adapts to the printed segment length (~12 %), so each orthogonal cross stays
     # legible at any mesh density: printed scale ≈ plot-area width / drawing span
     used0 = unique(vec(geo.quads[:, ks]))
-    spn = max(maximum(p -> p[1], P0[used0]) - minimum(p -> p[1], P0[used0]),
-              maximum(p -> p[2], P0[used0]) - minimum(p -> p[2], P0[used0]))
+    ext = window !== nothing ? sort([window[1][2] - window[1][1], window[2][2] - window[2][1]]) :
+          sort([maximum(p -> p[1], P0[used0]) - minimum(p -> p[1], P0[used0]),
+                maximum(p -> p[2], P0[used0]) - minimum(p -> p[2], P0[used0])])
+    spn = ext[2]
     hpt = h * (width - 95) / spn
     lw = clamp(0.12 * hpt, 0.3, 1.3)
     linesegments!(ax, tens; color = kjl_tension, linewidth = lw, linecap = :butt)
@@ -341,22 +428,40 @@ function fig_principal(model, w; geo = ShellGeo(model), title = "principal membr
         end
     end
     if loads !== nothing                                       # applied loads: dark gray, arrows into the panel
-        span = maximum(p -> p[1], P0[used]) - minimum(p -> p[1], P0[used])
         for (a, b) in loads
             A, B = Point2f(a...), Point2f(b...)
+            c = _clipseg(A, B, window)                         # a close-up shows the visible part
+            c === nothing && continue
+            A, B = c
             lines!(ax, [A, B]; color = kjl_darkgray, linewidth = 2.5, linecap = :butt)
             t = B - A; nrm = Point2f(-t[2], t[1]); nrm = nrm / max(norm(nrm), eps(Float32))
             m = (A + B) / 2
             dot(nrm, Point2f(cx, cz) - m) < 0 && (nrm = -nrm)           # point into the panel
-            L = 0.08f0 * span
+            L = Float32(min(0.08 * spn, 0.3 * ext[1]))         # a long, shallow member: arrows ≤ 30 % of its depth
             starts = [A + s * t - L * nrm for s in range(0.15f0, 0.85f0; length = 3)]
+            if window !== nothing                              # a close-up grows to take its arrows in
+                (x0, x1), (z0, z1) = window
+                for q in starts
+                    x0, x1, z0, z1 = min(x0, q[1]), max(x1, q[1]), min(z0, q[2]), max(z1, q[2])
+                end
+                window = ((x0, x1), (z0, z1))
+            end
             arrows2d!(ax, starts, fill(L * nrm, 3); color = kjl_darkgray, shaftwidth = 1.0, tipwidth = 5, tiplength = 5)
         end
     end
-    Legend(fig[1, 2], [LineElement(color = kjl_tension, linewidth = 2), LineElement(color = kjl_compression, linewidth = 2)],
-        ["tension (ties)", "compression (struts)"])
+    # a long, shallow drawing takes the legend underneath and the full width
+    tall = _plotheight(P0[used0], window; width = width - 95, maxheight) > 120
+    entries = [LineElement(color = kjl_tension, linewidth = 2), LineElement(color = kjl_compression, linewidth = 2)]
+    if tall
+        Legend(fig[1, 2], entries, ["tension (ties)", "compression (struts)"])
+    else
+        Legend(fig[2, 1], entries, ["tension (ties)", "compression (struts)"]; orientation = :horizontal,
+            tellwidth = false, padding = (0, 0, 0, 0))
+        rowgap!(fig.layout, 1, 4)
+    end
+    _cuts!(ax, cuts)
     structurestyle!(ax; scale = true, unit = "m")
-    fitstructure!(fig, ax; width = width - 95, maxheight = maxheight, padpt = 4)
+    _fitwindow!(fig, ax, window; width = tall ? width - 95 : width - 10, maxheight = maxheight, padpt = 4)
     return fig
 end
 
@@ -406,6 +511,40 @@ function fig_series(xs, series; xlabel = "", ylabel = "", ref = nothing, title =
         scatterlines!(ax, xs, ys; label = lab, kjl_series(i; marker = true)...)
     end
     (length(series) > 1 || ref !== nothing) && axislegend(ax; position = legendpos)
+    return fig
+end
+
+"""
+    fig_cutprofiles(profiles; width = W_FULL, height = 0.38width)
+
+Force profiles along section cuts, one panel each. A profile is a NamedTuple
+`(s, F, title, slabel, flabel, vertical = false, peaklabel)`: positions `s` along the cut and the
+force through it accumulated from the cut's start (`section_cut` node by node, `cumsum`); its
+peak is the tension a strut-and-tie model gives a tie. One series per panel, kjl_emphasis blue;
+zero gray dashed; the peak marked and labelled (`peaklabel`, default "<F> kN").
+`vertical = true` puts `s` on the vertical axis, so a vertical cut is drawn the way it stands.
+"""
+function fig_cutprofiles(profiles; width = W_FULL, height = 0.38width)
+    fig = Figure(size = (width, height))
+    for (i, p) in enumerate(profiles)
+        vert = get(p, :vertical, false)
+        ax = Axis(fig[1, i]; title = get(p, :title, ""),
+            xlabel = vert ? p.flabel : p.slabel, ylabel = vert ? p.slabel : p.flabel)
+        pts = vert ? Point2f.(p.F, p.s) : Point2f.(p.s, p.F)
+        vert ? vlines!(ax, [0.0]) : hlines!(ax, [0.0])
+        lines!(ax, pts; color = kjl_emphasis, linewidth = 1.2)
+        k = argmax(p.F)
+        scatter!(ax, [pts[k]]; color = kjl_emphasis, markersize = 5)
+        lab = get(p, :peaklabel, string(round(Int, p.F[k]), " kN"))
+        Fr = maximum(p.F) - min(0, minimum(p.F))
+        if vert                                                # room right of the peak for the label
+            text!(ax, pts[k]; text = lab, align = (:left, :center), offset = (5, 0), fontsize = 8)
+            xlims!(ax, min(0, minimum(p.F)) - 0.05Fr, maximum(p.F) + 0.75Fr)
+        else                                                   # room above it
+            text!(ax, pts[k]; text = lab, align = (:left, :bottom), offset = (4, 3), fontsize = 8)
+            ylims!(ax, min(0, minimum(p.F)) - 0.05Fr, maximum(p.F) + 0.3Fr)
+        end
+    end
     return fig
 end
 

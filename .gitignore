@@ -24,6 +24,8 @@ PROGRESS.md
 docs/MIGRATION_v1.md
 docs/MODERNIZATION.md
 docs/AUTHORING.md
+docs/shells/PLAN.md
+docs/shells/PLAN_S7.md
 
 # Documenter build artifacts
 docs/build/
@@ -32,3 +34,4 @@ examples/**/Manifest.toml
 
 # Typst sources of the example reports: kept locally (own git repo), only the PDFs are published
 examples/reports-src/
+docs/PLAN_CASES.md

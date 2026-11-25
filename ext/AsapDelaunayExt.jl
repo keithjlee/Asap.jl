@@ -11,9 +11,10 @@ The polygons enter as a planar straight-line graph of CONSTRAINED SEGMENTS
 on them), not as boundary curves. That is what lets holes touch the outline
 or each other — at a vertex, a vertex on an edge, or along a shared edge (a
 notch drawn as a hole, adjacent openings drawn as two) — which boundary curves
-cannot express. After refinement the triangles outside the material (outside
-the outline or inside a hole) are dropped, and the nodes on every input edge
-are recovered geometrically.
+cannot express. Interior `segments` (cut lines, load lines) enter the same
+graph. After refinement the triangles outside the material (outside the
+outline or inside a hole) are dropped, and the nodes on every input edge are
+recovered geometrically.
 """
 module AsapDelaunayExt
 
@@ -66,7 +67,7 @@ function _on_edge(p, poly, k, tol)
 end
 
 function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
-    holes = [], h = nothing, max_area = nothing, min_angle::Real = 25.0, points = [],
+    holes = [], segments = [], h = nothing, max_area = nothing, min_angle::Real = 25.0, points = [],
     origin = zeros(3), e1 = [1.0, 0, 0], e2 = [0.0, 1, 0], fixity::Symbol = :free,
     id::Symbol = :panel, seed::Integer = 1, reuse::AbstractVector = Asap.Node{T}[]) where {T}
     outer = _poly(outline)
@@ -92,6 +93,16 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     end
     ids = [[vid(p) for p in poly] for poly in polys]
     foreach(p -> vid((Float64(p[1]), Float64(p[2]))), points)
+    # interior segments (cut lines, load lines): both ends in the material
+    inmaterial(q) = (_inside(outer, q...) || any(k -> _on_edge(q, outer, k, tol), eachindex(outer))) &&
+                    !any(H -> _inside(H, q...) && !any(k -> _on_edge(q, H, k, tol), eachindex(H)), hs)
+    segs = map(enumerate(segments)) do (k, sg)
+        a, b = (Float64(sg[1][1]), Float64(sg[1][2])), (Float64(sg[2][1]), Float64(sg[2][2]))
+        a == b && throw(ArgumentError("mesh_polygon: segment $k has zero length"))
+        inmaterial(a) && inmaterial(b) && inmaterial(((a[1] + b[1]) / 2, (a[2] + b[2]) / 2)) ||
+            throw(ArgumentError("mesh_polygon: segment $k does not lie in the material"))
+        (vid(a), vid(b))
+    end
     # reused nodes in the panel's plane and in the material become vertices
     o, a, b = Asap._plane_axes(T, origin, e1, e2)
     nrm = cross(a, b)
@@ -99,15 +110,13 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
         d = n.position - o
         abs(dot(d, nrm)) <= tol || continue
         q = (Float64(dot(d, a)), Float64(dot(d, b)))
-        inmat = (_inside(outer, q...) || any(k -> _on_edge(q, outer, k, tol), eachindex(outer))) &&
-                !any(H -> _inside(H, q...) && !any(k -> _on_edge(q, H, k, tol), eachindex(H)), hs)
-        inmat && vid(q)
+        inmaterial(q) && vid(q)
     end
     # every input edge, split where another vertex lies on it (T-junctions); an
     # edge shared by two polygons (a hole along the outline or another hole) once
     edges = Set{NTuple{2,Int}}()
-    for poly in ids, k in eachindex(poly)
-        i, j = poly[k], poly[mod1(k + 1, length(poly))]
+    raw = [[(poly[k], poly[mod1(k + 1, length(poly))]) for poly in ids for k in eachindex(poly)]; segs]
+    for (i, j) in raw
         a, b = pts[i], pts[j]
         dx, dy = b[1] - a[1], b[2] - a[2]
         L = hypot(dx, dy)
@@ -127,8 +136,9 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     for x in eachindex(E), y in x+1:length(E)
         (a, b), (c, d) = E[x], E[y]
         _crosses(pts[a], pts[b], pts[c], pts[d], tol * scale) && throw(ArgumentError(
-            "mesh_polygon: polygon edges cross near $(pts[a]) → $(pts[b]): holes must lie inside " *
-            "the outline and must not overlap each other (touching is allowed)"))
+            "mesh_polygon: edges cross near $(pts[a]) → $(pts[b]): holes must lie inside the outline " *
+            "and must not overlap each other (touching is allowed); segments must not cross an edge or " *
+            "each other (split them at the crossing point)"))
     end
     # triangulate the segment graph (seeded: the same input gives the same mesh)
     tri = triangulate(pts; segments = edges, rng = DT.Random.Xoshiro(seed))

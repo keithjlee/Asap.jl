@@ -8,6 +8,17 @@ Pages = ["Analysis/functional.jl"]
 Private = false
 ```
 
+## Load cases
+
+Several load cases at one design state, one factorization: the plain-data case table and its
+design-dependent fixed-end forces.
+
+```@autodocs
+Modules = [Asap]
+Pages = ["Analysis/case_loads.jl"]
+Private = false
+```
+
 ## Internals
 
 The linear-solve seam of the differentiable path (the function AD rules attach to):

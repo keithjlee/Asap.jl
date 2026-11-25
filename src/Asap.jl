@@ -9,8 +9,6 @@ results (`LinearResults`, returned by `solve!`). One set of pure element
 kernels feeds both an in-place zero-allocation assembly path and a pure
 functional path (`ModelState` → `solve`) that automatic differentiation
 engines traverse natively (see `ext/AsapChainRulesExt.jl`).
-
-See `docs/MODERNIZATION.md` for the architecture and roadmap.
 """
 module Asap
 
@@ -91,6 +89,7 @@ include("Analysis/solve.jl")
 include("Analysis/functional.jl")
 include("Results/recovery.jl")
 include("Analysis/cases.jl")
+include("Analysis/case_loads.jl")      # pure-path load cases (needs ModelState, FEFTable)
 include("Results/shell_results.jl")    # after cases.jl: shell_envelope takes CaseResults
 export DofPartition, AnalysisCache
 export process!, solve!, assemble_K!, assemble_loads!
@@ -99,6 +98,7 @@ export LinearResults, displacement, reaction, element_forces, axial_force
 export ElementForceState, LoadTrace, internal_forces, InternalForces
 export shear_y, shear_z, torsion, moment_y, moment_z, local_displacements
 export LoadCombination, CaseResults, load_cases, solve_cases!, combine, Envelope, envelope
+export CaseLoads, case_loads, case_Pf, combination_weights
 export ModelState, extract_state, solve, compliance, assemble_K, assemble_Pf, fef_local
 export condensed_fef, element_fef_global
 

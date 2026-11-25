@@ -4,7 +4,7 @@ Enzyme across Asap — one case × mode per process (run via run_enzyme_matrix.s
     julia --project=examples examples/ad/enzyme_matrix.jl <case> <mode>
 
 case ∈ truss_area, truss_shape, spaceframe, frame_lineload, frame_joints,
-       springs, variable_element, shells, shells_tri, diaphragm
+       springs, variable_element, shells, shells_tri, diaphragm, cases
 mode ∈ reverse, forward
 
 Reference: Zygote. Prints one line: `RESULT case mode OK rel_err time_ms first_s`.
@@ -122,6 +122,32 @@ function case(name)
         solve!(m)
         p = OptParams(m, AbstractVariable[SpatialVariable(top[2], 0.0, -0.5, 0.5, :X), SpatialVariable(top[3], 0.0, -0.5, 0.5, :Y)])
         return x -> compliance(solve_structure(x, p), p), [0.1, -0.05]
+    elseif name == "cases"
+        # pure-path load cases (CaseLoads): a slab of quads and triangles on an edge beam and a
+        # column, three cases with design-dependent frame and shell loads; a weighted sum of the
+        # per-case compliances, in the node positions
+        conc = Material(3.0e4, 2.4e-3, 0.2)
+        slab = ShellSection(conc, 0.2)
+        P = [0.0 2.0 4.0 0.0 2.0 4.0 0.0 2.0 4.0; 0.0 0.0 0.0 2.0 2.0 2.0 4.0 4.0 4.0]
+        sm = shell_mesh(P, [(1, 2, 5, 4), (2, 3, 6, 5), (4, 5, 8), (4, 8, 7), (5, 6, 9), (5, 9, 8)], slab)
+        n = sm.nodes
+        foreach(k -> fixnode!(n[k], Bool[0, 0, 0, 0, 0, 0]), (1, 3))
+        base = Node([4.0, 4.0, -3.0], :fixed)
+        sec = Section(mat, 1e-2, 2e-4, 1e-4, 5e-5)
+        edge = FrameElement(n[7], n[8], sec); beam = FrameElement(n[8], n[9], sec); col = FrameElement(base, n[9], sec)
+        quads = filter(el -> el isa ShellElement{Float64,4}, sm.elements)
+        tris = filter(el -> el isa ShellElement{Float64,3}, sm.elements)
+        loads = AbstractLoad{Float64}[[SelfWeight(el; g = [0.0, 0, -9.81], case = :dead) for el in sm.elements]...,
+            LineLoad(edge, [0.0, 0.0, -5.0]; case = :dead), LineLoad(beam, [0.0, 0.0, -3.0]; case = :dead),
+            AreaLoad(quads[1], -2.0; case = :live), AreaLoad(tris[2], -3.0; case = :live),
+            PointLoad(edge, 0.3, [0.0, 0.0, -10.0]; case = :live),
+            NodeForce(n[9], [6.0, 0.0, 0.0]; case = :wind), LineLoad(col, [1.5, 0.0, 0.0]; case = :wind)]
+        m = Model([n; base], AbstractElement{Float64}[sm.elements..., edge, beam, col], loads)
+        solve!(m)
+        cl = case_loads(m); st = extract_state(m)
+        λ = [1.2, 1.6, 0.5]
+        x0 = vec(copy(st.X)) .+ 0.02 .* sin.(1:length(st.X))
+        return x -> dot(λ, compliance(m, ModelState{eltype(x)}(reshape(x, 3, :), st.sections), cl)), x0
     end
     error("unknown case $name")
 end

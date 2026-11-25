@@ -1,7 +1,7 @@
 # Load cases, combinations, envelopes
 
 ```@setup cases
-using Asap
+using Asap, LinearAlgebra
 steel  = Material(200e6, 77e6, 8.0, 0.3)
 wshape = Section(steel, 1e-2, 8e-5, 3e-5, 5e-7)
 ```
@@ -44,3 +44,36 @@ env = envelope(model, beam, cr,
     [strength, LoadCombination(:service, [:dead => 1.0, :live => 1.0])])
 env.x, env.lo, env.hi                       # rows: N, Vy, Mz, Vz, My, Mx
 ```
+
+## On the differentiable path
+
+The pure solve ([`solve`](@ref)`(model, state)`, the AD entry point) sees one load vector. For several
+cases at one design, build a [`CaseLoads`](@ref) table once with [`case_loads`](@ref), then solve every
+case at any design state with one factorization:
+
+```@example cases
+cl = case_loads(model)                       # every case; or case_loads(model; cases = [:dead, :live])
+state = extract_state(model)
+U = solve(model, state, cl)                  # n_dof × 3, one column per case
+compliance(model, state, cl)                 # one value per case
+```
+
+Each case's element loads are re-evaluated at the design (`loads = :design`, the default): a line load
+follows its member's length, self-weight the section, a shell pressure the element's area and
+orientation. `loads = :frozen` keeps them at the model's own state.
+
+A combination is a linear combination of the columns, with weights from
+[`combination_weights`](@ref). Its compliance is the work of the combined load on the combined
+displacement, not the weighted sum of the case compliances (compliance is quadratic in the loads):
+
+```@example cases
+λ = combination_weights(cl, strength)        # [1.2, 1.6, 0.5]
+u = U * λ                                    # ≡ combine(cr, strength).u
+free = model.cache.partition.free
+F = (cl.P - case_Pf(cl, state))[free, :]     # per-case loads at the state
+c = dot(F * λ, u[free])                      # ≡ combine(cr, strength).compliance
+```
+
+All of it differentiates with Zygote, ForwardDiff, Enzyme and Mooncake, with respect to positions, sections, shell thicknesses and end springs. The per-case frame fixed-end
+forces for force recovery are [`fef_local`](@ref)`(cl, state)`: column `j` belongs to case
+`cl.names[cl.fcase[j]]` and element `cl.fef.elem[j]`.

@@ -4,7 +4,6 @@
 #     julia --project=. test/characterization/generate_fixtures.jl
 #
 # Only regenerate deliberately: a diff in fixtures.jl is a behavior change.
-# See docs/MODERNIZATION.md (Phase 0).
 
 using Asap
 using LinearAlgebra

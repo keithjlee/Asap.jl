@@ -12,6 +12,7 @@ Units: kN, m.
 | `04_precast_joints.jl` | Stacked precast panels joined by `LinkElement`s: drift vs joint shear stiffness, joint axial-force distribution (tie demand) |
 | `05_thickness_design.jl` | Design sensitivities (Zygote, implicit `solution_tangents`, finite differences) and an optimality-criteria thickness redistribution with AsapOptim's `ThicknessVariable` |
 | `06_d_region.jl` | A **disturbed region**: a deep transfer panel with a duct and an opening, meshed with triangles (`mesh_polygon`), bearings and a column load on boundary segments, reactions per bearing, principal membrane forces as the strut-and-tie sketch, and a mesh study (reactions converge, corner peaks do not) |
+| `07_dapped_end.jl` | A **dapped-end beam**: interior cut lines in the mesh (`mesh_polygon(…; segments)`), bearing pads as pressures with rigid-body supports only, exact cut forces (`section_cut`) at the nib/beam interface, the nib tie and the hanger as integrated cut forces, the crack direction at the re-entrant corner, and a mesh study (ties converge, the corner peak does not) |
 
 `../ad/ad_backends_shells.jl` compares Zygote, Enzyme (reverse) and Mooncake through shells on the same
 models (all agree to 1e-16; Enzyme fastest).
