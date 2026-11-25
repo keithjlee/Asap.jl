@@ -132,7 +132,7 @@ const COOK_REF = 23.96                   # right-edge midpoint (literature)
         el = ShellElement(n, sec, :wall)
         @test Asap.area(el) ≈ 3.0
         @test Asap.local_frame(el)[3, :] ≈ [0, -1, 0]        # XZ wall, CCW about −y
-        @test_throws ArgumentError ShellElement((n[1], n[2], n[3]), sec)
+        @test_throws ArgumentError ShellElement((n[1], n[2]), sec)          # 2 nodes: not a shell
         @test_throws ArgumentError ShellElement((n[1], n[1], n[3], n[4]), sec)
         bad = ShellElement((n[1], n[3], n[2], n[4]), sec)     # bow-tie ordering
         @test_throws ArgumentError process!(Model(n, AbstractElement{Float64}[bad],

@@ -1,0 +1,312 @@
+#=
+General planar shell meshes: an array constructor for meshes from any mesher
+(triangles and quadrilaterals), boundary and segment queries, consistent edge
+loads along boundary segments, and reaction totals over node groups — the
+pieces a disturbed-region (strut-and-tie) analysis of a panel needs. The
+polygon mesher `mesh_polygon` is provided by the DelaunayTriangulation.jl
+extension (`AsapDelaunayExt`); this file only declares it.
+=#
+
+"""
+    AbstractShellMesh{T}
+
+Supertype of the shell mesh containers: [`WallMesh`](@ref) (structured walls
+with rectangular openings) and [`ShellMesh`](@ref) (general planar meshes).
+Every subtype carries `nodes::Vector{Node{T}}` and an element vector of
+[`ShellElement`](@ref)s, ready for a `Model`.
+"""
+abstract type AbstractShellMesh{T} end
+
+"""
+    ShellMesh{T, E<:ShellElement} <: AbstractShellMesh{T}
+
+A planar shell mesh in 3D space: nodes, elements and the boundary, with the
+in-plane coordinates kept for geometric queries. Returned by
+[`shell_mesh`](@ref) (from arrays of points and cells, e.g. another mesher's
+output) and [`mesh_polygon`](@ref) (DelaunayTriangulation.jl extension).
+
+# Fields
+- `nodes::Vector{Node{T}}`: mesh nodes; node `i` sits at `points[:, i]`
+- `elements::Vector{E}`: shell elements, counter-clockwise about `e₃`
+- `points::Matrix{T}`: 2 × n in-plane coordinates [length]
+- `boundary::Vector{Vector{Vector{Int}}}`: boundary curves → edges → node
+  indices in order. Curve 1 is the outline (counter-clockwise), curves 2… the
+  holes (clockwise). For [`mesh_polygon`](@ref) each edge of an input polygon
+  is its own entry, so `boundary[c][k]` lists every mesh node on input edge
+  `k` of curve `c`, end to end; for [`shell_mesh`](@ref) each closed loop is
+  a single entry.
+- `origin`, `e1`, `e2`: the plane: node `i` is at `origin + x·e1 + y·e2`
+  (orthonormal `e1`, `e2`; element normals are `e3 = e1 × e2`)
+
+Use [`boundary_nodes`](@ref), [`nodes_on_segment`](@ref), [`edge_loads`](@ref)
+(segment form), [`elements_in`](@ref) and [`total_reaction`](@ref) to place
+supports and loads and to read results by region.
+"""
+struct ShellMesh{T,E<:ShellElement} <: AbstractShellMesh{T}
+    nodes::Vector{Node{T}}
+    elements::Vector{E}
+    points::Matrix{T}
+    boundary::Vector{Vector{Vector{Int}}}
+    origin::SVector{3,T}
+    e1::SVector{3,T}
+    e2::SVector{3,T}
+end
+
+function _plane_axes(::Type{T}, origin, e1, e2) where {T}
+    o = SVector{3,T}(origin)
+    a = normalize(SVector{3,T}(e1))
+    b = SVector{3,T}(e2) - dot(SVector{3,T}(e2), a) * a
+    norm(b) > sqrt(eps(T)) || throw(ArgumentError("e1 and e2 must not be parallel"))
+    return o, a, normalize(b)
+end
+
+_points2(P::AbstractMatrix) = size(P, 1) == 2 ? P :
+    throw(DimensionMismatch("points must be 2 × n (in-plane coordinates)"))
+_points2(P::AbstractVector) = reduce(hcat, [collect(float.(p))[1:2] for p in P])
+
+"""
+    shell_mesh(points, cells, section; origin = [0, 0, 0], e1 = [1, 0, 0], e2 = [0, 1, 0],
+               fixity = :free, id = :mesh) -> ShellMesh
+
+Build shell elements from a planar mesh given as arrays — the output of any
+mesher (Gmsh, Triangle, a CAD export, a hand-made grid).
+
+- `points`: 2 × n matrix (or vector of 2-tuples) of in-plane coordinates [length]
+- `cells`: vector of 3- or 4-tuples (or vectors) of 1-based point indices;
+  triangles and quadrilaterals may mix. Orientation is normalized: cells are
+  reordered counter-clockwise in the plane, so element normals all point
+  along `e₃ = e1 × e2`.
+- `section`: the shell section of every element
+- `origin`, `e1`, `e2`: the plane in global coordinates (`e2` is
+  orthogonalized against `e1`)
+- `fixity`: fixity of every node (`:free` by default; place supports with
+  [`fixnode!`](@ref) on [`nodes_on_segment`](@ref))
+
+Points no cell uses are dropped. The boundary is recovered as closed loops of
+edges used by a single cell.
+"""
+function shell_mesh(points, cells, section::AbstractShellSection{T};
+    origin = zeros(3), e1 = [1.0, 0, 0], e2 = [0.0, 1, 0], fixity::Symbol = :free,
+    id::Symbol = :mesh) where {T}
+    P = Matrix{T}(_points2(points))
+    o, a, b = _plane_axes(T, origin, e1, e2)
+    used = sort!(unique!(reduce(vcat, [collect(Int, c) for c in cells])))
+    remap = Dict(old => new for (new, old) in enumerate(used))
+    Q = P[:, used]
+    nodes = [Node(o + Q[1, i] * a + Q[2, i] * b, fixity) for i in axes(Q, 2)]
+    oriented = map(cells) do c
+        ids = [remap[i] for i in c]
+        length(ids) in (3, 4) || throw(ArgumentError("cells must have 3 or 4 nodes"))
+        _signed_area2(Q, ids) < 0 ? reverse(ids) : ids
+    end
+    els = [ShellElement(Tuple(nodes[ids]), section, id) for ids in oriented]
+    return ShellMesh(nodes, identity.(els), Q, [[loop] for loop in _boundary_loops(oriented, Q)], o, a, b)
+end
+
+_signed_area2(Q, ids) = sum(k -> Q[1, ids[k]] * Q[2, ids[mod1(k + 1, length(ids))]] -
+                                 Q[1, ids[mod1(k + 1, length(ids))]] * Q[2, ids[k]], eachindex(ids))
+
+# closed boundary loops (node indices, first == last) from oriented cells: an
+# edge used by exactly one cell is a boundary edge, followed tail to head
+function _boundary_loops(cells, Q)
+    count = Dict{Tuple{Int,Int},Int}()
+    for c in cells, k in eachindex(c)
+        e = minmax(c[k], c[mod1(k + 1, length(c))])
+        count[e] = get(count, e, 0) + 1
+    end
+    next = Dict{Int,Int}()
+    for c in cells, k in eachindex(c)
+        i, j = c[k], c[mod1(k + 1, length(c))]
+        count[minmax(i, j)] == 1 && (next[i] = j)
+    end
+    loops = Vector{Vector{Int}}()
+    while !isempty(next)
+        start = minimum(keys(next))
+        loop = [start]
+        i = start
+        while true
+            j = pop!(next, i)
+            push!(loop, j)
+            j == start && break
+            i = j
+        end
+        push!(loops, loop)
+    end
+    # outline first: the loop enclosing the largest area (counter-clockwise; holes
+    # come out clockwise because cells are counter-clockwise)
+    sort!(loops; by = l -> -abs(_signed_area2(Q, l[1:end-1])))
+    return loops
+end
+
+"""
+    boundary_nodes(mesh::ShellMesh, curve = 1, edge = nothing) -> Vector{Node}
+
+Nodes on boundary `curve` (1 = outline, 2… = holes), in order: the whole
+closed curve (`edge = nothing`, first node not repeated), or only input edge
+`edge` of that curve (end nodes included) for a [`mesh_polygon`](@ref) mesh.
+"""
+function boundary_nodes(mesh::ShellMesh, curve::Int = 1, edge::Union{Nothing,Int} = nothing)
+    edges = mesh.boundary[curve]
+    if edge === nothing
+        ids = Int[]
+        for e in edges
+            append!(ids, isempty(ids) ? e : e[2:end])
+        end
+        length(ids) > 1 && ids[end] == ids[1] && pop!(ids)
+        return mesh.nodes[ids]
+    end
+    return mesh.nodes[edges[edge]]
+end
+
+"""
+    nodes_on_segment(mesh::ShellMesh, a, b; tol = 1e-8·scale) -> Vector{Node}
+
+Mesh nodes lying on the in-plane segment from `a` to `b` (2-vectors in the
+mesh's plane coordinates), ordered from `a` to `b` — e.g. the nodes of a
+bearing or of a loaded edge. Make sure the mesh has vertices at `a` and `b`
+(polygon corners or extra points of [`mesh_polygon`](@ref)).
+"""
+function nodes_on_segment(mesh::ShellMesh{T}, a, b; tol = nothing) where {T}
+    A, B = SVector{2,T}(a), SVector{2,T}(b)
+    d = B - A
+    L = norm(d)
+    L > 0 || throw(ArgumentError("segment end points coincide"))
+    scale = maximum(abs, mesh.points)
+    τ = tol === nothing ? 1e-8 * max(scale, L) : tol
+    hits = Tuple{T,Int}[]
+    for i in axes(mesh.points, 2)
+        p = SVector{2,T}(mesh.points[1, i], mesh.points[2, i]) - A
+        t = dot(p, d) / L
+        -τ <= t <= L + τ || continue
+        abs(p[1] * d[2] - p[2] * d[1]) / L <= τ && push!(hits, (t, i))
+    end
+    sort!(hits)
+    return mesh.nodes[last.(hits)]
+end
+
+"""
+    edge_loads(mesh::ShellMesh, a, b, w; case = :LC1) -> Vector{NodeLoad}
+
+Consistent nodal loads of a uniform line traction `w` [force/length] (global
+3-vector) along the boundary segment `a → b` of a mesh (in-plane
+coordinates): the element-edge loads ([`edge_loads`](@ref)) of every
+boundary element edge whose end nodes both lie on the segment, so forces and
+the drilling moments a drilling membrane needs are both included.
+"""
+function edge_loads(mesh::ShellMesh{T}, a, b, w::AbstractVector; case::Symbol = :LC1) where {T}
+    on = Set(nodes_on_segment(mesh, a, b))
+    loads = NodeLoad{T}[]
+    for el in mesh.elements, k in 1:length(el.nodes)
+        nJ, nK = el.nodes[k], el.nodes[mod1(k + 1, length(el.nodes))]
+        (nJ in on && nK in on) || continue
+        append!(loads, edge_loads(el, k, w; case = case))
+    end
+    isempty(loads) && throw(ArgumentError("no element edge lies on the segment $(a) → $(b)"))
+    return loads
+end
+
+"""
+    edge_loads(el::ShellElement{T,3}, edge, w; case = :LC1) -> Vector{NodeLoad}
+
+Triangle version (edges 1…3, edge k joins nodes k → k+1): forces `w·l/2` at
+both ends and drilling moments `∓α_b·(w·n)·l²/12` with α_b = 3/2, the
+ANDES-OPT force-lumping parameter (Felippa 2003), where `n` is the edge's
+outward in-plane normal. With these moments a uniform traction reproduces a
+uniform stress field exactly (patch test).
+"""
+function edge_loads(el::ShellElement{T,3}, edge::Int, w::AbstractVector; case::Symbol = :LC1) where {T}
+    1 <= edge <= 3 || throw(ArgumentError("edge must be 1…3"))
+    nJ, nK = el.nodes[edge], el.nodes[mod1(edge + 1, 3)]
+    e3 = local_frame(el)[3, :]
+    d = nK.position - nJ.position
+    l = norm(d)
+    n = normalize(cross(d, e3))
+    ws = SVector{3,T}(w)
+    F = ws * (l / 2)
+    m = (_ANDES_ALPHA_B * dot(ws, n) * l^2 / 12) * SVector{3,T}(e3)
+    return NodeLoad{T}[NodeForce(nJ, F; case = case), NodeForce(nK, F; case = case),
+                       NodeMoment(nJ, -m; case = case), NodeMoment(nK, m; case = case)]
+end
+
+"""
+    elements_in(mesh::ShellMesh, polygon) -> Vector{ShellElement}
+
+Elements whose centroid lies inside `polygon` (vector of in-plane 2-points or
+2 × n matrix) — e.g. the patch under a bearing plate for an
+[`AreaLoad`](@ref), or a region to read stresses from.
+"""
+function elements_in(mesh::ShellMesh{T}, polygon) where {T}
+    P = _points2(polygon)
+    idx = Dict(n => i for (i, n) in enumerate(mesh.nodes))
+    return filter(mesh.elements) do el
+        c = sum(n -> mesh.points[:, idx[n]], el.nodes) / length(el.nodes)
+        _inside(P, c[1], c[2])
+    end
+end
+
+# even–odd ray casting
+function _inside(P, x, y)
+    inside = false
+    n = size(P, 2)
+    for k in 1:n
+        xi, yi = P[1, k], P[2, k]
+        xj, yj = P[1, mod1(k + 1, n)], P[2, mod1(k + 1, n)]
+        ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi) && (inside = !inside)
+    end
+    return inside
+end
+
+"""
+    total_reaction(results, nodes; about = centroid) -> (F, M)
+
+Sum of the support reactions over a group of nodes — e.g. one bearing of a
+panel: the resultant force `F` and its moment `M` about `about` (default: the
+centroid of the nodes), global axes. Works with any `LinearResults` (a case
+or a combination).
+"""
+function total_reaction(res::LinearResults{T}, nodes::AbstractVector; about = nothing) where {T}
+    c = about === nothing ? sum(n -> n.position, nodes) / length(nodes) : SVector{3,T}(about)
+    F = zero(SVector{3,T}); M = zero(SVector{3,T})
+    for n in nodes
+        r = reaction(res, n)
+        f = SVector{3,T}(r[1], r[2], r[3])
+        F += f
+        M += SVector{3,T}(r[4], r[5], r[6]) + cross(n.position - c, f)
+    end
+    return F, M
+end
+
+"""
+    circle_polygon(center, radius; n = 32) -> Vector{NTuple{2}}
+
+A regular `n`-gon inscribed in a circle (counter-clockwise), for circular
+openings in [`mesh_polygon`](@ref). Choose `n` from a chord tolerance δ:
+`n ≥ π / acos(1 − δ/radius)`.
+"""
+circle_polygon(center, radius::Real; n::Int = 32) =
+    [(center[1] + radius * cospi(2k / n), center[2] + radius * sinpi(2k / n)) for k in 0:n-1]
+
+"""
+    mesh_polygon(outline, section; holes = [], h = nothing, max_area = nothing,
+                 min_angle = 25, points = [], origin = [0, 0, 0], e1 = [1, 0, 0],
+                 e2 = [0, 1, 0], fixity = :free, id = :panel) -> ShellMesh
+
+Triangulate a planar polygon with polygonal holes into triangular
+[`ShellElement`](@ref)s: constrained Delaunay with quality refinement
+(minimum angle `min_angle` [degrees]; maximum triangle area `max_area`, or a
+target edge length `h`). **Requires DelaunayTriangulation.jl**
+(`using DelaunayTriangulation` activates the extension).
+
+- `outline`: polygon vertices in plane coordinates (vector of 2-points or
+  2 × n), any orientation; include as vertices every point where a support or
+  a load starts or ends, so meshes nodes land there
+- `holes`: polygons strictly inside the outline (any orientation); circles via
+  [`circle_polygon`](@ref)
+- `points`: extra interior points that must become nodes (point loads)
+- `origin`, `e1`, `e2`, `fixity`, `id`: as in [`shell_mesh`](@ref)
+
+Each polygon edge is tracked through refinement: `mesh.boundary[c][k]` holds
+every node on edge `k` of curve `c` (1 = outline, 1 + j = hole j), and
+[`boundary_nodes`](@ref)`(mesh, c, k)` returns them.
+"""
+function mesh_polygon end

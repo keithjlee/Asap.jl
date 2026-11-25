@@ -90,6 +90,7 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
     inactive = Set(cache.partition.inactive)
     tracked = Any[]
     stracked = Any[]
+    ttracked = Any[]
     static = zeros(T, length(cache.Pf))
 
     for load in model.loads
@@ -100,19 +101,19 @@ function assemble_loads!(cache::AnalysisCache{T}, model::Model{T};
             static .+= cache.Pf .- before
         elseif load isa ElementLoad && load.element isa ShellElement
             _apply_load!(cache, load, inactive)
-            push!(stracked, load)
+            push!(length(nodes(load.element)) == 3 ? ttracked : stracked, load)
         else
             _apply_load!(cache, load, inactive)
             load isa ElementLoad && push!(tracked, load)
         end
     end
-    cache.fef = _build_fef_table(T, tracked, length(cache.Pf), static, stracked)
+    cache.fef = _build_fef_table(T, tracked, length(cache.Pf), static, stracked, ttracked)
     return cache.P, cache.Pf
 end
 
 # the plain-data table of state-tracked element loads (FrameElement only)
 function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::Vector{T},
-    sloads::Vector{Any} = Any[]) where {T}
+    sloads::Vector{Any} = Any[], tloads::Vector{Any} = Any[]) where {T}
     n = length(loads)
     elem = Vector{Int}(undef, n); i1 = similar(elem); i2 = similar(elem)
     roll = Vector{T}(undef, n); ends = Vector{Any}(undef, n)
@@ -146,7 +147,24 @@ function _build_fef_table(::Type{T}, loads::Vector{Any}, n_global::Int, static::
         end
     end
     sscatter = sparse(SI, SJ, ones(T, length(SI)), n_global, 24ns)
-    return FEFTable{T}(loads, elem, i1, i2, roll, ends, scatter, static, sloads, selem, snodes, sscatter)
+    nt = length(tloads)
+    telem = Vector{Int}(undef, nt)
+    tnodes = Matrix{Int}(undef, 3, nt)
+    TI = Int[]; TJ = Int[]
+    for (j, load) in enumerate(tloads)
+        el = load.element::ShellElement
+        telem[j] = el.index
+        for k in 1:3
+            tnodes[k, j] = el.nodes[k].index
+        end
+        g = element_global_dofs(el)
+        for k in 1:18
+            push!(TI, g[k]); push!(TJ, 18(j - 1) + k)
+        end
+    end
+    tscatter = sparse(TI, TJ, ones(T, length(TI)), n_global, 18nt)
+    return FEFTable{T}(loads, elem, i1, i2, roll, ends, scatter, static, sloads, selem, snodes, sscatter,
+        tloads, telem, tnodes, tscatter)
 end
 
 """
@@ -249,13 +267,13 @@ end
 # shells: uniform traction → consistent (condensed) local load; q̃ = −f is
 # stored locally for force recovery and rotated blockwise into Pf
 function _apply_shell_load!(cache::AnalysisCache{T}, load::ElementLoad{T},
-    el::ShellElement{T,4}) where {T}
+    el::ShellElement{T,N}) where {T,N}
     X = map(n -> n.position, el.nodes)
     q̃, R = shell_load_vector(el.section, X..., SVector{3,T}(_shell_traction(load, el)))
     cache.q_local[el.index][1] .+= q̃
-    Qg = _rotate24(R', q̃)
+    Qg = _rotate_nodes(R', q̃)
     g = element_global_dofs(el)
-    @inbounds for i in 1:24
+    @inbounds for i in 1:6N
         cache.Pf[g[i]] += Qg[i]
     end
     return nothing

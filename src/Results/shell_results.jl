@@ -5,29 +5,34 @@ Shell results: element nodal forces, stress resultants, section cuts.
 # global node-major 6N displacement vector of an element
 _element_u(res::LinearResults, el::AbstractElement) = res.u[element_global_dofs(el)]
 
-# shell: element nodal forces in LOCAL axes f = K_l·a_l + q̃ (24-vector), and
-# the fixed-DOF entries accumulated into the reactions (global)
+# shell (any node count N): element nodal forces in LOCAL axes f = K_l·a_l + q̃
+# (6N-vector), and the fixed-DOF entries accumulated into the reactions (global)
 function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
-    el::ShellElement{T,4}, u::Vector{T}) where {T}
+    el::ShellElement{T,N}, u::Vector{T}) where {T,N}
     X = map(n -> n.position, el.nodes)
     R = shell_frame(X...)[1]
     g = element_global_dofs(el)
     Ke = shell_stiffness(el.section, X...)
-    Qg = _rotate24(R', SVector{24,T}(cache.q_local[el.index][1]))
-    f_global = Ke * SVector{24,T}(ntuple(i -> u[g[i]], 24)) + Qg
-    @inbounds for i in 1:24
+    Qg = _rotate_nodes(R', SVector{6N,T}(cache.q_local[el.index][1]))
+    f_global = Ke * SVector{6N,T}(ntuple(i -> u[g[i]], Val(6N))) + Qg
+    @inbounds for i in 1:6N
         isfixed[g[i]] && (reactions[g[i]] += f_global[i])
     end
-    return Vector{T}(_rotate24(R, f_global))
+    return Vector{T}(_rotate_nodes(R, f_global))
 end
 
 """
     shell_resultants(model, el::ShellElement; at = (0.0, 0.0), results = model.results,
                      factors = nothing) -> NamedTuple
 
-Stress resultants of a solved shell element at natural coordinates
-`at = (ξ, η) ∈ [−1, 1]²` (default: the element centre), in the element's
-local axes ([`shell_frame`](@ref)):
+Stress resultants of a solved shell element at a point `at` (default: the
+element centre), in the element's local axes ([`shell_frame`](@ref)):
+
+- quadrilateral: natural coordinates `at = (ξ, η) ∈ [−1, 1]²`
+- triangle: triangular coordinates `at = (r, s)` (node 1 at (0, 0), node 2 at
+  (1, 0), node 3 at (0, 1); centroid (1/3, 1/3))
+
+Fields:
 
 - `N = (Nxx, Nyy, Nxy)` [force/length] — membrane forces, tension positive
 - `M = (Mxx, Myy, Mxy)` [force·length/length] — bending/twisting moments
@@ -43,8 +48,9 @@ Element centres are the superconvergent sampling points of the bilinear
 fields; corner values are extrapolations — smooth them only deliberately.
 """
 function shell_resultants(model::Model{T}, el::ShellElement{T,4};
-    at = (0.0, 0.0), results::Union{Nothing,LinearResults{T}} = nothing,
+    at = nothing, results::Union{Nothing,LinearResults{T}} = nothing,
     factors::Union{Nothing,Dict{Symbol,T}} = nothing) where {T}
+    at = at === nothing ? (0.0, 0.0) : at
     res = results === nothing ? model.results::LinearResults{T} : results
     X = map(n -> n.position, el.nodes)
     R, xy, _ = shell_frame(X...)
@@ -60,10 +66,21 @@ function shell_resultants(model::Model{T}, el::ShellElement{T,4};
     return (N = r.N, M = r.M, Q = r.Q, frame = R)
 end
 
+function shell_resultants(model::Model{T}, el::ShellElement{T,3};
+    at = nothing, results::Union{Nothing,LinearResults{T}} = nothing,
+    factors::Union{Nothing,Dict{Symbol,T}} = nothing) where {T}
+    at = at === nothing ? (1 / 3, 1 / 3) : at
+    res = results === nothing ? model.results::LinearResults{T} : results
+    X = map(n -> n.position, el.nodes)
+    R, xy, _ = shell_frame(X...)
+    a = _rotate18(R, SVector{18,T}(_element_u(res, el)))
+    r = shell_resultants_local(el.section, xy, a; at = at)
+    return (N = r.N, M = r.M, Q = r.Q, frame = R)
+end
+
 # global nodal forces (6 per node, nodes(el) order) of any supported element
-function _global_nodal_forces(res::LinearResults{T}, el::ShellElement{T,4}) where {T}
-    R = local_frame(el)
-    return _rotate24(R', SVector{24,T}(element_forces(res, el)))
+function _global_nodal_forces(res::LinearResults{T}, el::ShellElement{T,N}) where {T,N}
+    return _rotate_nodes(local_frame(el)', SVector{6N,T}(element_forces(res, el)))
 end
 function _global_nodal_forces(res::LinearResults{T}, el::Union{FrameElement,TrussElement}) where {T}
     return _rotate12(local_frame(el)', SVector{12,T}(element_forces(res, el)))
@@ -132,7 +149,7 @@ function section_cut(model::Model{T}, elements::AbstractVector, cut_nodes::Abstr
 end
 
 """
-    shell_envelope(model, el::ShellElement, cr::CaseResults, combos; at = (0.0, 0.0)) -> NamedTuple
+    shell_envelope(model, el::ShellElement, cr::CaseResults, combos; at = centre) -> NamedTuple
 
 Component-wise extrema of the stress resultants of `el` at `at` over the load
 combinations `combos` (the shell counterpart of [`envelope`](@ref)): fields
@@ -140,8 +157,8 @@ combinations `combos` (the shell counterpart of [`envelope`](@ref)): fields
 `Qmin` (2-vectors), each combination evaluated exactly by superposition
 ([`combine`](@ref)) with its case factors.
 """
-function shell_envelope(model::Model{T}, el::ShellElement{T,4}, cr::CaseResults{T},
-    combos::Vector{<:LoadCombination}; at = (0.0, 0.0)) where {T}
+function shell_envelope(model::Model{T}, el::ShellElement, cr::CaseResults{T},
+    combos::Vector{<:LoadCombination}; at = nothing) where {T}
     isempty(combos) && throw(ArgumentError("need at least one combination to envelope"))
     rs = [shell_resultants(model, el; at = at, results = combine(cr, c), factors = factor_dict(c))
           for c in combos]

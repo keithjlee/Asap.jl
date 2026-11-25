@@ -66,7 +66,7 @@ end
 
 # general structured shell mesh: `X(i, j)` gives the 3D position of node (i, j);
 # `fix(i, j)` returns a 6-Bool fixity vector (true = free) or `nothing` (all free)
-function shell_mesh(nx, ny, X, sec; fix = (i, j) -> nothing)
+function grid_shell_mesh(nx, ny, X, sec; fix = (i, j) -> nothing)
     grid = Matrix{Node{Float64}}(undef, nx + 1, ny + 1)
     for i in 0:nx, j in 0:ny
         f = fix(i, j)
@@ -96,7 +96,7 @@ function square_plate(n; a = 1.0, t = 0.01, E = 1.0e4, ν = 0.3, edge = :ss, poi
     onedge(i, j) = i == 0 || j == 0 || i == n || j == n
     fix(i, j) = onedge(i, j) ? (edge == :ss ? Bool[0, 0, 0, 1, 1, 0] : Bool[0, 0, 0, 0, 0, 0]) :
                 Bool[0, 0, 1, 1, 1, 0]
-    grid, els = shell_mesh(n, n, (i, j) -> (a * i / n, a * j / n, 0.0), sec; fix = fix)
+    grid, els = grid_shell_mesh(n, n, (i, j) -> (a * i / n, a * j / n, 0.0), sec; fix = fix)
     loads = point ? AbstractLoad{Float64}[NodeForce(grid[n÷2+1, n÷2+1], [0.0, 0.0, -1.0])] :
             lumped_area_loads(els, [0.0, 0.0, -1.0])
     m = Model(vec(grid), els, loads)
@@ -121,7 +121,7 @@ function scordelis_lo(n)
         j == 0 && (f[2] = f[4] = f[6] = false)                # crown symmetry: uy = θx = θz = 0
         return collect(f)
     end
-    grid, els = shell_mesh(n, n, X, sec; fix = fix)
+    grid, els = grid_shell_mesh(n, n, X, sec; fix = fix)
     m = Model(vec(grid), els, lumped_area_loads(els, [0.0, 0.0, -90.0]))
     solve!(m)
     return -displacement(m.results, grid[n+1, n+1])[3]

@@ -232,6 +232,7 @@ stateful `cache.Pf` to rounding.
 """
 function assemble_Pf(cache::AnalysisCache, state::ModelState)
     t = cache.fef
+    isempty(t.tloads) || return _assemble_Pf_tri(cache, state)
     isempty(t.loads) && isempty(t.sloads) && return cache.Pf
     isempty(t.sloads) && return t.static + _frame_fef(t, state)
     isempty(t.loads) && return t.static + _shell_fef(t, state)
@@ -261,6 +262,25 @@ function _shell_fef(t::FEFTable, state::ModelState)
     return t.sscatter * reduce(vcat, Q)
 end
 
+# models with triangular shell loads (kept out of `assemble_Pf`'s quad/frame
+# body, which Enzyme has been verified on)
+function _assemble_Pf_tri(cache::AnalysisCache, state::ModelState)
+    t = cache.fef
+    P = t.static + _shell3_fef(t, state)
+    P = isempty(t.loads) ? P : P + _frame_fef(t, state)
+    return isempty(t.sloads) ? P : P + _shell_fef(t, state)
+end
+
+function _shell3_fef(t::FEFTable, state::ModelState)
+    Q = map(eachindex(t.tloads)) do j
+        sec = state.sections[t.telem[j]]
+        X = (_position(state.X, t.tnodes[1, j]), _position(state.X, t.tnodes[2, j]),
+             _position(state.X, t.tnodes[3, j]))
+        _shell_fef_global(t.tloads[j], sec, X)
+    end
+    return t.tscatter * reduce(vcat, Q)
+end
+
 function _shell_fef_global(load, sec, X)
     qg, ql = _shell_traction_parts(load, sec)
     return _shell_fef_plain(first(_shell_rigidities(sec)), qg, ql, X...)
@@ -278,6 +298,13 @@ function _shell_fef_plain(A, qg, ql, X1, X2, X3, X4)
     corr = K16[_SONE12, b] * (K16[b, b] \ fb)
     Δ = vcat(corr, zero(eltype(corr)))[_IDX_MEMBRANE]
     return _rotate24(R', -(f24 - Δ))
+end
+
+# triangle: lumped (exact work-equivalent) load, no internal modes
+function _shell_fef_plain(A, qg, ql, X1, X2, X3)
+    R, xy, _ = shell_frame(X1, X2, X3)
+    q = qg + R' * ql
+    return _rotate18(R', -_tri_consistent_load(xy, R * q))
 end
 
 """
@@ -307,7 +334,7 @@ end
 function _design_loads(cache::AnalysisCache, loads::Symbol)
     loads === :design || loads === :frozen ||
         throw(ArgumentError("loads must be :design or :frozen, got :$loads"))
-    return loads === :design && !(isempty(cache.fef.loads) && isempty(cache.fef.sloads))
+    return loads === :design && !(isempty(cache.fef.loads) && isempty(cache.fef.sloads) && isempty(cache.fef.tloads))
 end
 
 # the reduced solve, behind a function barrier: each caller branch passes a

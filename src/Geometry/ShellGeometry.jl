@@ -9,7 +9,9 @@ column-per-item, ready for Makie's `mesh`/`poly`/`arrows`.
 - `nodes::Matrix{Float64}`: 3 × n_nodes positions (model node order; all
   nodes, so `quads` index directly)
 - `disp::Matrix{Float64}`: 3 × n_nodes translational displacements
-- `quads::Matrix{Int}`: 4 × n_shells node indices (counter-clockwise)
+- `quads::Matrix{Int}`: 4 × n_shells node indices (counter-clockwise); a
+  triangle repeats its third node in row 4 (a degenerate quad, which polygon
+  plotting draws as the triangle). [`shell_faces`](@ref) gives triangles.
 - `elements::Vector{Int}`: model element index of each shell
 - `centers`, `normals`: 3 × n_shells element centroids and unit normals
 - `frames::Vector{SMatrix{3,3,Float64,9}}`: local axes (rows e₁, e₂, e₃)
@@ -57,8 +59,9 @@ function ShellGeo(model::Model{Float64}; results = model.results, factors = noth
     N1 = zeros(ns); N2 = zeros(ns); θ = zeros(ns); thick = fill(NaN, ns)
     for (k, e) in enumerate(idx)
         el = model.elements[e]
-        quads[:, k] = [n.index for n in el.nodes]
-        centers[:, k] = sum(n -> n.position, el.nodes) / 4
+        ids = [n.index for n in el.nodes]
+        quads[:, k] = length(ids) == 4 ? ids : [ids; ids[3]]
+        centers[:, k] = sum(n -> n.position, el.nodes) / length(el.nodes)
         r = shell_resultants(model, el; results = res, factors = factors)
         frames[k] = r.frame
         normals[:, k] = r.frame[3, :]
@@ -81,10 +84,44 @@ function nodal_average(g::ShellGeo, values::AbstractVector)
     length(values) == size(g.quads, 2) || throw(DimensionMismatch("one value per shell element"))
     acc = zeros(size(g.nodes, 2)); cnt = zeros(Int, size(g.nodes, 2))
     for k in axes(g.quads, 2), a in 1:4
+        a == 4 && g.quads[4, k] == g.quads[3, k] && continue     # triangle
         acc[g.quads[a, k]] += values[k]
         cnt[g.quads[a, k]] += 1
     end
     return [c > 0 ? s / c : 0.0 for (s, c) in zip(acc, cnt)]
+end
+
+"""
+    shell_faces(g::ShellGeo) -> Matrix{Int}
+
+All shell faces as triangles (3 × n_faces node indices, counter-clockwise):
+each quadrilateral split along its 1–3 diagonal, each triangle as is. The
+element of face `f` is `g.elements[shell_face_owner(g)[f]]`. Ready for
+Makie's `mesh(g.nodes', shell_faces(g)')`.
+"""
+function shell_faces(g::ShellGeo)
+    F = Int[]
+    for k in axes(g.quads, 2)
+        q = view(g.quads, :, k)
+        append!(F, (q[1], q[2], q[3]))
+        q[4] == q[3] || append!(F, (q[1], q[3], q[4]))
+    end
+    return reshape(F, 3, :)
+end
+
+"""
+    shell_face_owner(g::ShellGeo) -> Vector{Int}
+
+For each face of [`shell_faces`](@ref), the column `k` of the ShellGeo arrays
+(element-wise fields such as `g.N1[k]`) it belongs to.
+"""
+function shell_face_owner(g::ShellGeo)
+    o = Int[]
+    for k in axes(g.quads, 2)
+        push!(o, k)
+        g.quads[4, k] == g.quads[3, k] || push!(o, k)
+    end
+    return o
 end
 
 """

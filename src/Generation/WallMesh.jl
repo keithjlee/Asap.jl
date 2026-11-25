@@ -16,7 +16,7 @@ openings, produced by [`mesh_wall`](@ref). The wall's own 2D coordinates are
 - `cells::Matrix{Int}`: element index of grid cell `(i, j)` (0 = opening)
 - `origin`, `along`, `up`: placement
 """
-struct WallMesh{T,S<:AbstractShellSection{T}}
+struct WallMesh{T,S<:AbstractShellSection{T}} <: AbstractShellMesh{T}
     nodes::Vector{Node{T}}
     elements::Vector{ShellElement{T,4,S}}
     s::Vector{T}

@@ -61,7 +61,9 @@ contribute a constant `static` vector, frozen at the model's stored values.
 - `sloads`, `selem`, `snodes`, `sscatter`: the SHELL surface loads
   (`AreaLoad`, `SelfWeight` on `ShellElement`s), re-evaluated per state:
   model element index, the 4 node indices (4 × n), and the
-  `n_global × 24·n` scatter of their global 24-vectors
+  `n_global × 24·n` scatter of their global 24-vectors (quadrilaterals)
+- `tloads`, `telem`, `tnodes`, `tscatter`: the same for TRIANGULAR shells
+  (3 × n node indices, `n_global × 18·n` scatter)
 """
 struct FEFTable{T}
     loads::Vector{Any}
@@ -76,10 +78,15 @@ struct FEFTable{T}
     selem::Vector{Int}
     snodes::Matrix{Int}
     sscatter::SparseMatrixCSC{T,Int}
+    tloads::Vector{Any}
+    telem::Vector{Int}
+    tnodes::Matrix{Int}
+    tscatter::SparseMatrixCSC{T,Int}
 end
 
 FEFTable{T}(n_global::Int) where {T} = FEFTable{T}(Any[], Int[], Int[], Int[], T[], Any[],
-    spzeros(T, n_global, 0), zeros(T, n_global), Any[], Int[], zeros(Int, 4, 0), spzeros(T, n_global, 0))
+    spzeros(T, n_global, 0), zeros(T, n_global), Any[], Int[], zeros(Int, 4, 0), spzeros(T, n_global, 0),
+    Any[], Int[], zeros(Int, 3, 0), spzeros(T, n_global, 0))
 
 """
     AnalysisCache{T}

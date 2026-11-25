@@ -109,6 +109,33 @@ end
 
 const _SONE12 = SOneTo(12)
 
+# blockwise rotation of a node-major 6N-vector, by element size
+@inline _rotate_nodes(R::SMatrix{3,3}, v::SVector{24}) = _rotate24(R, v)
+@inline _rotate_nodes(R::SMatrix{3,3}, v::SVector{18}) = _rotate18(R, v)
+
+# triangle: consistent nodal loads of a uniform LOCAL traction q: one third of
+# the resultant at each node, no moments. The plate's w is linear, so this is
+# the exact work-equivalent load; pressure does no work on the rotations or the
+# rotation bubble. For the ANDES membrane (not displacement-based) this is the
+# standard CST lumping, which keeps every resultant and equilibrium exact.
+@inline function _tri_consistent_load(xy, q::SVector{3})
+    a = _tri_area(xy) / 3
+    z = zero(a * q[1])
+    blk = SVector(a * q[1], a * q[2], a * q[3], z, z, z)
+    return vcat(blk, blk, blk)
+end
+
+"""
+    shell_load_vector(section, X1, X2, X3, q_global) -> (q̃_local, R)
+
+Triangle version: the negated consistent load (18-vector, local node-major)
+of a uniform GLOBAL traction `q` [force/length²], and the element frame.
+"""
+function shell_load_vector(section::AbstractShellSection, X1, X2, X3, q::SVector{3})
+    R, xy, _ = shell_frame(X1, X2, X3)
+    return -_tri_consistent_load(xy, R * q), R
+end
+
 # rotate a node-major 24-vector blockwise by R (local = R·global per 3-block)
 @inline _rotate24(R::SMatrix{3,3}, v::SVector{24}) =
     vec(R * reshape(v, Size(3, 8)))
@@ -164,3 +191,30 @@ function _mitc_gamma(xy, ap, ξ, η)
     eη = dot(((1 + ξ) / 2) * eB + ((1 - ξ) / 2) * eD, ap)
     return SVector((yη * eξ - yξ * eη) / detJ, (xξ * eη - xη * eξ) / detJ)
 end
+
+"""
+    shell_resultants_local(section, xy, a18; at = (1/3, 1/3)) -> NamedTuple
+
+Triangle version: stress resultants at triangular coordinates
+`at = (r, s)` (node 1 at (0, 0), node 2 at (1, 0), node 3 at (0, 1); default the
+centroid) from LOCAL nodal displacements `a18` (node-major
+`(u, v, w, θx, θy, ψ)×3`). Membrane `N = A·ε` with the ANDES strain field
+(Felippa 2003, eq 49; exact basic strain at the centroid); plate `M = D·κ`
+and `Q = S·γ` from MITC3+ with the rotation bubble recovered by condensation.
+Surface loads do not enter: the triangle has no load-dependent internal modes.
+"""
+function shell_resultants_local(section::AbstractShellSection, xy, a18::SVector{18};
+    at = (1 / 3, 1 / 3))
+    r, s = at
+    A, D, S, _ = _shell_rigidities(section)
+    am = a18[SVector(1, 2, 6, 7, 8, 12, 13, 14, 18)]
+    ap = a18[SVector(3, 4, 5, 9, 10, 11, 15, 16, 17)]
+    N = A * _andes_strain(xy, am, r, s)
+    K11 = _mitc3p_K11(xy, D, S)
+    b = SVector(10, 11)
+    α = -(K11[b, b] \ (K11[b, SOneTo(9)] * ap))
+    Bb, Bs = _mitc3p_B(_mitc3p_prep(xy), r, s)
+    d = vcat(ap, α)
+    return (N = N, M = D * (Bb * d), Q = S * (Bs * d))
+end
+

@@ -39,12 +39,12 @@ elements, adaptive refinement and nonlinear analysis are not required.
 
 | Phase | Content | Gate | Status |
 |---|---|---|---|
-| S7a | N-generic shell infrastructure: `ShellElement{T,3}`, `shell_frame` for 3 nodes, FEF table node rows per element, group rules for any N, results/geo/envelope dispatch, AsapOptim shell paths | quad models bitwise identical; lockstep | ☐ |
-| S7b | ANDES-OPT membrane kernel (9×9) | patch tests; bending optimality r = 1 on rectangle pairs; Cook's membrane; rank and rigid modes | ☐ |
-| S7c | MITC3+ plate kernel (9×9 after condensation) | Table 3 eigenvalues; patch tests; clamped plate convergence; isotropy (node-order invariance) | ☐ |
-| S7d | Triangle shell: 18×18 assembly, consistent loads, resultants (N, M, Q), `section_cut`, `ShellGeo`, `shell_envelope` | Scordelis–Lo and pinched cylinder on triangles; mixed quad/triangle meshes; equilibrium | ☐ |
-| S7e | Meshing: `shell_mesh(points, cells, section)`, `read_gmsh`, `AsapDelaunayExt` → `mesh_polygon(outline; holes, max_area, min_angle)` returning boundary edge sets | polygon with circular and L-shaped holes; mesh quality; node reuse | ☐ |
-| S7f | D-region workflow: loads and bearings along boundary segments, patch loads, reactions per bearing, principal fields | deep beam and dapped end against hand statics; reactions sum to loads | ☐ |
+| S7a | N-generic shell infrastructure: `ShellElement{T,3}`, `shell_frame` for 3 nodes, FEF table node rows per element, group rules for any N, results/geo/envelope dispatch, AsapOptim shell paths | quad models bitwise identical; lockstep | ✅ in-place + pure primal (separate triangle load table `tloads…`, `_assemble_Pf_tri`); group AD rules → S7g; AsapOptim → S7g |
+| S7b | ANDES-OPT membrane kernel (9×9) | patch tests; bending optimality r = 1 on rectangle pairs; Cook's membrane; rank and rigid modes | ✅ `d9c5761` (Felippa example to 5 digits; bending exact) |
+| S7c | MITC3+ plate kernel (9×9 after condensation) | Table 3 eigenvalues; patch tests; clamped plate convergence; isotropy (node-order invariance) | ✅ `d9c5761` (Table 3 to 5 digits) |
+| S7d | Triangle shell: 18×18 assembly, consistent loads, resultants (N, M, Q), `section_cut`, `ShellGeo`, `shell_envelope` | Scordelis–Lo and pinched cylinder on triangles; mixed quad/triangle meshes; equilibrium | ✅ Cook 1%, plates 2–3%, Scordelis–Lo 3% at 16×16; irregular patch exact; mixed mesh equilibrium + pure-path parity; `shell_faces` |
+| S7e | Meshing: `shell_mesh(points, cells, section)`, `read_gmsh`, `AsapDelaunayExt` → `mesh_polygon(outline; holes, max_area, min_angle)` returning boundary edge sets | polygon with circular and L-shaped holes; mesh quality; node reuse | ✅ except `read_gmsh` and node reuse (`AbstractShellMesh` ⊃ `WallMesh`, `ShellMesh`) |
+| S7f | D-region workflow: loads and bearings along boundary segments, patch loads, reactions per bearing, principal fields | deep beam and dapped end against hand statics; reactions sum to loads | ⏳ `nodes_on_segment`, segment `edge_loads`, `elements_in`, `total_reaction`, `fixnode!(n, ::Vector{Bool})`; deep beam statics exact. Open: dapped-end example, trajectory helper? |
 | S7g | AD and optimization: plain kernels + ForwardDiff rules (width 4), Enzyme/Mooncake bridges, `ThicknessVariable` on triangles, Enzyme matrix triangle case | gradients vs FD; Enzyme matrix 1.13 + 1.12; Julia 1.10 compile time | ☐ |
 | S7h | Walkthrough `examples/shells/06_polygon_panel.jl` + PDF report; docs; release notes 1.4.0 | strict docs build; lockstep | ☐ |
 | later | Warped-quad correction; MITC4+ (distorted quads) | | ☐ |
@@ -58,3 +58,17 @@ elements, adaptive refinement and nonlinear analysis are not required.
 - Julia 1.10 is the floor: check compile time and the suite on 1.10 for every new kernel.
 - Report sources stay private (`examples/reports-src/`); only PDFs are published.
 - No client or product names in this public repo.
+
+## Handoff notes
+
+- **Triangle edge loads need drilling moments `∓α_b·(w·n)·l²/12`, α_b = 3/2** (the ANDES force
+  lumping). Verified: only this sign and scale reproduce a uniform stress exactly (6e-14; other
+  signs/scales off by 1–6 in N). Same rule as the ITW quad (α = 1).
+- **A held edge of a drilling membrane must fix ψ** (as for quads): with ψ free the missing corner
+  drilling moments ruin a uniform state even under exact loads.
+- The quad pure-path code is untouched; triangles have their own load table fields
+  (`tloads`, `telem`, `tnodes`, `tscatter`) and `_assemble_Pf_tri`. `assemble_Pf` gained one
+  `isempty(t.tloads)` branch at the top, so the Enzyme matrix must be rerun.
+- Zygote through triangle models works but uses no fast rules yet (the group rule is Val(4) only and
+  the triangle kernels have no ForwardDiff rules): S7g.
+- Test helper renamed `shell_mesh` → `grid_shell_mesh` (the export took the name).

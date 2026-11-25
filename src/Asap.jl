@@ -111,10 +111,13 @@ include("FDM/FDM.jl")
 
 # ── parametric structure generators (absorbed from AsapToolkit) ──────────────
 include("Generation/Generators.jl")
+include("Generation/ShellMesh.jl")
 include("Generation/WallMesh.jl")
 export Frame, SpaceFrame, Warren2D, Pratt2D, SpaceFrameBeam, BakerTruss,
     TrussFrame, GridNetwork, GridFrame
 export WallMesh, mesh_wall, wall_cut, edge_loads
+export AbstractShellMesh, ShellMesh, shell_mesh, mesh_polygon, boundary_nodes, nodes_on_segment,
+    elements_in, total_reaction, circle_polygon
 export XGroundStructure, DenseGroundStructure, BoundedGroundStructure
 export to_truss, to_frame
 
@@ -122,7 +125,7 @@ export to_truss, to_frame
 include("Geometry/Displacements.jl")
 include("Geometry/Geometry.jl")
 include("Geometry/ShellGeometry.jl")
-export Geo, ModelGeo, TrussGeo, NetworkGeo, ShellGeo, nodal_average, principal_forces
+export Geo, ModelGeo, TrussGeo, NetworkGeo, ShellGeo, nodal_average, principal_forces, shell_faces, shell_face_owner
 export ElementDisplacements, displacements
 
 # ── display (last: defines Base.show for every user-facing type above) ──────

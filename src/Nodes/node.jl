@@ -100,13 +100,22 @@ const FIXITIES = Dict{Symbol,SVector{6,Bool}}(
 
 """
     fixnode!(node::Node, fixity::Symbol)
+    fixnode!(node::Node, fixity::AbstractVector{Bool})
 
 Replace a node's support condition with one of the standard types in
-[`FIXITIES`](@ref) (e.g. `:pinned`, `:fixed`, `:zfixed`).
+[`FIXITIES`](@ref) (e.g. `:pinned`, `:fixed`, `:zfixed`), or with an
+explicit 6-vector over `(Tx, Ty, Tz, Rx, Ry, Rz)`, `true` = free (the
+convention of the `Node` constructor), e.g. a wall held out of plane.
 """
 function fixnode!(node::Node, fixity::Symbol)
     @assert haskey(FIXITIES, fixity) "unknown fixity :$fixity — choose from $(sort!(collect(keys(FIXITIES))))"
     node.fixity = FIXITIES[fixity]
+    return node
+end
+
+function fixnode!(node::Node, fixity::AbstractVector{Bool})
+    length(fixity) == 6 || throw(ArgumentError("fixity must have 6 entries (Tx, Ty, Tz, Rx, Ry, Rz)"))
+    node.fixity = SVector{6,Bool}(fixity)
     return node
 end
 
