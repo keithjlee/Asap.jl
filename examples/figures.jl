@@ -411,7 +411,7 @@ end
 undeformed in light gray, deformed by `scale × u` along each member's EXACT
 deflected curve, coloured by axial force (blue tension, red compression)
 with line width ∝ |N| (or `widths`, one per member [pt], e.g. ∝ area), nodes as white dots. `diagram = :Mz` / `:My`
-overlays that bending-moment diagram normal to each frame member (scaled by `dscale`):
+overlays that bending-moment diagram on each frame member's TENSION side (scaled by `dscale`):
 black outline, 50 % black fill (one internal force → black). `labels = true` prints each member's N.
 """
 function fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = nothing, dscale = nothing,
@@ -431,11 +431,17 @@ function fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = no
         Ms = [getproperty(f, diagram) for f in fs]
         Mmax = maximum(m -> maximum(abs, m), Ms; init = 0.0)
         span = maximum(el -> norm(el.nodeEnd.position - el.nodeStart.position), frames)
-        ds = dscale === nothing ? 0.25 * span / max(Mmax, eps()) : dscale
+        ds = dscale === nothing ? 0.15 * span / max(Mmax, eps()) : dscale
         fills = Vector{Point2f}[]
         for (el, f, M) in zip(frames, fs, Ms)
             a, b = view2d(el.nodeStart.position, plane), view2d(el.nodeEnd.position, plane)
-            t = (b - a) / norm(b - a); nrm = Point2f(-t[2], t[1])
+            # drawn on the TENSION side: positive (sagging) Mz is tension on the member's −y face
+            # (−z for My), so offset along −(local y / z) projected into the view plane
+            Λ = local_frame(el.nodeStart.position, el.nodeEnd.position, el.rollangle)
+            ax_ = diagram === :Mz ? Λ[2, :] : Λ[3, :]
+            nrm = -view2d(ax_, plane)
+            norm(nrm) > 1e-6 || (t = (b - a) / norm(b - a); nrm = Point2f(t[2], -t[1]))
+            nrm = nrm / norm(nrm)
             L = norm(el.nodeEnd.position - el.nodeStart.position)
             base = [a + (x / L) * (b - a) for x in f.x]
             curve = [p + ds * m * nrm for (p, m) in zip(base, M)]
