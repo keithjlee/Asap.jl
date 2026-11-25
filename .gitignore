@@ -34,3 +34,4 @@ examples/**/Manifest.toml
 
 # Typst sources of the example reports: kept locally (own git repo), only the PDFs are published
 examples/reports-src/
+docs/PLAN_CASES.md
