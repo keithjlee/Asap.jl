@@ -213,8 +213,8 @@ model's own state (`cl.F0`). Rigid diaphragms are handled as in the
 single-case [`solve`](@ref).
 
 A load combination is a linear combination of the columns: `U * λ` with λ
-from [`combination_weights`](@ref). Differentiable with Zygote and
-ForwardDiff.
+from [`combination_weights`](@ref). Differentiable with Zygote,
+ForwardDiff, Enzyme and Mooncake.
 """
 function solve(model::Model{T}, state::ModelState, cl::CaseLoads; solver = nothing,
         loads::Symbol = :design) where {T}

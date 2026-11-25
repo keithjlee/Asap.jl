@@ -74,6 +74,6 @@ F = (cl.P - case_Pf(cl, state))[free, :]     # per-case loads at the state
 c = dot(F * λ, u[free])                      # ≡ combine(cr, strength).compliance
 ```
 
-All of it differentiates with Zygote and ForwardDiff, with respect to positions, sections, shell thicknesses and end springs. The per-case frame fixed-end
+All of it differentiates with Zygote, ForwardDiff, Enzyme and Mooncake, with respect to positions, sections, shell thicknesses and end springs. The per-case frame fixed-end
 forces for force recovery are [`fef_local`](@ref)`(cl, state)`: column `j` belongs to case
 `cl.names[cl.fcase[j]]` and element `cl.fef.elem[j]`.
