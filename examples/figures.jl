@@ -469,8 +469,13 @@ function fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = no
     if labels
         for el in lines_
             n = round(axial_force(model.results, el), digits = 1)
-            text!(ax, view2d((el.nodeStart.position + el.nodeEnd.position) / 2, plane);
-                text = replace(string(n), "-" => "−"), fontsize = 6.5, color = kjl_darkgray, align = (:center, :bottom))
+            c = member_curve(model, el, scale)                 # label at the DEFLECTED member's midpoint
+            mid = view2d(length(c) == 2 ? (c[1] + c[2]) / 2 : c[cld(length(c), 2)], plane)
+            str = replace(string(n), "-" => "−")
+            # white glyph halo underneath (CairoMakie strokes over the fill), then the label
+            text!(ax, mid; text = str, fontsize = 6.5, color = :white, align = (:center, :center),
+                strokecolor = :white, strokewidth = 2.0)
+            text!(ax, mid; text = str, fontsize = 6.5, color = kjl_black, align = (:center, :center))
         end
     end
     color === :axial && Legend(fig[2, 1], [LineElement(color = kjl_tension, linewidth = 2.5), LineElement(color = kjl_compression, linewidth = 2.5)],
