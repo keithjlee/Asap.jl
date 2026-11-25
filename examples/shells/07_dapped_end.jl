@@ -154,10 +154,14 @@ function cuts(model, mesh)
     left = elements_in(mesh, [(0.0, hd), (ln, hd), (ln, 0.0), (xc, 0.0), (xc, H), (0.0, H)])
     snode = [nodes_on_segment(mesh, section[1]...); nodes_on_segment(mesh, section[2]...)[2:end]]
     _, Ms = section_cut(model, left, snode; about = [xc, 0.0, H / 2])
-    Ts = maximum(cut_profile(model, left, snode, [1.0, 0, 0]))
+    Sx = cut_profile(model, left, snode, [1.0, 0, 0])
+    # the three profiles (position along the cut, accumulated force), for the figure
+    profiles = (nib = (s = [n.position[3] - hd for n in inode], F = T),
+                section = (s = [n.position[3] for n in snode], F = Sx),
+                hanger = (s = [n.position[1] - ln for n in hnode], F = Hz))
     return (V = -F[3], M = -M[2], nib_tie = T[kt], nib_tie_depth = inode[kt].position[3] - hd,
             hanger = Hz[kh], hanger_width = hnode[kh].position[1] - ln,
-            Ms = -Ms[2], section_tension = Ts)
+            Ms = -Ms[2], section_tension = maximum(Sx), profiles)
 end
 
 begin
@@ -245,10 +249,32 @@ begin
      peak_N1 = round(maximum(g.N1), digits = 0))
 end
 
+#=
+## Figures
+
+The whole beam, then a close-up of the left end (the dap is too small to read at full length)
+with the three cut lines, and the force profiles along the cuts: the peak of each is a tie.
+=#
 begin
-    savefig("S7_principal.pdf", fig_principal(model, mesh; geo = g, title = "principal membrane forces",
-        bearings = [brgL, brgR], loads = [floor_load]))
-    savefig("S7_N1.pdf", fig_wall(model, mesh; geo = g, field = :N1, title = "N_1 tension [kN/m]"))
+    win = ((0.0, 1.5), (0.0, H))                       # the left end, past the full-depth section
+    cutlines = [(seg = interface, label = "interface"),
+                (seg = ((ln, hd), (L / 2, hd)), label = "dap top", at = (0.95, hd),
+                 align = (:center, :bottom), offset = (0, 3)),
+                (seg = ((xc, H), (xc, 0.0)), label = "x = 1.2")]
+    savefig("S7_beam.pdf", fig_principal(model, mesh; geo = g, title = "principal membrane forces",
+        bearings = [brgL, brgR], loads = [floor_load], width = W_FULL))
+    savefig("S7_principal.pdf", fig_principal(model, mesh; geo = g, title = "left end",
+        bearings = [brgL], loads = [floor_load], window = win, cuts = cutlines, width = W_WIDE))
+    savefig("S7_N1.pdf", fig_wall(model, mesh; geo = g, field = :N1, title = "N_1 tension, left end",
+        window = win, cuts = cutlines, width = W_WIDE))
+    p = c.profiles
+    savefig("S7_cuts.pdf", fig_cutprofiles([
+        (s = p.nib.s, F = p.nib.F, vertical = true, title = "nib interface",
+         slabel = "z above dap [m]", flabel = "F_x [kN]"),
+        (s = p.section.s, F = p.section.F, vertical = true, title = "section x = 1.2",
+         slabel = "z [m]", flabel = "F_x [kN]"),
+        (s = p.hanger.s, F = p.hanger.F, title = "dap top",
+         slabel = "x past dap face [m]", flabel = "F_z [kN]")]))
 end
 
 #=
