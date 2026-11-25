@@ -6,7 +6,7 @@ Shell sections and elements, their kernels, surface loads, resultants and sectio
 Modules = [Asap]
 Pages = ["Materials/shell_sections.jl", "Elements/shell.jl", "Elements/link.jl",
          "Elements/kernels/shell.jl", "Elements/kernels/shell_tri.jl", "Elements/kernels/shell_loads_recovery.jl",
-         "Loads/shell_loads.jl", "Results/shell_results.jl", "Generation/WallMesh.jl", "Generation/ShellMesh.jl",
+         "Loads/shell_loads.jl", "Results/shell_results.jl", "Generation/WallMesh.jl", "Generation/ShellMesh.jl", "Generation/Gmsh.jl",
          "Model/diaphragm.jl", "Analysis/constraints.jl", "Geometry/ShellGeometry.jl"]
 Private = false
 ```

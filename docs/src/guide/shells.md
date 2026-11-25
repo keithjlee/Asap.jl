@@ -38,7 +38,7 @@ w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 6.0, 3.0, wall;
 
 ## General planar meshes
 
-For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygonal holes (constrained Delaunay with quality refinement; load DelaunayTriangulation.jl to enable it). Put a vertex wherever a support or a load starts or ends, and use [`circle_polygon`](@ref) for round openings. Meshes from any other mesher (points and triangle/quad cells) become elements through [`shell_mesh`](@ref). Both return a [`ShellMesh`](@ref), which keeps the in-plane coordinates for region queries:
+For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygonal holes (constrained Delaunay with quality refinement; load DelaunayTriangulation.jl to enable it). Put a vertex wherever a support or a load starts or ends, and use [`circle_polygon`](@ref) for round openings. Meshes from any other mesher (points and triangle/quad cells) become elements through [`shell_mesh`](@ref), and Gmsh files (MSH 4.1 ASCII) through [`read_gmsh`](@ref), which keeps Gmsh's physical groups as named node and element sets ([`group_nodes`](@ref), [`group_elements`](@ref)) and reads curved surfaces as spatial meshes. `mesh_polygon` is reproducible: the same input and `seed` give the same mesh. Both return a [`ShellMesh`](@ref), which keeps the in-plane coordinates for region queries:
 
 - [`nodes_on_segment`](@ref) and [`boundary_nodes`](@ref): nodes along a bearing or a loaded edge;
 - [`edge_loads`](@ref) with a segment: consistent line loads along a boundary, drilling moments included;

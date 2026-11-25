@@ -112,12 +112,13 @@ include("FDM/FDM.jl")
 # ── parametric structure generators (absorbed from AsapToolkit) ──────────────
 include("Generation/Generators.jl")
 include("Generation/ShellMesh.jl")
+include("Generation/Gmsh.jl")
 include("Generation/WallMesh.jl")
 export Frame, SpaceFrame, Warren2D, Pratt2D, SpaceFrameBeam, BakerTruss,
     TrussFrame, GridNetwork, GridFrame
 export WallMesh, mesh_wall, wall_cut, edge_loads
 export AbstractShellMesh, ShellMesh, shell_mesh, mesh_polygon, boundary_nodes, nodes_on_segment,
-    elements_in, total_reaction, circle_polygon
+    elements_in, total_reaction, circle_polygon, group_nodes, group_elements, read_gmsh
 export XGroundStructure, DenseGroundStructure, BoundedGroundStructure
 export to_truss, to_frame
 

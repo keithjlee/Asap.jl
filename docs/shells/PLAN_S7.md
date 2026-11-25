@@ -43,10 +43,10 @@ elements, adaptive refinement and nonlinear analysis are not required.
 | S7b | ANDES-OPT membrane kernel (9×9) | patch tests; bending optimality r = 1 on rectangle pairs; Cook's membrane; rank and rigid modes | ✅ `d9c5761` (Felippa example to 5 digits; bending exact) |
 | S7c | MITC3+ plate kernel (9×9 after condensation) | Table 3 eigenvalues; patch tests; clamped plate convergence; isotropy (node-order invariance) | ✅ `d9c5761` (Table 3 to 5 digits) |
 | S7d | Triangle shell: 18×18 assembly, consistent loads, resultants (N, M, Q), `section_cut`, `ShellGeo`, `shell_envelope` | Scordelis–Lo and pinched cylinder on triangles; mixed quad/triangle meshes; equilibrium | ✅ Cook 1%, plates 2–3%, Scordelis–Lo 3% at 16×16; irregular patch exact; mixed mesh equilibrium + pure-path parity; `shell_faces` |
-| S7e | Meshing: `shell_mesh(points, cells, section)`, `read_gmsh`, `AsapDelaunayExt` → `mesh_polygon(outline; holes, max_area, min_angle)` returning boundary edge sets | polygon with circular and L-shaped holes; mesh quality; node reuse | ✅ except `read_gmsh` and node reuse (`AbstractShellMesh` ⊃ `WallMesh`, `ShellMesh`) |
+| S7e | Meshing: `shell_mesh(points, cells, section)`, `read_gmsh`, `AsapDelaunayExt` → `mesh_polygon(outline; holes, max_area, min_angle)` returning boundary edge sets | polygon with circular and L-shaped holes; mesh quality; node reuse | ✅ `read_gmsh` (MSH 4.1 ASCII, physical groups, planar or spatial), `seed` for reproducible meshes; node reuse open (`AbstractShellMesh` ⊃ `WallMesh`, `ShellMesh`) |
 | S7f | D-region workflow: loads and bearings along boundary segments, patch loads, reactions per bearing, principal fields | deep beam and dapped end against hand statics; reactions sum to loads | ⏳ `nodes_on_segment`, segment `edge_loads`, `elements_in`, `total_reaction`, `fixnode!(n, ::Vector{Bool})`; deep beam statics exact. Open: dapped-end example, trajectory helper? |
 | S7g | AD and optimization: plain kernels + ForwardDiff rules (width 4), Enzyme/Mooncake bridges, `ThicknessVariable` on triangles, Enzyme matrix triangle case | gradients vs FD; Enzyme matrix 1.13 + 1.12; Julia 1.10 compile time | ⏳ rules + bridges + group rules for any N; AsapOptim (branch `triangles`): mixed meshes, `shell_volume`, implicit tangents; Enzyme case `shells_tri` (rev 2e-16, fwd 3e-15); 1.10 first pullback 8.6 s (quad 141 s). Full matrix rerun pending |
-| S7h | Walkthrough `examples/shells/06_polygon_panel.jl` + PDF report; docs; release notes 1.4.0 | strict docs build; lockstep | ☐ |
+| S7h | Walkthrough `examples/shells/06_d_region.jl` + PDF report; docs; release notes 1.4.0 | strict docs build; lockstep | ⏳ walkthrough written (numerics verified: exact statics, reactions converge 1298→1302→1300 kN, singular corner peaks grow); figures by the figures session (`fig_principal`/`fig_wall` for `AbstractShellMesh`); report S6 by the figures session |
 | later | Warped-quad correction; MITC4+ (distorted quads) | | ☐ |
 
 ## Rules carried over from 1.3
@@ -79,3 +79,12 @@ elements, adaptive refinement and nonlinear analysis are not required.
   a polygon union before meshing — open, needed for the STM v3 openings spec.
 - **Julia 1.10**: triangle kernels compile fast (primal 5.8 s, stiffness pullback 8.6 s, load
   pullback 0.2 s) — the 18×18 kernels are far lighter than the quad's 24×24.
+- **Mesh reproducibility**: DelaunayTriangulation inserts points in random order; `mesh_polygon` passes a
+  seeded `Xoshiro(seed)` (default 1) to `triangulate` and `refine!` (reached as
+  `DelaunayTriangulation.Random`, no new Asap dependency).
+- **D-region walkthrough lessons**: a pad's reaction resultant sits toward its inner edge (x = 1.075
+  on a 0.4–1.2 pad), so a lever rule at pad centres is 3 % off; the local compression direction
+  part-way up a pad-to-column strut is steeper than the straight resultant line (bottle-shaped
+  strut, 64° vs 51°); corner peaks diverge under refinement (−3231 → −5502 kN/m).
+- **Shared checkout**: another session (figures) commits to Asap `triangles`. Stage explicit paths
+  only; it owns `examples/figures.jl`, walkthrough figures, report PDFs and `reports-src`.

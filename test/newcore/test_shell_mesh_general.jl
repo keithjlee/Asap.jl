@@ -53,9 +53,93 @@ import DelaunayTriangulation
         notch = mesh_polygon(outline, sec; holes = [[(2.0, 0.0), (3.0, 0.0), (3.0, 1.0), (2.0, 1.0)]], h = 0.5)
         @test sum(Asap.area, notch.elements) ≈ 17.0 rtol = 1e-10
         @test_throws ArgumentError mesh_polygon(outline, sec; holes = [[(0.0, 0.0), (1.0, 0.5), (0.5, 1.0)]], h = 0.5)
+        # reproducible: same input and seed → identical mesh
+        m2 = mesh_polygon(outline, sec; holes = [circle, L], h = 0.25, min_angle = 25)
+        @test m2.points == m.points
         # an extra point becomes a node
         mp = mesh_polygon(outline, sec; h = 0.5, points = [(3.0, 1.5)])
         @test any(n -> n.position ≈ [3.0, 1.5, 0.0], mp.nodes)
+    end
+
+    @testset "read_gmsh: MSH 4.1 ASCII, physical groups, planar and curved" begin
+        # 2 × 1 panel: one quad (1,2,5,6) and two triangles; physical curve "bottom"
+        # (y = 0) and physical surface "panel"; nodes shifted by `shift(x, y)`
+        function msh(z)
+            P = [(0.0, 0.0), (1.0, 0.0), (2.0, 0.0), (2.0, 1.0), (1.0, 1.0), (0.0, 1.0)]
+            nodes = join(["$(x) $(y) $(z(x, y))" for (x, y) in P], "\n")
+            """
+            \$MeshFormat
+            4.1 0 8
+            \$EndMeshFormat
+            \$PhysicalNames
+            2
+            1 1 "bottom"
+            2 2 "panel"
+            \$EndPhysicalNames
+            \$Entities
+            0 1 1 0
+            1 0 0 0 2 0 0 1 1 0
+            1 0 0 0 2 1 1 1 2 0
+            \$EndEntities
+            \$Nodes
+            1 6 1 6
+            2 1 0 6
+            1
+            2
+            3
+            4
+            5
+            6
+            $nodes
+            \$EndNodes
+            \$Elements
+            3 6 1 6
+            1 1 1 2
+            1 1 2
+            2 2 3
+            2 1 3 1
+            3 1 2 5 6
+            2 1 2 2
+            4 2 3 4
+            5 2 4 5
+            \$EndElements
+            """
+        end
+        f = joinpath(mktempdir(), "panel.msh")
+        write(f, msh((x, y) -> 0.0))
+        m = read_gmsh(f, sec)
+        @test size(m.points) == (2, 6)
+        @test count(el -> el isa ShellElement{Float64,4}, m.elements) == 1
+        @test count(el -> el isa ShellElement{Float64,3}, m.elements) == 2
+        @test sort([n.position[1] for n in group_nodes(m, "bottom")]) ≈ [0.0, 1.0, 2.0]
+        @test length(group_elements(m, "panel")) == 3
+        @test sum(Asap.area, m.elements) ≈ 2.0
+        @test all(el -> local_frame(el)[3, :] ≈ local_frame(m.elements[1])[3, :], m.elements)
+        @test_throws ArgumentError group_nodes(m, "top")
+        # the same panel tilted out of the XY plane: still planar, lengths preserved
+        write(f, msh((x, y) -> 0.5y))
+        mt = read_gmsh(f, sec)
+        @test size(mt.points) == (2, 6)
+        @test sum(Asap.area, mt.elements) ≈ 2.0 * sqrt(1.25)
+        @test length(nodes_on_segment(mt, mt.points[:, 1], mt.points[:, 3])) == 3
+        # curved (z = x²/4): a spatial mesh with 3D coordinates; segment queries in 3D
+        write(f, msh((x, y) -> x^2 / 4))
+        mc = read_gmsh(f, sec)
+        @test size(mc.points) == (3, 6)
+        @test length(nodes_on_segment(mc, [0.0, 1.0, 0.0], [0.0, 0.0, 0.0])) == 2
+        @test_throws ArgumentError read_gmsh(f, sec; planar = true)
+        @test_throws ArgumentError elements_in(mc, [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0)])
+        # solve on the curved mesh: bottom edge clamped, a load at the far corner
+        foreach(n -> fixnode!(n, :fixed), group_nodes(mc, "bottom"))
+        corner = only(filter(n -> n.position[1] ≈ 2 && n.position[2] ≈ 1, mc.nodes))
+        model = Model(mc.nodes, AbstractElement{Float64}[mc.elements...],
+            AbstractLoad{Float64}[NodeForce(corner, [0.0, 0.0, -1.0])])
+        solve!(model)
+        F, _ = total_reaction(model.results, group_nodes(mc, "bottom"))
+        @test F ≈ [0.0, 0.0, 1.0] atol = 1e-9
+        # unsupported formats are refused clearly
+        write(f, replace(msh((x, y) -> 0.0), "4.1 0 8" => "2.2 0 8"))
+        @test_throws ArgumentError read_gmsh(f, sec)
     end
 
     @testset "triangle edge_loads: uniform stress reproduced exactly" begin

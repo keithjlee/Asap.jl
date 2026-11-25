@@ -48,7 +48,7 @@ end
 function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     holes = [], h = nothing, max_area = nothing, min_angle::Real = 25.0, points = [],
     origin = zeros(3), e1 = [1.0, 0, 0], e2 = [0.0, 1, 0], fixity::Symbol = :free,
-    id::Symbol = :panel) where {T}
+    id::Symbol = :panel, seed::Integer = 1) where {T}
     outer = _poly(outline)
     _area2(outer) < 0 && reverse!(outer)                    # outline counter-clockwise
     hs = map(holes) do H
@@ -66,13 +66,14 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     end
     extra = [(Float64(p[1]), Float64(p[2])) for p in points]
     append!(pts, extra)
-    tri = triangulate(pts; boundary_nodes = curves)
+    # a seeded generator: the same input gives the same mesh on every run
+    tri = triangulate(pts; boundary_nodes = curves, rng = DT.Random.Xoshiro(seed))
     amax = max_area !== nothing ? Float64(max_area) :
            h !== nothing ? sqrt(3) / 4 * Float64(h)^2 : nothing
     if amax === nothing
-        refine!(tri; min_angle = Float64(min_angle))
+        refine!(tri; min_angle = Float64(min_angle), rng = DT.Random.Xoshiro(seed))
     else
-        refine!(tri; min_angle = Float64(min_angle), max_area = amax)
+        refine!(tri; min_angle = Float64(min_angle), max_area = amax, rng = DT.Random.Xoshiro(seed))
     end
     P = DT.get_points(tri)
     cells = [collect(DT.triangle_vertices(t)) for t in DT.each_solid_triangle(tri)]
