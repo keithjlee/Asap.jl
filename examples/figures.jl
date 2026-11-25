@@ -314,46 +314,38 @@ function fig_3d(model; field = :umag, scale = 0.0, title = "", geo = ShellGeo(mo
     nodes = true, halo = true)
     size_shells(geo) == 0 && return _fig_3d_lines(model; scale, title, azimuth, elevation, width, ratio,
         linecolor, nodes, halo)
-    fig = Figure(size = (width, round(Int, ratio * width)))
-    ax = Axis3(fig[1, 1]; title = title, azimuth = azimuth, elevation = elevation)
-    X0 = geo.nodes
+    # shells + line elements: hidden-surface vector drawing (kjlMakie `hiddenface!`): faces
+    # painter-sorted, members and nodes behind a nearer face removed, crossings as in hiddenline!
     X = geo.nodes .+ scale .* geo.disp
-    P = [Point3f(X[:, i]) for i in axes(X, 2)]
-    if size_shells(geo) > 0
-        ks = axes(geo.quads, 2)
-        vals = field_scale(field) .* nodal_field(geo, field, ks)
-        used = unique(vec(geo.quads))
-        cm, cr = field_colormap(field, vals[used])
-        colormap === nothing || (cm = colormap)
-        m = mesh!(ax, P, tri_faces(geo.quads, ks); color = vals, colormap = cm, colorrange = cr, shading = NoShading)
-        linesegments!(ax, quad_edges(P, geo.quads, ks); color = (kjl_black, 0.25), linewidth = 0.3)
-        Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)), height = Relative(0.6))
+    P = [Point3d(X[:, i]...) for i in axes(X, 2)]
+    ks = collect(axes(geo.quads, 2))
+    vals = field_scale(field) .* nodal_field(geo, field, ks)
+    used = unique(vec(geo.quads))
+    cm, cr = field_colormap(field, vals[used])
+    colormap === nothing || (cm = colormap)
+    tris = tri_faces(geo.quads, ks)
+    es = Point3d[]; ee = Point3d[]
+    for k in ks, a in 1:4
+        push!(es, P[geo.quads[a, k]]); push!(ee, P[geo.quads[mod1(a + 1, 4), k]])
     end
     lines_ = [el for el in model.elements if el isa Union{FrameElement,TrussElement}]
-    if !isempty(lines_)
-        seg0 = Point3f[]; seg = Point3f[]
-        for el in lines_
-            i, j = el.nodeStart.index, el.nodeEnd.index
-            push!(seg0, Point3f(X0[:, i]), Point3f(X0[:, j]))
-            push!(seg, P[i], P[j])
-        end
-        scale == 0 || linesegments!(ax, seg0; color = kjl_lightgray, linewidth = 0.5)
-        if linecolor === :axial
-            N = [axial_force(model.results, el) for el in lines_]
-            Nmax = max(maximum(abs, N), eps())
-            cols = reduce(vcat, [[force_color(n), force_color(n)] for n in N])
-            widths = reduce(vcat, [[0.4 + 2.6 * abs(n) / Nmax, 0.4 + 2.6 * abs(n) / Nmax] for n in N])
-            linesegments!(ax, seg; color = cols, linewidth = widths)
-        else
-            linesegments!(ax, seg; color = kjl_darkgray, linewidth = 1.2)
-        end
-        if nodes
-            nd = unique([P[el.nodeStart.index] for el in lines_] ∪ [P[el.nodeEnd.index] for el in lines_])
-            scatter!(ax, nd; color = :white, strokecolor = kjl_black, strokewidth = 0.5, markersize = 3.5)
-        end
+    S = [P[el.nodeStart.index] for el in lines_]; E = [P[el.nodeEnd.index] for el in lines_]
+    if linecolor === :axial
+        N = [axial_force(model.results, el) for el in lines_]
+        Nmax = max(maximum(abs, N; init = 0.0), eps())
+        C = force_color.(N); W = [0.4 + 2.6 * abs(n) / Nmax for n in N]
+    else
+        C = fill(kjl_darkgray, length(lines_)); W = fill(1.2, length(lines_))
     end
-    structurestyle!(ax; ground = true)
-    fitlimits!(ax; pad = 0.02)
+    nds = nodes ? unique(vcat(S, E)) : nothing
+    fig = Figure()
+    ax = Axis(fig[1, 1]; title = title)
+    m = hiddenface!(ax, P, tris, S, E; azimuth, elevation, facecolor = vals, colormap = cm, colorrange = cr,
+        edges = (es, ee), color = C, linewidth = W, nodes = nds, nodesize = 2.5, nodestrokecolor = kjl_black,
+        nodestrokewidth = 0.5, halo, ground = true, width = width - 60)
+    Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)), height = Relative(0.6))
+    structurestyle!(ax)
+    fitstructure!(fig, ax; width = width - 68, maxheight = ratio * width, padpt = 4)
     return fig
 end
 
