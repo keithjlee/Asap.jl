@@ -11,6 +11,7 @@ Units: kN, m.
 | `03_frame_wall_building.jl` | Shells **with frames**: perimeter frames + a coupled shear wall (frame coupling beams in the wall's plane, through the drilling DOF), rigid diaphragms, load cases and combinations, drift, wall-vs-frame base-shear split, pier and coupling-beam forces, envelopes, 3D figures |
 | `04_precast_joints.jl` | Stacked precast panels joined by `LinkElement`s: drift vs joint shear stiffness, joint axial-force distribution (tie demand) |
 | `05_thickness_design.jl` | Design sensitivities (Zygote, implicit `solution_tangents`, finite differences) and an optimality-criteria thickness redistribution with AsapOptim's `ThicknessVariable` |
+| `06_d_region.jl` | A **disturbed region**: a deep transfer panel with a duct and an opening, meshed with triangles (`mesh_polygon`), bearings and a column load on boundary segments, reactions per bearing, principal membrane forces as the strut-and-tie sketch, and a mesh study (reactions converge, corner peaks do not) |
 
 `../ad/ad_backends_shells.jl` compares Zygote, Enzyme (reverse) and Mooncake through shells on the same
 models (all agree to 1e-16; Enzyme fastest).

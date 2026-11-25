@@ -4,7 +4,7 @@ Enzyme across Asap — one case × mode per process (run via run_enzyme_matrix.s
     julia --project=examples examples/ad/enzyme_matrix.jl <case> <mode>
 
 case ∈ truss_area, truss_shape, spaceframe, frame_lineload, frame_joints,
-       springs, variable_element, shells, diaphragm
+       springs, variable_element, shells, shells_tri, diaphragm
 mode ∈ reverse, forward
 
 Reference: Zygote. Prints one line: `RESULT case mode OK rel_err time_ms first_s`.
@@ -96,6 +96,21 @@ function case(name)
         solve!(m)
         half = [el for el in w.elements if sum(n -> n.position[1], el.nodes) / 4 < 1.5]
         rest = [el for el in w.elements if !(el in half)]
+        p = OptParams(m, AbstractVariable[ThicknessVariable(half, 0.1, 0.5), ThicknessVariable(rest, 0.1, 0.5)])
+        return x -> compliance(solve_structure(x, p), p), [0.25, 0.18]
+    elseif name == "shells_tri"
+        # the same wall with every quad split into two triangles (ANDES-OPT + MITC3+)
+        conc = Material(3.0e4, 2.4e-3, 0.2)
+        sec = ShellSection(conc, 0.2)
+        w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 3.0, 2.0, sec; size = 0.5)
+        tris = [t for el in w.elements for t in (ShellElement((el.nodes[1], el.nodes[2], el.nodes[3]), sec),
+                                                 ShellElement((el.nodes[1], el.nodes[3], el.nodes[4]), sec))]
+        top = [w.grid[i, end] for i in eachindex(w.s)]
+        m = Model(w.nodes, AbstractElement{Float64}[tris...],
+            AbstractLoad{Float64}[[SelfWeight(el; g = [0.0, 0, -9.81]) for el in tris]..., [NodeForce(n, [0.5, 0, 0]) for n in top]...])
+        solve!(m)
+        half = [el for el in tris if sum(n -> n.position[1], el.nodes) / 3 < 1.5]
+        rest = [el for el in tris if !(el in half)]
         p = OptParams(m, AbstractVariable[ThicknessVariable(half, 0.1, 0.5), ThicknessVariable(rest, 0.1, 0.5)])
         return x -> compliance(solve_structure(x, p), p), [0.25, 0.18]
     elseif name == "diaphragm"

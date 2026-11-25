@@ -79,9 +79,9 @@ begin
     gfd = [(drift(x0 + h * (1:4 .== j)) - drift(x0 - h * (1:4 .== j))) / 2h for j in 1:4]
     grads = (zygote = gz, implicit = gi, finite_diff = gfd)
     @show grads
-    f = fig_bars(names, -1000 .* gi; ylabel = "−∂drift/∂t [mm per m]",
-        title = "where thickness buys stiffness", rotation = π / 8)
-    savefig("05_sensitivities.png", f)
+    f = fig_bars(names, -1000 .* gi; ylabel = "−∂ DRIFT / ∂t [mm/m]",
+        title = "drift sensitivity", rotation = π / 8)
+    savefig("05_sensitivities.pdf", f)
 end
 
 #=
@@ -121,24 +121,27 @@ begin
 end
 
 begin
-    f = Figure(size = (620, 380))
-    ax1 = Axis(f[1, 1]; xlabel = "iteration", ylabel = "concrete volume [m³]", title = "optimality criteria history")
-    ax2 = Axis(f[1, 1]; ylabel = "roof drift / limit", yaxisposition = :right)
+    f = Figure(size = (W_HALF, round(Int, 0.95W_HALF)))
+    ax1 = Axis(f[1, 1]; xlabel = "iteration", ylabel = "concrete volume [m³]", title = "OC history")
+    ax2 = Axis(f[1, 1]; ylabel = "roof drift / limit", yaxisposition = :right, rightspinevisible = true,
+        leftspinevisible = false, bottomspinevisible = false, xticksvisible = false, xticklabelsvisible = false)
     hidespines!(ax2); hidexdecorations!(ax2)
-    l1 = scatterlines!(ax1, 0:length(hist)-1, [h.V for h in hist]; color = kjl_blue)
-    l2 = scatterlines!(ax2, 0:length(hist)-1, [h.δ / δlim for h in hist]; color = kjl_pink)
+    l1 = scatterlines!(ax1, 0:length(hist)-1, [h.V for h in hist]; kjl_series(1; marker = true)...)
+    l2 = scatterlines!(ax2, 0:length(hist)-1, [h.δ / δlim for h in hist]; kjl_series(2; marker = true)...)
+    linkxaxes!(ax1, ax2)
     axislegend(ax1, [l1, l2], ["volume", "drift / limit"]; position = :rt)
-    savefig("05_oc_history.png", f)
+    savefig("05_oc_history.pdf", f)
 end
 
 begin
-    f = Figure(size = (620, 360))
+    f = Figure(size = (W_HALF, round(Int, 0.95W_HALF)))
     ax = Axis(f[1, 1]; ylabel = "thickness [m]", xticks = (1:4, names), xticklabelrotation = π / 8,
-        title = "thickness: start vs optimized (same drift)")
-    barplot!(ax, [1, 2, 3, 4] .- 0.18, x0; width = 0.34, color = kjl_gray, label = "start")
-    barplot!(ax, [1, 2, 3, 4] .+ 0.18, x; width = 0.34, color = kjl_blue, label = "optimized")
+        title = "start vs optimized", xticksvisible = false)
+    barplot!(ax, [1, 2, 3, 4] .- 0.18, x0; width = 0.34, color = kjl_lightgray, label = "start")
+    barplot!(ax, [1, 2, 3, 4] .+ 0.18, x; width = 0.34, color = kjl_emphasis, label = "optimized")
+    zerobase!(ax, vcat(x0, x))
     axislegend(ax; position = :rt)
-    savefig("05_thickness.png", f)
+    savefig("05_thickness.pdf", f)
 end
 
 #=

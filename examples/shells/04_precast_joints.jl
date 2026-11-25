@@ -71,9 +71,9 @@ begin
     drifts = [stacked(kn(k)).drift for k in ks]
     f = fig_series(ks, [("two panels, linked", 1000 .* drifts)]; xscale = log10,
         xlabel = "joint shear stiffness per node [kN/m]", ylabel = "top drift [mm]",
-        ref = 1000 * stiff.drift, reflabel = "monolithic", title = "precast joint: drift vs shear stiffness",
+        ref = 1000 * stiff.drift, reflabel = "monolithic", title = "drift vs joint stiffness",
         legendpos = :rt)
-    savefig("04_joint_drift_sweep.png", f)
+    savefig("04_joint_drift_sweep.pdf", f)
     @show extrema(drifts)
 end
 
@@ -94,17 +94,17 @@ begin
     N = [l.k[3] * (displacement(res, l.nodeEnd)[3] - displacement(res, l.nodeStart)[3]) for l in r.joint]
     Wupper = areal_mass(panel) * 9.81 * L * H
     @show sum(N) (-Wupper)          # Σ joint forces = − weight of the upper panel
-    f = Figure(size = (620, 360))
-    ax = Axis(f[1, 1]; xlabel = "position along joint s [m]", ylabel = "joint axial force per node [kN] (+ tension)",
-        title = "horizontal joint: bearing at the toe, tension at the heel")
-    barplot!(ax, s, N; color = [n > 0 ? kjl_pink : kjl_blue for n in N], width = 0.2)
-    hlines!(ax, [0.0]; color = :black, linewidth = 0.5)
-    savefig("04_joint_forces.png", f)
+    f = Figure(size = (W_HALF, round(Int, 0.95W_HALF)))
+    ax = Axis(f[1, 1]; xlabel = "position along joint s [m]", ylabel = "link axial force [kN]",
+        title = "horizontal joint")
+    barplot!(ax, s, N; color = force_color.(N), width = 0.2)
+    hlines!(ax, [0.0]; color = kjl_black, linewidth = 0.6, linestyle = :solid)
+    savefig("04_joint_forces.pdf", f)
 end
 
 begin
-    f = fig_wall(r.m, r.upper; field = :Nyy, scale = 200.0, title = "upper panel: Nyy (deformed ×200)")
-    savefig("04_upper_panel_Nyy.png", f)
+    f = fig_wall(r.m, r.upper; field = :Nyy, scale = 200.0, title = "upper panel: N_{yy}, ×200", width = W_HALF)
+    savefig("04_upper_panel_Nyy.pdf", f)
 end
 
 #=

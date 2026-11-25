@@ -54,8 +54,8 @@ begin
 end
 
 begin
-    f = fig_3d(roof; scale = 50.0, linecolor = :axial, title = "corner-supported spaceframe: axial force, deflection ×50")
-    savefig("A2_spaceframe.png", f)
+    f = fig_3d(roof; scale = 50.0, linecolor = :axial, title = "axial force, deflection ×50", ratio = 0.55)
+    savefig("A2_spaceframe.pdf", f)
 end
 
 #=
@@ -72,8 +72,8 @@ begin
         m = SpaceFrame(8, 1.5, 6, 1.5, 1.2, tube; support = s, load = [0.0, 0.0, -4.0]).model
         1000 * maximum(abs, m.results.u[3:6:end])
     end
-    f = fig_bars(string.(layouts), defl; ylabel = "max deflection [mm]", title = "support layout")
-    savefig("A2_supports.png", f)
+    f = fig_bars(string.(layouts), defl; ylabel = "max deflection [mm]", title = "support layout", width = 190)
+    savefig("A2_supports.pdf", f)
     defl
 end
 

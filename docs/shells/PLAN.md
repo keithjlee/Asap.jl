@@ -34,7 +34,7 @@
 | S6c examples for ALL scenarios + Enzyme across Asap (Keith, 2026-11-23 evening) | ✅ walkthroughs + PDF reports + Enzyme matrix (1.13 + 1.12, 18/18) | see below |
 | S6d reverse-mode performance (2026-11-23/24) | ✅ AsapFrameADExt; gather refactor REVERTED (broke Enzyme); linear-cost RuleConfig group rules + split shell rules (vs v1.2 frames 8.8–11.7×; vs kernel rules only frames 2.4–6.9×, shells 2.2–4.1×); bitwise primal vs v1.2; Enzyme 36/36 | release notes "Performance" |
 | Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ✅ 2026-11-24: merged to `main`, v1.3.0 (AsapOptim 1.3.0); registration via `@JuliaRegistrator` | |
-| S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
+| S7 triangles, general meshes, D-region workflow (Asap 1.4) | ⏳ see `PLAN_S7.md` | |
 
 ### S6c — walkthroughs for every scenario + Enzyme verification (Keith: before release)
 

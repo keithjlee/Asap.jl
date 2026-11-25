@@ -29,6 +29,7 @@ Units in every walkthrough: kN, m. Asap itself is units-agnostic.
 3. A frame plus coupled shear wall building with rigid diaphragms.
 4. Precast panel joints.
 5. Wall-thickness sensitivities and optimization.
+6. A disturbed region: a deep transfer panel with openings, triangulated (`mesh_polygon`).
 
 ## Optimization — `optimization/` (with AsapOptim)
 

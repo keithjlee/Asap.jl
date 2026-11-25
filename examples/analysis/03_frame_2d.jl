@@ -66,15 +66,15 @@ begin
 end
 
 begin
-    f = fig_member(frame, beam; title = "girder: N, V, M")
-    savefig("A3_girder_diagrams.png", f)
+    f = fig_member(frame, beam; title = "girder", width = 210)
+    savefig("A3_girder_diagrams.pdf", f)
 end
 
 begin
     diag = maximum(abs, InternalForces(frame, beam).Mz) > maximum(abs, InternalForces(frame, beam).My) ? :Mz : :My
     f = fig_lines(frame; plane = :XZ, scale = 50.0, diagram = diag, color = kjl_darkgray,
-        title = "portal: bending moment (green) and deflected shape ×50")
-    savefig("A3_portal.png", f)
+        title = "moment, deflection ×50", width = W_HALF)
+    savefig("A3_portal.pdf", f)
 end
 
 #=

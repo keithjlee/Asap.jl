@@ -15,7 +15,7 @@ end
 # vertical cantilever wall in the XZ plane: length B (x), height H (z), clamped base
 function _wall(nx, nz; B = 4.0, H = 6.0, t = 0.2, E = 3.0e7, ν = 0.2, ρ = 2.4)
     sec = ShellSection(Material(E, ρ, ν), t)
-    grid, els = shell_mesh(nx, nz, (i, j) -> (B * i / nx, 0.0, H * j / nz), sec;
+    grid, els = grid_shell_mesh(nx, nz, (i, j) -> (B * i / nx, 0.0, H * j / nz), sec;
         fix = (i, j) -> j == 0 ? falses(6) |> collect : nothing)
     return grid, els, sec
 end
@@ -108,7 +108,7 @@ end
         n = 16
         sec = ShellSection(Material(1.0e4, 1.0, 0.3), 0.01)
         onedge(i, j) = i == 0 || j == 0 || i == n || j == n
-        grid, els = shell_mesh(n, n, (i, j) -> (i / n, j / n, 0.0), sec;
+        grid, els = grid_shell_mesh(n, n, (i, j) -> (i / n, j / n, 0.0), sec;
             fix = (i, j) -> onedge(i, j) ? Bool[0, 0, 0, 1, 1, 0] : Bool[0, 0, 1, 1, 1, 0])
         m = Model(vec(grid), els, AbstractLoad{Float64}[AreaLoad(el, [0.0, 0.0, -1.0]) for el in els])
         solve!(m)

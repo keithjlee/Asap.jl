@@ -73,15 +73,15 @@ end
 
 begin
     f = fig_series(0:length(hist)-1, [("compliance", hist)]; xlabel = "OC iteration", ylabel = "compliance [kN·m]",
-        title = "size optimization (volume fixed)", legendpos = :rt)
-    savefig("O1_history.png", f)
+        title = "OC history (volume fixed)", legendpos = :rt)
+    savefig("O1_history.pdf", f)
 end
 
 begin
     opt = updatemodel(p, xopt)               # write the design into p.model (in place), re-solve, return it
-    f = fig_lines(opt; plane = :XY, widths = 1 .+ 14 .* xopt ./ maximum(xopt),
-        title = "size-optimized Pratt truss (width ∝ area; blue C / pink T)")
-    savefig("O1_optimized.png", f)
+    f = fig_lines(opt; plane = :XY, widths = 0.5 .+ 6 .* xopt ./ maximum(xopt), width = W_FULL,
+        title = "size-optimized (width ∝ area)")
+    savefig("O1_optimized.pdf", f)
 end
 
 #=

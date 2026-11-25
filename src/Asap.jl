@@ -47,6 +47,7 @@ export EndSprings, EndConditions, rigid_end, pinned_end, RELEASES, release_symbo
 include("Elements/kernels/transformation.jl")
 include("Elements/kernels/stiffness.jl")
 include("Elements/kernels/shell.jl")
+include("Elements/kernels/shell_tri.jl")
 include("Elements/interface.jl")
 include("Elements/frame.jl")
 include("Elements/variable.jl")
@@ -57,6 +58,7 @@ export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment
 export ShellElement, shell_frame, shell_stiffness, itw_membrane_stiffness
+export andes_membrane_stiffness, andes_beta0, mitc3p_plate_stiffness
 export shell_resultants, shell_envelope, section_cut, LinkElement
 
 # ── springs ─────────────────────────────────────────────────────────────────
@@ -109,10 +111,14 @@ include("FDM/FDM.jl")
 
 # ── parametric structure generators (absorbed from AsapToolkit) ──────────────
 include("Generation/Generators.jl")
+include("Generation/ShellMesh.jl")
+include("Generation/Gmsh.jl")
 include("Generation/WallMesh.jl")
 export Frame, SpaceFrame, Warren2D, Pratt2D, SpaceFrameBeam, BakerTruss,
     TrussFrame, GridNetwork, GridFrame
 export WallMesh, mesh_wall, wall_cut, edge_loads
+export AbstractShellMesh, ShellMesh, shell_mesh, mesh_polygon, boundary_nodes, nodes_on_segment,
+    elements_in, total_reaction, circle_polygon, group_nodes, group_elements, read_gmsh
 export XGroundStructure, DenseGroundStructure, BoundedGroundStructure
 export to_truss, to_frame
 
@@ -120,7 +126,7 @@ export to_truss, to_frame
 include("Geometry/Displacements.jl")
 include("Geometry/Geometry.jl")
 include("Geometry/ShellGeometry.jl")
-export Geo, ModelGeo, TrussGeo, NetworkGeo, ShellGeo, nodal_average, principal_forces
+export Geo, ModelGeo, TrussGeo, NetworkGeo, ShellGeo, nodal_average, principal_forces, shell_faces, shell_face_owner
 export ElementDisplacements, displacements
 
 # ── display (last: defines Base.show for every user-facing type above) ──────

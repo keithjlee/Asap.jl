@@ -4,7 +4,7 @@
 cd "$(dirname "$0")/.."
 JL=${1:-}
 PROJ=${2:-.}
-for c in truss_area truss_shape frame_lineload frame_joints springs variable_element diaphragm shells spaceframe; do
+for c in truss_area truss_shape frame_lineload frame_joints springs variable_element diaphragm shells shells_tri spaceframe; do
   for m in reverse forward; do
     out=$(timeout 900 julia $JL --project=$PROJ ad/enzyme_matrix.jl $c $m 2>&1)
     code=$?

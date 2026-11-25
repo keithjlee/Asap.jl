@@ -149,9 +149,9 @@ begin
     Vframe = -sum(n -> reaction(rEY, n)[2], basecols)
     share = (wall = Vwall, frames = Vframe, total = Vwall + Vframe, wall_fraction = Vwall / (Vwall + Vframe))
     @show share
-    f = fig_bars(["coupled wall", "frames"], [Vwall, Vframe]; ylabel = "base shear, EY [kN]",
-        title = "EY base shear: $(round(100 * share.wall_fraction, digits = 1))% to the wall")
-    savefig("03_building_shear_share.png", f)
+    f = fig_bars(["coupled wall", "frames"], [Vwall, Vframe]; ylabel = "base shear [kN]",
+        title = "EY: $(round(100 * share.wall_fraction, digits = 1))% to wall", highlight = 1, width = 180)
+    savefig("03_building_shear_share.pdf", f)
 end
 
 #=
@@ -192,19 +192,19 @@ end
 =#
 begin
     rg = ShellGeo(model; results = rEY)
-    f = fig_3d(model; geo = rg, field = :umag, scale = 300.0, title = "EY, deformed ×300 (shells coloured by |u|)")
-    savefig("03_building_EY_3d.png", f)
+    f = fig_3d(model; geo = rg, field = :umag, scale = 300.0, title = "EY, deformed ×300", width = 312)
+    savefig("03_building_EY_3d.pdf", f)
 end
 
 begin
     # the full wall line (both piers) in one elevation: build a geo once, plot each pier
-    f = fig_wall(model, pierA; geo = rg, field = :Nyy, scale = 300.0, title = "pier A — vertical membrane force, EY")
-    savefig("03_pierA_Nyy_EY.png", f)
+    f = fig_wall(model, pierA; geo = rg, field = :Nyy, scale = 300.0, title = "pier A: N_{yy}, EY", width = 196)
+    savefig("03_pierA_Nyy_EY.pdf", f)
 end
 
 begin
-    f = fig_principal(model, pierB; geo = rg, title = "pier B — principal membrane forces, EY")
-    savefig("03_pierB_principal_EY.png", f)
+    f = fig_principal(model, pierB; geo = rg, title = "pier B: principal, EY", width = 196)
+    savefig("03_pierB_principal_EY.pdf", f)
 end
 
 #=

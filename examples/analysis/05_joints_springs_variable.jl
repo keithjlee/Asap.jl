@@ -48,10 +48,10 @@ begin
     ks = 10.0 .^ (3:0.5:8)
     drifts = [portal(spring(k)) for k in ks]
     rigid = portal(EndConditions(:fixedfixed))
-    f = fig_series(ks, [("semi-rigid girder joints", drifts)]; xscale = log10, legendpos = :rt,
-        xlabel = "connection stiffness k [kN·m/rad]", ylabel = "drift [mm]", ref = rigid, reflabel = "rigid limit",
-        title = "pinned-base portal: drift vs joint stiffness")
-    savefig("A5_joint_sweep.png", f)
+    f = fig_series(ks, [("semi-rigid", drifts)]; xscale = log10, legendpos = :rt,
+        xlabel = "joint stiffness k [kN·m/rad]", ylabel = "drift [mm]", ref = rigid, reflabel = "rigid",
+        title = "drift vs joint stiffness", width = W_HALF)
+    savefig("A5_joint_sweep.pdf", f)
     (k_1e3 = drifts[1], k_1e8 = drifts[end], rigid = rigid)
 end
 
@@ -78,9 +78,9 @@ begin
     exact(kθ) = 1000 * (10 * 4^3 / (3EI) + 10 * 4 * 4 / kθ + 10 / 1e6)
     tops = cantilever.(kθs)
     f = fig_series(kθs, [("Asap", tops), ("closed form", exact.(kθs))]; xscale = log10, legendpos = :rt,
-        xlabel = "footing rotational stiffness kθ [kN·m/rad]", ylabel = "top displacement [mm]",
-        title = "column on a rotational spring")
-    savefig("A5_footing_spring.png", f)
+        xlabel = "footing stiffness kθ [kN·m/rad]", ylabel = "top displacement [mm]",
+        title = "column on a spring", width = W_HALF)
+    savefig("A5_footing_spring.pdf", f)
     maximum(abs.(tops .- exact.(kθs)) ./ exact.(kθs))     # ≈ 0: Asap matches the closed form
 end
 
@@ -111,8 +111,8 @@ begin
 end
 
 begin
-    f = fig_member(hm, haunched; title = "haunched girder (deep ends): N, V, M")
-    savefig("A5_haunched.png", f)
+    f = fig_member(hm, haunched; title = "haunched girder", width = 200)
+    savefig("A5_haunched.pdf", f)
 end
 
 #=

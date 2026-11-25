@@ -60,9 +60,9 @@ begin
     drift = [sum(n -> displacement(rW, n)[1], filter(n -> n.position[3] ≈ z, model.nodes)) /
              count(n -> n.position[3] ≈ z, model.nodes) for z in levels]
     interstorey = diff([0.0; drift]) ./ H
-    f = fig_bars(["L1", "L2", "L3"], 1000 .* drift; ylabel = "storey displacement under W [mm]",
-        title = "wind drift (max interstorey drift ratio 1/$(round(Int, 1 / maximum(interstorey))))")
-    savefig("A4_drift.png", f)
+    f = fig_bars(["L1", "L2", "L3"], 1000 .* drift; ylabel = "storey displacement [mm]",
+        title = "wind drift (max ratio 1/$(round(Int, 1 / maximum(interstorey))))", width = 215)
+    savefig("A4_drift.pdf", f)
 end
 
 #=
@@ -72,8 +72,8 @@ case's loads (cheap — same nodes and elements):
 begin
     windonly = Model(model.nodes, model.elements, filter(l -> l.case == :W, model.loads))
     solve!(windonly)
-    f = fig_3d(windonly; scale = 100.0, linecolor = :axial, title = "building under W: axial force, deflection ×100")
-    savefig("A4_building_W.png", f)
+    f = fig_3d(windonly; scale = 100.0, linecolor = :axial, title = "W: axial force, ×100", width = W_HALF)
+    savefig("A4_building_W.pdf", f)
 end
 
 #=
@@ -94,12 +94,12 @@ begin
     getc(Mat, k) = size(Mat, 1) == length(env.x) ? Mat[:, k] : Mat[k, :]
     k = argmax([maximum(abs, getc(env.hi, k)) + maximum(abs, getc(env.lo, k)) for k in comp if k != 1])
     k = collect(comp)[k + 1]
-    f = Figure(size = (620, 360))
-    ax = Axis(f[1, 1]; xlabel = "x along girder [m]", ylabel = "bending moment [kN·m]", title = "primary beam segment (3 m, between joists): moment envelope")
-    band!(ax, env.x, getc(env.lo, k), getc(env.hi, k); color = (kjl_blue, 0.2))
-    lines!(ax, env.x, getc(env.hi, k); color = kjl_blue); lines!(ax, env.x, getc(env.lo, k); color = kjl_blue)
-    hlines!(ax, [0.0]; color = :black, linewidth = 0.5)
-    savefig("A4_envelope.png", f)
+    f = Figure(size = (W_HALF, round(Int, 0.8W_HALF)))
+    ax = Axis(f[1, 1]; aspect = nothing, xlabel = "x along girder [m]", ylabel = "moment [kN·m]", title = "moment envelope")
+    band!(ax, env.x, getc(env.lo, k), getc(env.hi, k); color = kjl_diagramgray)     # one internal force: light gray fill, black lines
+    lines!(ax, env.x, getc(env.hi, k); color = kjl_black, linewidth = 1); lines!(ax, env.x, getc(env.lo, k); color = kjl_black, linewidth = 1)
+    hlines!(ax, [0.0]; color = kjl_midgray, linewidth = 0.5, linestyle = :solid)
+    savefig("A4_envelope.pdf", f)
 end
 
 #=

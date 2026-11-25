@@ -257,7 +257,7 @@ env.x; env.lo; env.hi                       # rows: N, Vy, Mz, Vz, My, Mx
 
 ## Shells, walls and diaphragms
 
-`ShellElement` is a 4-node flat shell: a drilling-rotation membrane plus the MITC4 plate. It mixes freely with frames. `mesh_wall` meshes walls with openings, `section_cut` gives exact pier forces, `LinkElement` models precast joints, and `RigidDiaphragm` ties a floor rigidly in its plane:
+`ShellElement` is a flat shell in two shapes that mix freely: a 4-node quadrilateral (drilling-rotation membrane plus the MITC4 plate) and a 3-node triangle (ANDES-OPT drilling membrane plus the MITC3+ plate). Shells mix freely with frames. `mesh_wall` meshes walls with openings, `section_cut` gives exact pier forces, `LinkElement` models precast joints, and `RigidDiaphragm` ties a floor rigidly in its plane:
 
 ```julia
 concrete = Material(3.0e7, 2.4, 0.2)                    # kN, m
@@ -276,6 +276,18 @@ shell_resultants(wallmodel, w.elements[1]).N                        # (Nxx, Nyy,
 ```
 
 Surface loads: `AreaLoad(el, q)` (global traction) or `AreaLoad(el, p)` (normal pressure), and `SelfWeight`. Shells take part in the differentiable path, including gradients with respect to thickness. Load ForwardDiff alongside Zygote for the fast shell rules.
+
+Any other planar outline: `mesh_polygon` (load DelaunayTriangulation.jl) triangulates a polygon with polygonal holes, which may touch the outline or each other, and `read_gmsh` reads Gmsh meshes with their physical groups. Supports and loads go on boundary segments, and reactions sum per bearing, which is what a disturbed-region (strut-and-tie) analysis needs:
+
+```julia
+using DelaunayTriangulation
+panel = mesh_polygon([(0.0, 0.0), (0.5, 0.0), (5.5, 0.0), (6.0, 0.0), (6.0, 3.0), (0.0, 3.0)],
+    ShellSection(concrete, 0.3); holes = [circle_polygon((3.0, 1.5), 0.4)], h = 0.2,
+    e1 = [1.0, 0, 0], e2 = [0.0, 0, 1])                            # a panel in the XZ plane
+foreach(n -> fixnode!(n, Bool[1, 0, 1, 0, 1, 0]), panel.nodes)      # held out of plane
+brg = nodes_on_segment(panel, (0.0, 0.0), (0.5, 0.0))              # a bearing pad
+loads = edge_loads(panel, (0.0, 3.0), (6.0, 3.0), [0.0, 0.0, -40.0])
+```
 
 ## Differentiable analysis
 

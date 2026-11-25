@@ -4,7 +4,12 @@
 using Asap
 ```
 
-Asap's [`ShellElement`](@ref) is a 4-node flat shell: a drilling-rotation membrane (Ibrahimbegović–Taylor–Wilson, with two complementary incompatible modes) combined with the MITC4 Reissner–Mindlin plate. It mixes freely with frames and trusses, and its drilling DOF lets an in-plane beam transfer moment into a wall at a shared node.
+Asap's [`ShellElement`](@ref) is a flat shell in two shapes, which mix freely in one mesh:
+
+- **Quadrilateral** (4 nodes): a drilling-rotation membrane (Ibrahimbegović–Taylor–Wilson, with two complementary incompatible modes) combined with the MITC4 Reissner–Mindlin plate.
+- **Triangle** (3 nodes): Felippa's ANDES-OPT drilling membrane (exact in-plane bending of rectangular two-triangle units) combined with the MITC3+ Reissner–Mindlin plate.
+
+Shells mix freely with frames and trusses, and the drilling DOF lets an in-plane beam transfer moment into a wall at a shared node.
 
 The formulation and its verification (patch tests, MacNeal–Harder, Timoshenko & Woinowsky-Krieger plates, the Scordelis–Lo roof) are documented in `docs/shells/DERIVATION.md` in the repository.
 
@@ -30,6 +35,31 @@ w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 6.0, 3.0, wall;
               openings = [(2.0, 0.0, 1.0, 2.1)],      # a door: s₀, z₀, width, height
               z_lines = [1.0], size = 0.5)
 ```
+
+## General planar meshes
+
+For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygonal holes (constrained Delaunay with quality refinement; load DelaunayTriangulation.jl to enable it). Put a vertex wherever a support or a load starts or ends, and use [`circle_polygon`](@ref) for round openings. Meshes from any other mesher (points and triangle/quad cells) become elements through [`shell_mesh`](@ref), and Gmsh files (MSH 4.1 ASCII) through [`read_gmsh`](@ref), which keeps Gmsh's physical groups as named node and element sets ([`group_nodes`](@ref), [`group_elements`](@ref)) and reads curved surfaces as spatial meshes. `mesh_polygon` is reproducible: the same input and `seed` give the same mesh. Both return a [`ShellMesh`](@ref), which keeps the in-plane coordinates for region queries:
+
+- [`nodes_on_segment`](@ref) and [`boundary_nodes`](@ref): nodes along a bearing or a loaded edge;
+- [`edge_loads`](@ref) with a segment: consistent line loads along a boundary, drilling moments included;
+- [`elements_in`](@ref): elements in a region (a bearing plate's patch load, a zone to read stresses from);
+- [`total_reaction`](@ref): the resultant of the reactions over a node group, e.g. one bearing.
+
+```julia
+using DelaunayTriangulation      # activates mesh_polygon
+outline = [(0.0, 0.0), (0.5, 0.0), (5.5, 0.0), (6.0, 0.0), (6.0, 3.0), (0.0, 3.0)]
+panel = mesh_polygon(outline, wall; holes = [circle_polygon((3.0, 1.5), 0.4)], h = 0.25,
+                     e1 = [1.0, 0, 0], e2 = [0.0, 0, 1])          # a panel in the XZ plane
+for n in panel.nodes
+    fixnode!(n, Bool[1, 0, 1, 0, 1, 0])                        # held out of plane
+end
+# bearings: translations held along the segment, so the drilling rotation (about Y) too
+foreach(n -> fixnode!(n, Bool[0, 0, 0, 0, 0, 0]), nodes_on_segment(panel, (0.0, 0.0), (0.5, 0.0)))
+foreach(n -> fixnode!(n, Bool[1, 0, 0, 0, 0, 0]), nodes_on_segment(panel, (5.5, 0.0), (6.0, 0.0)))
+loads = AbstractLoad{Float64}[edge_loads(panel, (0.0, 3.0), (6.0, 3.0), [0.0, 0.0, -40.0])...]
+```
+
+Where translations are held along a segment of several nodes (a bearing, a clamped edge), hold the drilling rotation there too: the material cannot rotate along a held line, and leaving the drilling DOF free leaves the edge's drilling moments unbalanced. A single-node pin keeps it free.
 
 ## Loads
 
