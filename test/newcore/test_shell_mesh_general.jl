@@ -196,6 +196,42 @@ import DelaunayTriangulation
         @test F ≈ [-2p, 0, 0] atol = 1e-8
     end
 
+    @testset "node reuse: a triangulated wall joined to a frame" begin
+        # a 6 × 3 wall in the XZ plane; a beam framing into its top edge at x = 2 and
+        # x = 4.5, and a column joint inside the panel at (3, 1.5): all become mesh
+        # vertices and the mesh uses those very Node objects
+        steel = Section(Material(2.0e8, 7.7e7, 7.85, 0.3), 1e-2, 1e-4, 1e-4, 1e-5)
+        a = Node([2.0, 0.0, 3.0], :free)
+        b = Node([4.5, 0.0, 3.0], :free)
+        c = Node([3.0, 0.0, 1.5], :free)
+        off = Node([3.0, 2.0, 1.5], :free)                 # off the panel's plane: ignored
+        tip = Node([4.5, 3.0, 3.0], :free)
+        outline = [(0.0, 0.0), (6.0, 0.0), (6.0, 3.0), (0.0, 3.0)]
+        m = mesh_polygon(outline, sec; h = 0.4, e1 = [1.0, 0, 0], e2 = [0.0, 0, 1], reuse = [a, b, c, off])
+        @test any(n -> n === a, m.nodes) && any(n -> n === b, m.nodes) && any(n -> n === c, m.nodes)
+        @test !any(n -> n === off, m.nodes)
+        foreach(n -> fixnode!(n, :fixed), nodes_on_segment(m, (0.0, 0.0), (6.0, 0.0)))
+        frame = AbstractElement{Float64}[FrameElement(b, tip, steel), FrameElement(c, off, steel)]
+        nodes = unique([a, b, c, off, tip, m.nodes...])
+        loads = AbstractLoad{Float64}[NodeForce(tip, [0.0, 0.0, -10.0]), NodeForce(off, [5.0, 0.0, 0.0])]
+        model = Model(nodes, AbstractElement{Float64}[m.elements..., frame...], loads)
+        solve!(model)
+        F, _ = total_reaction(model.results, nodes_on_segment(m, (0.0, 0.0), (6.0, 0.0)))
+        @test F ≈ [-5.0, 0.0, 10.0] rtol = 1e-9                # the frame loads reach the wall's base
+        ub = displacement(model.results, b)
+        # listing a reused node twice is harmless (as with mesh_wall's reuse): its first
+        # slot connects to nothing and is retired as inactive; the results are the same
+        dup = Model([a, b, c, off, tip, m.nodes...], AbstractElement{Float64}[m.elements..., frame...], loads)
+        solve!(dup)
+        @test displacement(dup.results, b) ≈ ub rtol = 1e-10
+        # array constructor: reuse by position
+        P = [0.0 1.0 1.0 0.0; 0.0 0.0 1.0 1.0]
+        corner = Node([1.0, 1.0, 0.0], :fixed)
+        ma = shell_mesh(P, [(1, 2, 3), (1, 3, 4)], sec; reuse = [corner])
+        @test any(n -> n === corner, ma.nodes)
+        @test count(n -> n.position ≈ [1.0, 1.0, 0.0], ma.nodes) == 1
+    end
+
     @testset "deep beam on two bearings: statics of the reactions" begin
         # 6 × 3 panel, bearings 0–0.5 and 5.5–6 on the bottom, line load on the top
         # 2–4, self-weight; vertices at every bearing/load end point

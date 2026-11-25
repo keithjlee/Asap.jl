@@ -98,7 +98,7 @@ _points2(P::AbstractVector) = reduce(hcat, [collect(float.(p))[1:2] for p in P])
 
 """
     shell_mesh(points, cells, section; origin = [0, 0, 0], e1 = [1, 0, 0], e2 = [0, 1, 0],
-               fixity = :free, id = :mesh) -> ShellMesh
+               fixity = :free, id = :mesh, reuse = Node[]) -> ShellMesh
 
 Build shell elements from a planar mesh given as arrays — the output of any
 mesher (Gmsh, Triangle, a CAD export, a hand-made grid).
@@ -111,15 +111,20 @@ mesher (Gmsh, Triangle, a CAD export, a hand-made grid).
 - `section`: the shell section of every element
 - `origin`, `e1`, `e2`: the plane in global coordinates (`e2` is
   orthogonalized against `e1`)
-- `fixity`: fixity of every node (`:free` by default; place supports with
+- `fixity`: fixity of every NEW node (`:free` by default; place supports with
   [`fixnode!`](@ref) on [`nodes_on_segment`](@ref))
+- `reuse`: existing nodes (frame joints, another wall's edge): a mesh node at the
+  same position (to 1e-9 of the mesh size) IS that node, which is how a mesh
+  connects to frames and other meshes. Reused nodes keep their fixity and appear
+  in `mesh.nodes` too: `unique([frame_nodes; mesh.nodes])` is the tidy node list
+  (a node listed twice is harmless, its spare slot is retired as inactive).
 
 Points no cell uses are dropped. The boundary is recovered as closed loops of
 edges used by a single cell.
 """
 function shell_mesh(points, cells, section::AbstractShellSection{T};
     origin = zeros(3), e1 = [1.0, 0, 0], e2 = [0.0, 1, 0], fixity::Symbol = :free,
-    id::Symbol = :mesh) where {T}
+    id::Symbol = :mesh, reuse::AbstractVector = Node{T}[]) where {T}
     P = Matrix{T}(_pointsd(points))
     used = sort!(unique!(reduce(vcat, [collect(Int, c) for c in cells])))
     remap = Dict(old => new for (new, old) in enumerate(used))
@@ -129,26 +134,40 @@ function shell_mesh(points, cells, section::AbstractShellSection{T};
         length(ids) in (3, 4) || throw(ArgumentError("cells must have 3 or 4 nodes"))
         ids
     end
-    return _shell_mesh(T, Q, cellsr, section, origin, e1, e2, fixity, id)
+    return _shell_mesh(T, Q, cellsr, section, origin, e1, e2, fixity, id, reuse)
 end
 
 # planar (2 × n): positions in the given plane, cells made counter-clockwise
-function _shell_mesh(::Type{T}, Q::Matrix{T}, cells, section, origin, e1, e2, fixity, id) where {T}
+function _shell_mesh(::Type{T}, Q::Matrix{T}, cells, section, origin, e1, e2, fixity, id,
+        reuse = Node{T}[]) where {T}
     if size(Q, 1) == 2
         o, a, b = _plane_axes(T, origin, e1, e2)
-        nodes = [Node(o + Q[1, i] * a + Q[2, i] * b, fixity) for i in axes(Q, 2)]
+        X = [o + Q[1, i] * a + Q[2, i] * b for i in axes(Q, 2)]
+        nodes = _mesh_nodes(X, reuse, fixity)
         oriented = [_signed_area2(Q, ids) < 0 ? reverse(ids) : ids for ids in cells]
         loops = _boundary_loops(oriented, l -> abs(_signed_area2(Q, l[1:end-1])), Q)
     else
         # spatial (3 × n): global positions; the cells keep the mesher's orientation
         # (a consistently oriented surface keeps consistent element normals)
         o, a, b = zero(SVector{3,T}), SVector{3,T}(1, 0, 0), SVector{3,T}(0, 1, 0)
-        nodes = [Node(SVector{3,T}(Q[1, i], Q[2, i], Q[3, i]), fixity) for i in axes(Q, 2)]
+        nodes = _mesh_nodes([SVector{3,T}(Q[1, i], Q[2, i], Q[3, i]) for i in axes(Q, 2)], reuse, fixity)
         oriented = cells
         loops = _boundary_loops(oriented, l -> sum(k -> norm(Q[:, l[k+1]] - Q[:, l[k]]), 1:length(l)-1))
     end
     els = [ShellElement(Tuple(nodes[ids]), section, id) for ids in oriented]
     return ShellMesh(nodes, identity.(els), Q, [[loop] for loop in loops], o, a, b)
+end
+
+# a node per position: an existing node from `reuse` where one sits there (to
+# 1e-9 of the mesh size), else a new node with `fixity`
+function _mesh_nodes(X::Vector{SVector{3,T}}, reuse, fixity) where {T}
+    isempty(reuse) && return [Node(x, fixity) for x in X]
+    scale = maximum(x -> maximum(abs, x), X)
+    tol = 1e-9 * max(scale, one(T))
+    return map(X) do x
+        i = findfirst(n -> norm(n.position - x) <= tol, reuse)
+        i === nothing ? Node(x, fixity) : reuse[i]
+    end
 end
 
 _pointsd(P::AbstractMatrix) = size(P, 1) in (2, 3) ? P :
@@ -367,7 +386,7 @@ circle_polygon(center, radius::Real; n::Int = 32) =
 """
     mesh_polygon(outline, section; holes = [], h = nothing, max_area = nothing,
                  min_angle = 25, points = [], origin = [0, 0, 0], e1 = [1, 0, 0],
-                 e2 = [0, 1, 0], fixity = :free, id = :panel, seed = 1) -> ShellMesh
+                 e2 = [0, 1, 0], fixity = :free, id = :panel, seed = 1, reuse = Node[]) -> ShellMesh
 
 Triangulate a planar polygon with polygonal holes into triangular
 [`ShellElement`](@ref)s: constrained Delaunay with quality refinement
@@ -387,6 +406,12 @@ target edge length `h`). **Requires DelaunayTriangulation.jl**
 - `origin`, `e1`, `e2`, `fixity`, `id`: as in [`shell_mesh`](@ref)
 - `seed`: the triangulator inserts points in random order; the seeded generator
   makes the mesh reproducible (same input and seed → same mesh)
+- `reuse`: existing nodes (frame joints, beam and column nodes, another wall's
+  edge nodes). Each one lying in the panel's plane, inside the material or on its
+  boundary, becomes a mesh vertex and the mesh uses THAT node object, which
+  connects the panel to them; nodes off the panel are ignored. Reused nodes keep
+  their fixity and appear in `mesh.nodes` too: `unique([frame_nodes; mesh.nodes])`
+  is the tidy node list (a node listed twice is harmless).
 
 Each polygon edge is tracked through refinement: `mesh.boundary[c][k]` holds
 every node on edge `k` of curve `c` (1 = outline, 1 + j = hole j), and

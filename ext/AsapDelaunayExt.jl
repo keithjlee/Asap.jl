@@ -19,6 +19,7 @@ module AsapDelaunayExt
 
 using Asap
 using Asap: ShellMesh, AbstractShellSection
+using LinearAlgebra: cross, dot
 using DelaunayTriangulation
 const DT = DelaunayTriangulation
 
@@ -67,7 +68,7 @@ end
 function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     holes = [], h = nothing, max_area = nothing, min_angle::Real = 25.0, points = [],
     origin = zeros(3), e1 = [1.0, 0, 0], e2 = [0.0, 1, 0], fixity::Symbol = :free,
-    id::Symbol = :panel, seed::Integer = 1) where {T}
+    id::Symbol = :panel, seed::Integer = 1, reuse::AbstractVector = Asap.Node{T}[]) where {T}
     outer = _poly(outline)
     _area2(outer) < 0 && reverse!(outer)                    # outline counter-clockwise
     hs = map(holes) do H
@@ -91,6 +92,17 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     end
     ids = [[vid(p) for p in poly] for poly in polys]
     foreach(p -> vid((Float64(p[1]), Float64(p[2]))), points)
+    # reused nodes in the panel's plane and in the material become vertices
+    o, a, b = Asap._plane_axes(T, origin, e1, e2)
+    nrm = cross(a, b)
+    for n in reuse
+        d = n.position - o
+        abs(dot(d, nrm)) <= tol || continue
+        q = (Float64(dot(d, a)), Float64(dot(d, b)))
+        inmat = (_inside(outer, q...) || any(k -> _on_edge(q, outer, k, tol), eachindex(outer))) &&
+                !any(H -> _inside(H, q...) && !any(k -> _on_edge(q, H, k, tol), eachindex(H)), hs)
+        inmat && vid(q)
+    end
     # every input edge, split where another vertex lies on it (T-junctions); an
     # edge shared by two polygons (a hole along the outline or another hole) once
     edges = Set{NTuple{2,Int}}()
@@ -136,7 +148,7 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
         _inside(outer, cx, cy) && !any(H -> _inside(H, cx, cy), hs) && push!(cells, [i, j, k])
     end
     mesh = Asap.shell_mesh([P[i] for i in eachindex(P)], cells, section;
-        origin = origin, e1 = e1, e2 = e2, fixity = fixity, id = id)
+        origin = origin, e1 = e1, e2 = e2, fixity = fixity, id = id, reuse = reuse)
     # the mesh nodes on every input edge, in order along it
     boundary = [[_edge_nodes(mesh, poly[k], poly[mod1(k + 1, length(poly))], tol) for k in eachindex(poly)]
                 for poly in polys]
