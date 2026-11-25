@@ -274,4 +274,43 @@ import DelaunayTriangulation
         @test g.N2[k_top] < 0
         @test g.N1[k_bot] > 0
     end
+
+    @testset "interior segments: section cuts through the material" begin
+        outline = [(0.0, 0.0), (0.5, 0.0), (5.5, 0.0), (6.0, 0.0), (6.0, 3.0),
+                   (4.0, 3.0), (2.0, 3.0), (0.0, 3.0)]
+        cutline = ((1.5, 0.0), (1.5, 3.0))                    # outline to outline, clear of the load
+        m = mesh_polygon(outline, sec; segments = [cutline, ((3.0, 1.0), (4.0, 2.0))], h = 0.3,
+            e1 = [1.0, 0, 0], e2 = [0.0, 0, 1])
+        cut = nodes_on_segment(m, cutline...)
+        @test length(cut) >= 9 && all(n -> n.position[1] ≈ 1.5, cut)
+        @test length(nodes_on_segment(m, (3.0, 1.0), (4.0, 2.0))) >= 3   # a free-standing segment
+        # element edges follow the cut: every element lies on one side
+        @test all(m.elements) do el
+            x = [n.position[1] for n in el.nodes]
+            all(<=(1.5 + 1e-12), x) || all(>=(1.5 - 1e-12), x)
+        end
+        @test sum(Asap.area, m.elements) ≈ 18.0 rtol = 1e-12
+        for n in m.nodes
+            fixnode!(n, Bool[1, 0, 1, 0, 1, 0])
+        end
+        brgL = nodes_on_segment(m, (0.0, 0.0), (0.5, 0.0))
+        foreach(n -> fixnode!(n, Bool[0, 0, 0, 0, 0, 0]), brgL)
+        foreach(n -> fixnode!(n, Bool[1, 0, 0, 0, 0, 0]), nodes_on_segment(m, (5.5, 0.0), (6.0, 0.0)))
+        w = 40.0
+        model = Model(m.nodes, AbstractElement{Float64}[m.elements...],
+            AbstractLoad{Float64}[edge_loads(m, (2.0, 3.0), (4.0, 3.0), [0.0, 0.0, -w])...])
+        solve!(model)
+        # the free body left of the cut carries only its bearing reaction: the cut balances it
+        left = elements_in(m, [(0.0, 0.0), (1.5, 0.0), (1.5, 3.0), (0.0, 3.0)])
+        c = [1.5, 0.0, 1.5]
+        F, M = section_cut(model, left, cut; about = c)
+        FL, ML = total_reaction(model.results, brgL; about = c)
+        @test norm(F + FL) < 1e-9 * w
+        @test norm(M + ML) < 1e-9 * w
+        @test -F[3] ≈ FL[3] rtol = 1e-12                       # the shear at the cut = left reaction
+        # refused: a segment leaving the material, segments crossing each other
+        @test_throws ArgumentError mesh_polygon(outline, sec; segments = [((7.0, 1.0), (5.0, 1.0))], h = 0.5)
+        @test_throws ArgumentError mesh_polygon(outline, sec;
+            segments = [((1.0, 1.0), (2.0, 2.0)), ((1.0, 2.0), (2.0, 1.0))], h = 0.5)
+    end
 end
