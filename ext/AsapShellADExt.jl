@@ -116,4 +116,51 @@ function ChainRulesCore.rrule(::typeof(Asap._shell_rigidities), s::ShellSection{
     return y, shell_rigidities_pullback
 end
 
+# ── triangles (3 nodes): same pattern, 18×18 stiffness and 18-vector loads ────
+
+@inline _x3(v) = (SVector(v[1], v[2], v[3]), SVector(v[4], v[5], v[6]), SVector(v[7], v[8], v[9]))
+
+function ChainRulesCore.rrule(::typeof(Asap._shell_K_plain), A, D, S, γt, X1, X2, X3)
+    K = Asap._shell_K_plain(A, D, S, γt, X1, X2, X3)
+    function shell_K3_pullback(ΔK)
+        Δ = reshape(_cot(Val(324), unthunk(ΔK)), Size(18, 18))
+        As, Ds, Ss, γ = SMatrix{3,3,Float64}(A), SMatrix{3,3,Float64}(D), SMatrix{2,2,Float64}(S), Float64(γt)
+        X = (_sv3(X1), _sv3(X2), _sv3(X3))
+        gm = _grad(vec(As), Val(_CHUNK)) do p
+            sum(Δ .* Asap._shell_K_plain(_m3(p, 0), Ds, Ss, γ, X...))
+        end
+        gp = _grad(vcat(vec(Ds), vec(Ss)), Val(_CHUNK)) do p
+            sum(Δ .* Asap._shell_K_plain(As, _m3(p, 0), SMatrix{2,2}(p[10], p[11], p[12], p[13]), γ, X...))
+        end
+        gx = _grad(vcat(X...), Val(_CHUNK)) do p
+            sum(Δ .* Asap._shell_K_plain(As, Ds, Ss, γ, _x3(p)...))
+        end
+        x1, x2, x3 = _x3(gx)
+        # the ANDES triangle has a genuine drilling DOF: γt (the ITW quad's penalty) is unused
+        return (NoTangent(), _m3(gm, 0), _m3(gp, 0), SMatrix{2,2}(gp[10], gp[11], gp[12], gp[13]),
+            zero(γ), x1, x2, x3)
+    end
+    return K, shell_K3_pullback
+end
+
+function ChainRulesCore.rrule(::typeof(Asap._shell_fef_plain), A, qg, ql, X1, X2, X3)
+    f = Asap._shell_fef_plain(A, qg, ql, X1, X2, X3)
+    function shell_fef3_pullback(Δf)
+        Δ = _cot(Val(18), unthunk(Δf))
+        g0, l0 = SVector{3,Float64}(qg), SVector{3,Float64}(ql)
+        X = (_sv3(X1), _sv3(X2), _sv3(X3))
+        ga = _grad(vcat(g0, l0), Val(_CHUNK)) do p
+            dot(Δ, Asap._shell_fef_plain(A, SVector(p[1], p[2], p[3]), SVector(p[4], p[5], p[6]), X...))
+        end
+        gx = _grad(vcat(X...), Val(_CHUNK)) do p
+            dot(Δ, Asap._shell_fef_plain(A, g0, l0, _x3(p)...))
+        end
+        x1, x2, x3 = _x3(gx)
+        # the triangle's lumped load does not depend on the membrane rigidity
+        return (NoTangent(), zero(SMatrix{3,3,Float64}), SVector(ga[1], ga[2], ga[3]),
+            SVector(ga[4], ga[5], ga[6]), x1, x2, x3)
+    end
+    return f, shell_fef3_pullback
+end
+
 end # module

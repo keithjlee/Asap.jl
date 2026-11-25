@@ -28,6 +28,23 @@ end
 
 _area2(p) = sum(k -> p[k][1] * p[mod1(k + 1, length(p))][2] - p[mod1(k + 1, length(p))][1] * p[k][2], eachindex(p))
 
+# DelaunayTriangulation cannot take boundary curves that share a vertex (a hole
+# touching the outline, or another hole, at a point): fail clearly instead of
+# deep inside the triangulator. Holes whose edge lies along the outline work.
+function _check_touching(polys)
+    scale = maximum(p -> maximum(q -> max(abs(q[1]), abs(q[2])), p), polys)
+    tol = 1e-9 * max(scale, 1.0)
+    for a in eachindex(polys), b in a+1:length(polys), p in polys[a], q in polys[b]
+        if abs(p[1] - q[1]) <= tol && abs(p[2] - q[2]) <= tol
+            what = a == 1 ? "hole $(b - 1) touches the outline" : "holes $(a - 1) and $(b - 1) touch"
+            throw(ArgumentError("mesh_polygon: $what at the vertex $(p). Boundary curves that " *
+                "share a vertex are not supported: merge the opening into the outline polygon " *
+                "(a notch), or leave a small gap."))
+        end
+    end
+    return nothing
+end
+
 function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     holes = [], h = nothing, max_area = nothing, min_angle::Real = 25.0, points = [],
     origin = zeros(3), e1 = [1.0, 0, 0], e2 = [0.0, 1, 0], fixity::Symbol = :free,
@@ -38,6 +55,7 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
         p = _poly(H)
         _area2(p) > 0 ? reverse(p) : p                       # holes clockwise
     end
+    _check_touching((outer, hs...))
     pts = Tuple{Float64,Float64}[]
     curves = Vector{Vector{Vector{Int}}}()
     for poly in (outer, hs...)

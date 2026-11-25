@@ -356,12 +356,12 @@ function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._group_entries_all)
     return V, frame_group_pullback
 end
 
-# shell stiffness entries of one group
+# shell stiffness entries of one group (quadrilaterals N = 4, triangles N = 3)
 function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._group_entries_nnode_all),
-        g::HOST.ElementGroup{<:Asap.ShellElement}, state::_F64State, v::Val{4})
+        g::HOST.ElementGroup{<:Asap.ShellElement}, state::_F64State, v::Val{N}) where {N}
     V = HOST._group_entries_nnode_all(g, state, v)
     shellK = (sec, xs, ec) -> vec(Asap.shell_stiffness(sec, xs...))
-    item(e) = (shellK, g.model_indices[e], ntuple(k -> g.inodes[k, e], 4), 0, nothing, 576)
+    item(e) = (shellK, g.model_indices[e], ntuple(k -> g.inodes[k, e], Val(N)), 0, nothing, (6N)^2)
     function shell_group_pullback(ΔV)
         Δ = _cotvec(ΔV)
         Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent(), NoTangent())
@@ -429,6 +429,23 @@ function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._shell_fef),
         return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.sloads), item, t.sscatter' * Δ))
     end
     return y, shell_fef_pullback
+end
+
+# design-dependent triangular shell surface loads
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._shell3_fef),
+        t::HOST.FEFTable, state::_F64State)
+    y = HOST._shell3_fef(t, state)
+    function item(j)
+        load = t.tloads[j]
+        f = (sec, xs, ec) -> HOST._shell_fef_global(load, sec, xs)
+        return f, t.telem[j], ntuple(k -> t.tnodes[k, j], Val(3)), 0, nothing, 18
+    end
+    function shell3_fef_pullback(Δy)
+        Δ = _cotvec(Δy)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.tloads), item, t.tscatter' * Δ))
+    end
+    return y, shell3_fef_pullback
 end
 
 end # module

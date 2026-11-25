@@ -36,4 +36,15 @@ Mooncake.@from_rrule(
     Tuple{typeof(Asap._shell_fef_plain),M3,V3,V3,V3,V3,V3,V3},
 )
 
+# triangles (3 positions)
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{typeof(Asap._shell_K_plain),M3,M3,M2,Float64,V3,V3,V3},
+)
+
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{typeof(Asap._shell_fef_plain),M3,V3,V3,V3,V3,V3},
+)
+
 end # module

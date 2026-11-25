@@ -49,6 +49,10 @@ import DelaunayTriangulation
         @test length(right) >= 3                                       # refined
         @test Set(right) == Set(nodes_on_segment(m, (6.0, 0.0), (6.0, 3.0)))
         @test length(boundary_nodes(m, 2)) >= 24                       # circle: all its vertices
+        # a hole along the outline edge (a notch) works; touching at a vertex is refused clearly
+        notch = mesh_polygon(outline, sec; holes = [[(2.0, 0.0), (3.0, 0.0), (3.0, 1.0), (2.0, 1.0)]], h = 0.5)
+        @test sum(Asap.area, notch.elements) ≈ 17.0 rtol = 1e-10
+        @test_throws ArgumentError mesh_polygon(outline, sec; holes = [[(0.0, 0.0), (1.0, 0.5), (0.5, 1.0)]], h = 0.5)
         # an extra point becomes a node
         mp = mesh_polygon(outline, sec; h = 0.5, points = [(3.0, 1.5)])
         @test any(n -> n.position ≈ [3.0, 1.5, 0.0], mp.nodes)

@@ -57,4 +57,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_shell_tri.jl")             # S7: ANDES-OPT + MITC3+ triangle kernels
     include("newcore/test_shell_tri_element.jl")     # S7d: triangles in models
     include("newcore/test_shell_mesh_general.jl")    # S7e/f: general meshes, D-region workflow
+    include("newcore/test_shell_tri_ad.jl")          # S7g: triangles on the differentiable path
 end
