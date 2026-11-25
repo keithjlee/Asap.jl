@@ -93,7 +93,7 @@ end
 
 begin
     f = fig_bars(["initial", "size only", "shape only", "shape + size"], collect(values(results));
-        ylabel = "{C·V} / initial", title = "shape vs size",
+        ylabel = "C·V / initial", title = "shape vs size",
         highlight = argmin(collect(values(results))), rotation = π / 6, width = 210)
     savefig("O2_comparison.pdf", f)
 end

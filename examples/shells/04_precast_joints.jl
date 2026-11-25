@@ -95,7 +95,7 @@ begin
     Wupper = areal_mass(panel) * 9.81 * L * H
     @show sum(N) (-Wupper)          # Σ joint forces = − weight of the upper panel
     f = Figure(size = (W_HALF, round(Int, 0.95W_HALF)))
-    ax = Axis(f[1, 1]; xlabel = "position along joint {s} [m]", ylabel = "link axial force [kN]",
+    ax = Axis(f[1, 1]; xlabel = "position along joint s [m]", ylabel = "link axial force [kN]",
         title = "horizontal joint")
     barplot!(ax, s, N; color = force_color.(N), width = 0.2)
     hlines!(ax, [0.0]; color = kjl_black, linewidth = 0.6, linestyle = :solid)
@@ -103,7 +103,7 @@ begin
 end
 
 begin
-    f = fig_wall(r.m, r.upper; field = :Nyy, scale = 200.0, title = rich("UPPER PANEL: N", subscript("yy"), ", ×200"), width = W_HALF)
+    f = fig_wall(r.m, r.upper; field = :Nyy, scale = 200.0, title = "upper panel: N_{yy}, ×200", width = W_HALF)
     savefig("04_upper_panel_Nyy.pdf", f)
 end
 

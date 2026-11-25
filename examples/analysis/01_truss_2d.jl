@@ -122,7 +122,7 @@ begin
     end
     depths = 1.0:0.25:3.0
     f = fig_series(collect(depths), [("midspan deflection", pratt_deflection.(depths))];
-        xlabel = "depth {H} [m]", ylabel = "deflection [mm]", title = "depth study", legendpos = :rt)
+        xlabel = "depth H [m]", ylabel = "deflection [mm]", title = "depth study", legendpos = :rt)
     savefig("A1_depth.pdf", f)
 end
 

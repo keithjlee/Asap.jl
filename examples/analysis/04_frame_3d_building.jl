@@ -95,8 +95,8 @@ begin
     k = argmax([maximum(abs, getc(env.hi, k)) + maximum(abs, getc(env.lo, k)) for k in comp if k != 1])
     k = collect(comp)[k + 1]
     f = Figure(size = (W_HALF, round(Int, 0.8W_HALF)))
-    ax = Axis(f[1, 1]; aspect = nothing, xlabel = "{x} along girder [m]", ylabel = "moment [kN·m]", title = "moment envelope")
-    band!(ax, env.x, getc(env.lo, k), getc(env.hi, k); color = (kjl_black, 0.5))     # one internal force: black, 50 % fill
+    ax = Axis(f[1, 1]; aspect = nothing, xlabel = "x along girder [m]", ylabel = "moment [kN·m]", title = "moment envelope")
+    band!(ax, env.x, getc(env.lo, k), getc(env.hi, k); color = kjl_diagramgray)     # one internal force: light gray fill, black lines
     lines!(ax, env.x, getc(env.hi, k); color = kjl_black, linewidth = 1); lines!(ax, env.x, getc(env.lo, k); color = kjl_black, linewidth = 1)
     hlines!(ax, [0.0]; color = kjl_midgray, linewidth = 0.5, linestyle = :solid)
     savefig("A4_envelope.pdf", f)

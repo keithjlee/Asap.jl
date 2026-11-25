@@ -198,7 +198,7 @@ end
 
 begin
     # the full wall line (both piers) in one elevation: build a geo once, plot each pier
-    f = fig_wall(model, pierA; geo = rg, field = :Nyy, scale = 300.0, title = rich("PIER A: N", subscript("yy"), ", EY"), width = 196)
+    f = fig_wall(model, pierA; geo = rg, field = :Nyy, scale = 300.0, title = "pier A: N_{yy}, EY", width = 196)
     savefig("03_pierA_Nyy_EY.pdf", f)
 end
 

@@ -49,7 +49,7 @@ begin
     drifts = [portal(spring(k)) for k in ks]
     rigid = portal(EndConditions(:fixedfixed))
     f = fig_series(ks, [("semi-rigid", drifts)]; xscale = log10, legendpos = :rt,
-        xlabel = "joint stiffness {k} [kN·m/rad]", ylabel = "drift [mm]", ref = rigid, reflabel = "rigid",
+        xlabel = "joint stiffness k [kN·m/rad]", ylabel = "drift [mm]", ref = rigid, reflabel = "rigid",
         title = "drift vs joint stiffness", width = W_HALF)
     savefig("A5_joint_sweep.pdf", f)
     (k_1e3 = drifts[1], k_1e8 = drifts[end], rigid = rigid)
@@ -78,7 +78,7 @@ begin
     exact(kθ) = 1000 * (10 * 4^3 / (3EI) + 10 * 4 * 4 / kθ + 10 / 1e6)
     tops = cantilever.(kθs)
     f = fig_series(kθs, [("Asap", tops), ("closed form", exact.(kθs))]; xscale = log10, legendpos = :rt,
-        xlabel = "footing stiffness {kθ} [kN·m/rad]", ylabel = "top displacement [mm]",
+        xlabel = "footing stiffness kθ [kN·m/rad]", ylabel = "top displacement [mm]",
         title = "column on a spring", width = W_HALF)
     savefig("A5_footing_spring.pdf", f)
     maximum(abs.(tops .- exact.(kθs)) ./ exact.(kθs))     # ≈ 0: Asap matches the closed form

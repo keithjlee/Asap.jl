@@ -79,7 +79,7 @@ begin
     gfd = [(drift(x0 + h * (1:4 .== j)) - drift(x0 - h * (1:4 .== j))) / 2h for j in 1:4]
     grads = (zygote = gz, implicit = gi, finite_diff = gfd)
     @show grads
-    f = fig_bars(names, -1000 .* gi; ylabel = "−∂ DRIFT / ∂{t} [mm/m]",
+    f = fig_bars(names, -1000 .* gi; ylabel = "−∂ DRIFT / ∂t [mm/m]",
         title = "drift sensitivity", rotation = π / 8)
     savefig("05_sensitivities.pdf", f)
 end
@@ -139,6 +139,7 @@ begin
         title = "start vs optimized", xticksvisible = false)
     barplot!(ax, [1, 2, 3, 4] .- 0.18, x0; width = 0.34, color = kjl_lightgray, label = "start")
     barplot!(ax, [1, 2, 3, 4] .+ 0.18, x; width = 0.34, color = kjl_emphasis, label = "optimized")
+    zerobase!(ax, vcat(x0, x))
     axislegend(ax; position = :rt)
     savefig("05_thickness.pdf", f)
 end
