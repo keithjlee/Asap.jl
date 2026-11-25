@@ -32,7 +32,7 @@
 | S6 pure path / AD + AsapOptim thickness variable | ✅ design-dependent shell loads; `AsapShellADExt`; AsapOptim `ThicknessVariable` (branch `shells`) | (see `git log`) |
 | S6b feature parity (Keith, 2026-11-23 — before release) | ✅ P1–P7; lockstep green (Asap 3067), docs + README pass | `31a0335`, `2e1e3f2`; AsapOptim `0dc0ae8` |
 | S6c examples for ALL scenarios + Enzyme across Asap (Keith, 2026-11-23 evening) | ✅ walkthroughs + PDF reports + Enzyme matrix (1.13 + 1.12, 18/18) | see below |
-| S6d reverse-mode performance (2026-11-23/24) | ✅ AsapFrameADExt; gather refactor REVERTED (broke Enzyme); linear-cost RuleConfig group rules + split shell rules (vs v1.2 frames 8.8–11.7×; vs kernel rules only frames 2.4–6.9×, shells 2.4–4.7×); bitwise primal vs v1.2; Enzyme 36/36 | release notes "Performance" |
+| S6d reverse-mode performance (2026-11-23/24) | ✅ AsapFrameADExt; gather refactor REVERTED (broke Enzyme); linear-cost RuleConfig group rules + split shell rules (vs v1.2 frames 8.8–11.7×; vs kernel rules only frames 2.4–6.9×, shells 2.2–4.1×); bitwise primal vs v1.2; Enzyme 36/36 | release notes "Performance" |
 | Release 1.3.0 (docs pages, release notes, lockstep, registrator) | ✅ 2026-11-24: merged to `main`, v1.3.0 (AsapOptim 1.3.0); registration via `@JuliaRegistrator` | |
 | S7 triangles, mesh import, warping correction (post-1.3) | ☐ | |
 
@@ -443,8 +443,9 @@ Keith: "carry forward with any cleanup of the code, any performance gains". Prof
   config-free kernel rules, so they never see these. `_natural` converts structural
   `Tangent{SMatrix}` fields back to arrays.
 - DONE — shell kernel pullbacks: separate ForwardDiff passes per input group (membrane rigidities,
-  plate rigidities, load, positions). Only the position group carries dual geometry: stiffness
-  pullback 200 → 125 µs, compile ~85 → 43 s. `_shell_rigidities(sec)` (one rule for `ShellSection`:
+  plate rigidities, load, positions). Only the position group carries dual geometry. Dual width 4 for
+  every group (2026-11-24, after CI): widths 10/13/15 ran ~20% faster but compiled 69 s vs 37 s on
+  1.13 and 853 s vs 141 s on Julia 1.10. `_shell_rigidities(sec)` (one rule for `ShellSection`:
   one width-4 dual pass over E, G, ν, t, instead of a 35 µs Zygote trace of four accessors).
   `_shell_fef_plain(A, qg, ql, X…)` takes the traction as global + local parts (the kernel forms
   qg + Rᵀql, bitwise the old traction), so Zygote no longer traces `shell_frame` per loaded element.

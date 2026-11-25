@@ -24,7 +24,11 @@ struct ShellTag end
 # rigidities (or the load) carry partials the geometry (shell frame,
 # Jacobians, strain operators) stays plain Float64, which is most of the
 # kernel. Only the position group pays for dual geometry.
-const _CHUNK_X = 4   # positions (12), 3 passes. Measured: 6 or 12 run no faster, compile 52 or 71 s vs 43 s
+# Dual width 4 for every group. Wider duals (one pass per group) run ~20% faster
+# but compile far slower: first pullback 69 s vs 37 s on Julia 1.13, and 853 s vs
+# 141 s on Julia 1.10, whose compiler struggles with wide duals through these
+# unrolled 24×24 kernels.
+const _CHUNK = 4
 
 function _grad(h, p0::SVector{N,Float64}, ::Val{C}) where {N,C}
     v = Vector(p0)
@@ -53,13 +57,13 @@ function ChainRulesCore.rrule(::typeof(Asap._shell_K_plain), A, D, S, γt, X1, X
         As, Ds, Ss, γ = SMatrix{3,3,Float64}(A), SMatrix{3,3,Float64}(D), SMatrix{2,2,Float64}(S), Float64(γt)
         X = (_sv3(X1), _sv3(X2), _sv3(X3), _sv3(X4))
         # membrane (A, γt) and plate (D, S) at plain geometry
-        gm = _grad(vcat(vec(As), SVector(γ)), Val(10)) do p
+        gm = _grad(vcat(vec(As), SVector(γ)), Val(_CHUNK)) do p
             sum(Δ .* Asap._shell_K_plain(_m3(p, 0), Ds, Ss, p[10], X...))
         end
-        gp = _grad(vcat(vec(Ds), vec(Ss)), Val(13)) do p
+        gp = _grad(vcat(vec(Ds), vec(Ss)), Val(_CHUNK)) do p
             sum(Δ .* Asap._shell_K_plain(As, _m3(p, 0), SMatrix{2,2}(p[10], p[11], p[12], p[13]), γ, X...))
         end
-        gx = _grad(vcat(X...), Val(_CHUNK_X)) do p
+        gx = _grad(vcat(X...), Val(_CHUNK)) do p
             sum(Δ .* Asap._shell_K_plain(As, Ds, Ss, γ, _x4(p)...))
         end
         x1, x2, x3, x4 = _x4(gx)
@@ -76,11 +80,11 @@ function ChainRulesCore.rrule(::typeof(Asap._shell_fef_plain), A, qg, ql, X1, X2
         As, g0, l0 = SMatrix{3,3,Float64}(A), SVector{3,Float64}(qg), SVector{3,Float64}(ql)
         X = (_sv3(X1), _sv3(X2), _sv3(X3), _sv3(X4))
         # rigidity and traction at plain geometry; positions
-        ga = _grad(vcat(vec(As), g0, l0), Val(15)) do p
+        ga = _grad(vcat(vec(As), g0, l0), Val(_CHUNK)) do p
             dot(Δ, Asap._shell_fef_plain(_m3(p, 0), SVector(p[10], p[11], p[12]),
                 SVector(p[13], p[14], p[15]), X...))
         end
-        gx = _grad(vcat(X...), Val(_CHUNK_X)) do p
+        gx = _grad(vcat(X...), Val(_CHUNK)) do p
             dot(Δ, Asap._shell_fef_plain(As, g0, l0, _x4(p)...))
         end
         x1, x2, x3, x4 = _x4(gx)
@@ -102,7 +106,7 @@ function ChainRulesCore.rrule(::typeof(Asap._shell_rigidities), s::ShellSection{
         Δ isa AbstractZero && return (NoTangent(), Δ)
         ΔA, ΔD, ΔS, Δγ = map(_dense, (unthunk(Δ[1]), unthunk(Δ[2]), unthunk(Δ[3]), unthunk(Δ[4])), y)
         m = s.material
-        g = _grad(SVector(m.E, m.G, m.ν, s.t), Val(4)) do p
+        g = _grad(SVector(m.E, m.G, m.ν, s.t), Val(_CHUNK)) do p
             A, D, S, γ = Asap._shell_rigidities(ShellSection(Material(p[1], p[2], m.ρ, p[3]), p[4]))
             sum(ΔA .* A) + sum(ΔD .* D) + sum(ΔS .* S) + Δγ * γ
         end

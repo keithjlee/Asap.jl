@@ -13,12 +13,12 @@ linear-cost group rules (AsapChainRulesExt) and the split shell rules.
     model                       primal   v1.2       1.3 kernels   1.3
     frame 120 el / 64 nodes     0.6 ms    62.8 ms     16.7 ms      7.1 ms
     frame 665 el / 294 nodes    2.9 ms   435.6 ms    256.2 ms     37.1 ms
-    shell 96 el                 1.2 ms      —         63.9 ms     26.2 ms
-    shell 384 el                5.8 ms      —        294.7 ms    107.0 ms
-    shell 1536 el              24.0 ms      —       1976.8 ms    419.2 ms
+    shell 96 el                 1.3 ms      —         63.9 ms     28.9 ms
+    shell 384 el                5.5 ms      —        294.7 ms    104.4 ms
+    shell 1536 el              24.0 ms      —       1976.8 ms    486.1 ms
 
 With the group rules the cost is a FIXED multiple of the primal (frames 13×,
-shells 18–22×): the per-element closures index arrays they capture, and under
+shells about 20×): the per-element closures index arrays they capture, and under
 plain Zygote each index pulled back into a full-size cotangent (quadratic
 cost). The rules leave the primal untouched (Enzyme and Mooncake never see
 them) and accumulate one cotangent per state field.

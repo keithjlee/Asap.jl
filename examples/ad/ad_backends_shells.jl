@@ -9,8 +9,8 @@ both fail on the shell kernels natively. Enzyme needs runtime activity and
 a `Const` function annotation (as everywhere in Asap).
 
 Recorded 2026-11-24 (Julia 1.13.4, Enzyme 0.13.221, Mooncake 0.5.72, Apple M4):
-    12 elements: primal 0.18 ms | Zygote 3.3 | Enzyme 3.1 | Mooncake 9.3 ms
-    96 elements: primal 1.36 ms | Zygote 29.2 | Enzyme 25.6 | Mooncake 76.1 ms
+    12 elements: primal 0.16 ms | Zygote 3.3 | Enzyme 3.1 | Mooncake 9.5 ms
+    96 elements: primal 1.38 ms | Zygote 26.9 | Enzyme 24.3 | Mooncake 88.5 ms
 (before the 1.3 linear-cost and split shell rules: Zygote 6.0 / 59.2, Enzyme
 4.1 / 32.5, Mooncake 10.6 / 97.7 ms)
 =#
