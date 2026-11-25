@@ -86,8 +86,8 @@ corners.
 begin
     g = ShellGeo(model)
     f = fig_wall(model, w; geo = g, field = :Nyy, scale = 200.0,
-        title = "vertical membrane force Nyy, deformed ×200")
-    savefig("01_wall_Nyy.png", f)
+        title = rich("N", subscript("yy"), ", DEFORMED ×200"))
+    savefig("01_wall_Nyy.pdf", f)
 end
 
 #=
@@ -100,7 +100,7 @@ the tension field below the window.
 =#
 begin
     f = fig_principal(model, w; geo = g)
-    savefig("01_wall_principal.png", f)
+    savefig("01_wall_principal.pdf", f)
 end
 
 #=
@@ -122,8 +122,8 @@ begin
     piers = (left = (V = FL[1], P = FL[3], M = ML[2]), right = (V = FR[1], P = FR[3], M = MR[2]))
     @show FL[1] + FR[1]          # = total storey shear above z = 1 (280 kN), exactly
     f = fig_bars(["left pier V", "right pier V"], [FL[1], FR[1]]; ylabel = "shear [kN]",
-        title = "pier shears at z = 1 m (sum = 280 kN)")
-    savefig("01_wall_pier_shears.png", f)
+        title = "pier shears at {z = 1 m}", width = 200)
+    savefig("01_wall_pier_shears.pdf", f)
     @show piers
 end
 
@@ -161,7 +161,7 @@ begin
     end
     f = fig_series(sizes, [("roof drift", 1000 .* drift)]; xlabel = "element size [m]",
         ylabel = "roof drift [mm]", xscale = log2, title = "mesh convergence")
-    savefig("01_wall_convergence.png", f)
+    savefig("01_wall_convergence.pdf", f)
     drift
 end
 

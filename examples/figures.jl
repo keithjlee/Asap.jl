@@ -1,11 +1,11 @@
 #=
-Figure generators for the shell walkthroughs.
+Figure generators for the walkthroughs.
 
-Plain functions of Asap's plot-extraction objects (`ShellGeo`, `WallMesh`,
-the solved `Model`) that return Makie figures in the kjlMakie house style:
+Plain functions of Asap's plot-extraction objects (`ShellGeo`, `WallMesh`, the solved
+`Model`) that return Makie figures in the kjlMakie house style:
 
     fig_wall(model, w; field = :N2, scale = 0.0)    wall elevation, contoured field on the (scaled) deformed mesh
-    fig_principal(model, w)                         principal membrane-force trajectories (struts / ties)
+    fig_principal(model, w)                         principal membrane-force trajectories (ties / struts)
     fig_bars(labels, values; ylabel)                bar chart (pier shears, storey shears, …)
     fig_slab(model; field = :Mxx, elements)         plan view of a slab, contoured
     fig_3d(model; field = :N2, scale)               3D view of shells + frames, deformed
@@ -13,6 +13,21 @@ the solved `Model`) that return Makie figures in the kjlMakie house style:
     fig_lines(model; plane, scale, diagram)         2D view of frames/trusses: deformed (exact member curves),
                                                     coloured by axial force, optional moment diagram
     fig_member(model, el)                           N / V / M diagrams along one member
+
+House style (kjlMakie; the rules are in AsapEcosystem/CLAUDE.md "Figures"):
+- internal-force diagrams: ONE diagram black with a 50 % fill (`diagramband!`); several compared
+  `kjl_categorical` (blue, green, yellow, grays).
+- colours by ROLE only: kjl_tension (blue, +) / kjl_compression (red, −), signed fields
+  kjl_diverging (red → white → blue, `symmetric_range`), neutral fields such as displacement
+  `neutral_colormap` (white → orange), one highlighted series kjl_emphasis (blue) with the rest
+  grayscale (`kjl_series(i)`), a bad item kjl_alert (red). No literal hues, no Makie colormaps.
+- data axes: theme `kjl_light`; structure drawings: `structurestyle!` + `fitstructure!`
+  (true aspect, padded limits, no axes).
+- labels in CAPS (`savefig` applies `capslabels!`; units in [brackets], Greek, rich-text
+  subscripts and `{…}` keep their case).
+- figure units are points: every generator takes `width` = the PRINTED width [pt]
+  (W_FULL / W_WIDE / W_PLAN / W_HALF below); `savefig` writes a PDF at 1 pt per unit and the
+  reports embed it at natural size, so the 9 pt text prints at 9 pt.
 
 `include(joinpath(@__DIR__, "..", "figures.jl")); set_figdir(@__DIR__)` from any
 walkthrough (it loads the plotting stack); figures go to `figures/` next to the walkthrough.
@@ -25,29 +40,28 @@ using Asap, LinearAlgebra
 using kjlMakie, CairoMakie
 CairoMakie.activate!()
 set_theme!(kjl_light)
-update_theme!(backgroundcolor = :white)        # PNGs: opaque white, not transparent
+
+# printed widths [pt] (kjl-typst report: 504 pt text width)
+const W_FULL = 470                # full width (a little inside the text block)
+const W_WIDE = 428                # 85 %
+const W_PLAN = 353                # 70 %
+const W_HALF = 240                # one column of a two-column grid
 
 # each walkthrough saves into `figures/` next to itself: call `set_figdir(@__DIR__)`
 const FIGDIR = Ref(joinpath(@__DIR__, "figures"))
 set_figdir(dir) = (FIGDIR[] = joinpath(dir, "figures"); mkpath(FIGDIR[]); FIGDIR[])
-# Saved PNGs are cropped to their content plus a margin: axes with a data aspect (elevations,
-# plans) otherwise leave wide empty bands, which waste page space in the reports.
-function savefig(name, fig; pad = 24)
-    path = joinpath(FIGDIR[], name)
-    save(path, fig; px_per_unit = 2)
-    endswith(name, ".png") && _crop_whitespace!(path; pad)
+
+"""
+    savefig(name, fig)
+
+Caps the labels and writes `figures/<name>.pdf` (vector, 1 pt per figure unit: embed at
+natural size). Any extension given in `name` is replaced by `.pdf`.
+"""
+function savefig(name, fig)
+    capslabels!(fig)
+    path = joinpath(FIGDIR[], splitext(name)[1] * ".pdf")
+    savereport(path, fig)
     return fig
-end
-function _crop_whitespace!(path; pad = 24)
-    img = Makie.FileIO.load(path)
-    C = Makie.Colors
-    ink = map(c -> min(C.red(c), C.green(c), C.blue(c)) < 0.98, img)
-    rows, cols = findall(vec(any(ink; dims = 2))), findall(vec(any(ink; dims = 1)))
-    (isempty(rows) || isempty(cols)) && return path
-    r = max(first(rows) - pad, 1):min(last(rows) + pad, size(img, 1))
-    c = max(first(cols) - pad, 1):min(last(cols) + pad, size(img, 2))
-    (length(r), length(c)) == size(img) || Makie.FileIO.save(path, img[r, c])
-    return path
 end
 
 # ── report data ──────────────────────────────────────────────────────────────
@@ -73,12 +87,24 @@ end
 
 # ── fields ───────────────────────────────────────────────────────────────────
 
+# colourbar labels (rich text keeps subscripts lowercase; units kN, m — displacements in mm)
+_sub(base, s, rest) = rich(base, subscript(s), rest)
 const FIELD_LABELS = Dict(
-    :Nxx => "Nxx  [force/length]", :Nyy => "Nyy  [force/length]", :Nxy => "Nxy  [force/length]",
-    :N1 => "N1 (major principal)  [force/length]", :N2 => "N2 (minor principal)  [force/length]",
-    :Mxx => "Mxx  [force·length/length]", :Myy => "Myy  [force·length/length]",
-    :Mxy => "Mxy  [force·length/length]", :Qx => "Qx  [force/length]", :Qy => "Qy  [force/length]",
-    :w => "out-of-plane displacement  [length]", :umag => "|u|  [length]")
+    :Nxx => _sub("N", "xx", "  [kN/m]"), :Nyy => _sub("N", "yy", "  [kN/m]"), :Nxy => _sub("N", "xy", "  [kN/m]"),
+    :N1 => _sub("N", "1", "  MAJOR PRINCIPAL [kN/m]"), :N2 => _sub("N", "2", "  MINOR PRINCIPAL [kN/m]"),
+    :Mxx => _sub("M", "xx", "  [kN·m/m]"), :Myy => _sub("M", "yy", "  [kN·m/m]"),
+    :Mxy => _sub("M", "xy", "  [kN·m/m]"), :Qx => _sub("Q", "x", "  [kN/m]"), :Qy => _sub("Q", "y", "  [kN/m]"),
+    :w => rich("w  OUT-OF-PLANE [mm]"), :umag => rich("|u|  [mm]"))
+
+const DISPLACEMENT_FIELDS = (:w, :umag)
+# displacement fields are drawn in mm
+field_scale(field) = field in DISPLACEMENT_FIELDS ? 1000.0 : 1.0
+
+"""
+colormap and colorrange for `field` over `vals`: forces/moments are signed (kjl_diverging,
+zero white at the centre); displacements are neutral (white → kjl_orange, zero white)
+"""
+field_colormap(field, vals) = field in DISPLACEMENT_FIELDS ? neutral_colormap(vals) : (kjl_diverging, symmetric_range(vals))
 
 "per-shell-element values of `field` (`:w`, `:umag` are nodal and handled by `nodal_field`)"
 function element_field(g::ShellGeo, field::Symbol)
@@ -128,66 +154,78 @@ shell_columns(g::ShellGeo, model, els) = [findfirst(==(findfirst(e -> e === el, 
 tri_faces(q::AbstractMatrix{Int}, ks) =
     reduce(vcat, [[q[1, k] q[2, k] q[3, k]; q[1, k] q[3, k] q[4, k]] for k in ks])
 
-symmetric_range(v) = (m = maximum(abs, v; init = 0.0); m == 0 ? (-1.0, 1.0) : (-m, m))
+# quad edges as line segments
+quad_edges(P, q, ks) = reduce(vcat, [P[q[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4])
 
-# ── wall elevation ───────────────────────────────────────────────────────────
-
-# figure size following the wall's aspect ratio (plot area ≈ 420 px tall + colourbar/legend)
-wall_figsize(w::WallMesh) = (round(Int, clamp(420 * w.s[end] / w.z[end], 160, 900)) + 260, 480)
-
-# limits from the plotted points only (the geometry holds every node of the
-# model, so auto-limits would take in other walls), and the axis column sized
-# to the data aspect so a colourbar/legend sits right beside the wall
-function fit_wall_axis!(fig, ax, pts; pad = 0.03)
-    s = extrema(p -> p[1], pts); z = extrema(p -> p[2], pts)
-    ds, dz = s[2] - s[1], z[2] - z[1]
-    m = pad * max(ds, dz)
-    limits!(ax, s[1] - m, s[2] + m, z[1] - m, z[2] + m)
-    colsize!(fig.layout, 1, Aspect(1, (ds + 2m) / (dz + 2m)))
-    resize_to_layout!(fig)
-    return fig
-end
+# ── wall elevation / slab plan ───────────────────────────────────────────────
 
 # wall-plane coordinates (s, z) of global points (columns of X)
 wall_sz(w::WallMesh, X::AbstractMatrix) =
     [Point2f(dot(w.along, X[:, i] - w.origin), dot(w.up, X[:, i] - w.origin)) for i in axes(X, 2)]
 
-"""
-    fig_wall(model, w; field = :N2, scale = 0.0, title, geo, colormap)
-
-Elevation of the wall `w` (a `WallMesh` inside `model`): the mesh deformed by
-`scale × displacement` (in-plane components), coloured by `field` averaged to
-the nodes over this wall's elements; the undeformed outline in grey.
-"""
-function fig_wall(model, w; field = :N2, scale = 0.0, title = "", geo = ShellGeo(model),
-    colormap = :balance, colorrange = nothing)
-    ks = shell_columns(geo, model, w.elements)
-    vals = nodal_field(geo, field, ks)
-    P0 = wall_sz(w, geo.nodes)
-    P = wall_sz(w, geo.nodes .+ scale .* geo.disp)
-    F = tri_faces(geo.quads, ks)
-    fig = Figure(size = wall_figsize(w))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = title, xlabel = "s  [length]", ylabel = "z  [length]")
-    edges0 = [P0[geo.quads[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4]
-    linesegments!(ax, reduce(vcat, edges0); color = (:gray, 0.4), linewidth = 0.5)
-    cr = colorrange === nothing ? (field in (:umag,) ? (0.0, maximum(vals[unique(vec(geo.quads[:, ks]))])) :
-                                   symmetric_range(vals[unique(vec(geo.quads[:, ks]))])) : colorrange
-    m = mesh!(ax, P, F; color = vals, colormap = colormap, colorrange = cr, shading = NoShading)
-    edges = [P[geo.quads[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4]
-    linesegments!(ax, reduce(vcat, edges); color = :black, linewidth = 0.4)
+# a contoured shell drawing: mesh coloured by `vals`, element edges, colourbar beside it
+function _contour_figure(P0, P, quads, ks, vals, field; title, colormap, colorrange, width, maxheight)
+    # keep only this drawing's nodes: the geometry holds every node of the model, and mesh!
+    # (hence the limits) would take them all in
+    used = sort!(unique(vec(quads[:, ks])))
+    remap = Dict(i => k for (k, i) in enumerate(used))
+    quads = [remap[quads[a, k]] for a in 1:4, k in ks]
+    ks = axes(quads, 2)
+    P = P[used]; vals = vals[used]; P0 = P0 === nothing ? nothing : P0[used]
+    fig = Figure()
+    ax = Axis(fig[1, 1]; title = title)
+    cm, cr = field_colormap(field, vals)
+    colormap === nothing || (cm = colormap)
+    colorrange === nothing || (cr = colorrange)
+    P0 === nothing || linesegments!(ax, quad_edges(P0, quads, ks); color = kjl_lightgray, linewidth = 0.4)
+    m = mesh!(ax, P, tri_faces(quads, ks); color = vals, colormap = cm, colorrange = cr, shading = NoShading)
+    linesegments!(ax, quad_edges(P, quads, ks); color = (kjl_black, 0.35), linewidth = 0.3)
     Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)))
-    used = unique(vec(geo.quads[:, ks]))
-    return fit_wall_axis!(fig, ax, vcat(P0[used], P[used]))
+    structurestyle!(ax; scale = true, unit = "m")
+    fitstructure!(fig, ax; width = width - 62, maxheight = maxheight, padpt = 4)
+    return fig
 end
 
 """
-    fig_principal(model, w; geo, title, maxlen)
+    fig_wall(model, w; field = :N2, scale = 0.0, title, geo, colormap, colorrange, width = W_PLAN)
+
+Elevation of the wall `w` (a `WallMesh` inside `model`): the mesh deformed by
+`scale × displacement` (in-plane components), coloured by `field` averaged to
+the nodes over this wall's elements (forces red − / white 0 / blue +; displacements white →
+orange); the undeformed mesh in light gray.
+"""
+function fig_wall(model, w; field = :N2, scale = 0.0, title = "", geo = ShellGeo(model),
+    colormap = nothing, colorrange = nothing, width = W_PLAN, maxheight = 1.1width)
+    ks = shell_columns(geo, model, w.elements)
+    vals = field_scale(field) .* nodal_field(geo, field, ks)
+    P0 = wall_sz(w, geo.nodes)
+    P = wall_sz(w, geo.nodes .+ scale .* geo.disp)
+    return _contour_figure(scale == 0 ? nothing : P0, P, geo.quads, ks, vals, field;
+        title, colormap, colorrange, width, maxheight)
+end
+
+"""
+    fig_slab(model; field = :Mxx, elements = all shells, title, geo, colormap, width = W_HALF)
+
+Plan view (x, y) of horizontal shell elements, coloured by `field`.
+"""
+function fig_slab(model; field = :Mxx, elements = nothing, title = "", geo = ShellGeo(model),
+    colormap = nothing, colorrange = nothing, width = W_HALF, maxheight = 1.1width)
+    ks = elements === nothing ? collect(axes(geo.quads, 2)) : shell_columns(geo, model, elements)
+    vals = field_scale(field) .* nodal_field(geo, field, ks)
+    P = [Point2f(geo.nodes[1, i], geo.nodes[2, i]) for i in axes(geo.nodes, 2)]
+    return _contour_figure(nothing, P, geo.quads, ks, vals, field; title, colormap, colorrange, width, maxheight)
+end
+
+"""
+    fig_principal(model, w; geo, title, maxlen, width = W_PLAN)
 
 Principal membrane-force trajectories of wall `w`: at each element centre a
-segment along each principal direction, length ∝ |N|, blue = compression
-(struts), pink = tension (ties). The strut-and-tie reading of a wall.
+segment along each principal direction, length ∝ √|N|, blue = tension (ties),
+red = compression (struts). The strut-and-tie reading of a wall.
 """
-function fig_principal(model, w; geo = ShellGeo(model), title = "principal membrane forces", maxlen = nothing)
+function fig_principal(model, w; geo = ShellGeo(model), title = "principal membrane forces", maxlen = nothing,
+    width = W_PLAN, maxheight = 1.1width)
     ks = shell_columns(geo, model, w.elements)
     Nmax = maximum(k -> max(abs(geo.N1[k]), abs(geo.N2[k])), ks)
     h = maxlen === nothing ? 0.9 * minimum(diff(w.s)) : maxlen
@@ -202,94 +240,94 @@ function fig_principal(model, w; geo = ShellGeo(model), title = "principal membr
             append!(Nk < 0 ? comp : tens, seg)
         end
     end
-    fig = Figure(size = wall_figsize(w))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = title, xlabel = "s  [length]", ylabel = "z  [length]")
+    fig = Figure()
+    ax = Axis(fig[1, 1]; title = title)
     P0 = wall_sz(w, geo.nodes)
-    linesegments!(ax, reduce(vcat, [P0[geo.quads[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4]);
-        color = (:gray, 0.35), linewidth = 0.5)
-    linesegments!(ax, comp; color = kjl_blue, linewidth = 1.6, label = "compression")
-    linesegments!(ax, tens; color = kjl_pink, linewidth = 1.6, label = "tension")
-    Legend(fig[1, 2], ax; framevisible = false)
-    return fit_wall_axis!(fig, ax, P0[unique(vec(geo.quads[:, ks]))])
+    linesegments!(ax, quad_edges(P0, geo.quads, ks); color = (kjl_lightgray, 0.6), linewidth = 0.3)
+    linesegments!(ax, tens; color = kjl_tension, linewidth = 1.3)
+    linesegments!(ax, comp; color = kjl_compression, linewidth = 1.3)
+    Legend(fig[1, 2], [LineElement(color = kjl_tension, linewidth = 2), LineElement(color = kjl_compression, linewidth = 2)],
+        ["tension (ties)", "compression (struts)"])
+    structurestyle!(ax; scale = true, unit = "m")
+    fitstructure!(fig, ax; width = width - 95, maxheight = maxheight, padpt = 4)
+    return fig
 end
 
 # ── bars and series ──────────────────────────────────────────────────────────
 
-function fig_bars(labels, values; ylabel = "", title = "", color = kjl_blue, rotation = 0.0)
-    fig = Figure(size = (max(520, 46 * length(labels)), 360))
-    ax = Axis(fig[1, 1]; ylabel = ylabel, title = title, xticks = (1:length(labels), labels),
-        xticklabelrotation = rotation)
-    barplot!(ax, 1:length(values), values; color = color, gap = 0.25)
-    hlines!(ax, [0.0]; color = :black, linewidth = 0.5)
+"""
+    fig_bars(labels, values; ylabel, title, highlight, alert, rotation, width = W_HALF)
+
+Bar chart. All bars kjl_blue, unless `highlight` (index or indices: the bar the figure is
+about, kjl_emphasis) or `alert` (a bad bar, kjl_alert) is given; the others are then gray.
+"""
+function fig_bars(labels, values; ylabel = "", title = "", highlight = nothing, alert = nothing,
+    rotation = 0.0, width = W_HALF, height = 0.95width)
+    n = length(values)
+    colors = if highlight === nothing && alert === nothing
+        fill(kjl_emphasis, n)
+    else
+        c = fill(kjl_lightgray, n)
+        highlight === nothing || (c[collect(highlight)] .= kjl_emphasis)
+        alert === nothing || (c[collect(alert)] .= kjl_alert)
+        c
+    end
+    fig = Figure(size = (width, height))
+    ax = Axis(fig[1, 1]; ylabel = ylabel, title = title, xticks = (1:n, labels),
+        xticklabelrotation = rotation, xticksvisible = false)
+    barplot!(ax, 1:n, values; color = colors)
+    hlines!(ax, [0.0]; color = kjl_black, linewidth = 0.6, linestyle = :solid)
     return fig
 end
 
 """
-    fig_series(xs, series; xlabel, ylabel, ref, title, xscale)
+    fig_series(xs, series; xlabel, ylabel, ref, title, xscale, width = W_HALF)
 
-`series` = vector of `(label, ys)`; `ref` an optional horizontal reference value.
+`series` = vector of `(label, ys)`; the FIRST series is the emphasised one (kjl_blue), the
+rest grayscale with distinct linestyles/markers (`kjl_series`). `ref` an optional horizontal
+reference value (gray dashed).
 """
 function fig_series(xs, series; xlabel = "", ylabel = "", ref = nothing, title = "", xscale = identity,
-    reflabel = "reference", legendpos = :rb)
-    fig = Figure(size = (560, 380))
+    reflabel = "reference", legendpos = :rb, width = W_HALF, height = 0.95width)
+    fig = Figure(size = (width, height))
     ax = Axis(fig[1, 1]; xlabel = xlabel, ylabel = ylabel, title = title, xscale = xscale)
-    ref === nothing || hlines!(ax, [ref]; color = :black, linestyle = :dash, label = reflabel)
-    colors = (kjl_blue, kjl_pink, kjl_green, kjl_orange, kjl_turquoise)
+    ref === nothing || hlines!(ax, [ref]; label = reflabel)
     for (i, (lab, ys)) in enumerate(series)
-        scatterlines!(ax, xs, ys; label = lab, color = colors[mod1(i, length(colors))])
+        scatterlines!(ax, xs, ys; label = lab, kjl_series(i; marker = true)...)
     end
-    axislegend(ax; position = legendpos)
+    (length(series) > 1 || ref !== nothing) && axislegend(ax; position = legendpos)
     return fig
-end
-
-# ── slab plan view ───────────────────────────────────────────────────────────
-
-"""
-    fig_slab(model; field = :Mxx, elements = all shells, title)
-
-Plan view (x, y) of horizontal shell elements, coloured by `field`.
-"""
-function fig_slab(model; field = :Mxx, elements = nothing, title = "", geo = ShellGeo(model), colormap = :balance)
-    ks = elements === nothing ? collect(axes(geo.quads, 2)) : shell_columns(geo, model, elements)
-    vals = nodal_field(geo, field, ks)
-    P = [Point2f(geo.nodes[1, i], geo.nodes[2, i]) for i in axes(geo.nodes, 2)]
-    F = tri_faces(geo.quads, ks)
-    fig = Figure(size = (560, 480))
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = title, xlabel = "x  [length]", ylabel = "y  [length]")
-    used = unique(vec(geo.quads[:, ks]))
-    cr = field === :umag ? (0.0, maximum(vals[used])) : symmetric_range(vals[used])
-    m = mesh!(ax, P, F; color = vals, colormap = colormap, colorrange = cr, shading = NoShading)
-    linesegments!(ax, reduce(vcat, [P[geo.quads[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4]);
-        color = (:black, 0.3), linewidth = 0.4)
-    Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)))
-    return fit_wall_axis!(fig, ax, P[used])
 end
 
 # ── 3D view ──────────────────────────────────────────────────────────────────
 
 """
-    fig_3d(model; field = :umag, scale = 0.0, title, azimuth, elevation)
+    fig_3d(model; field = :umag, scale = 0.0, title, azimuth, elevation, linecolor = :frame, width = W_PLAN)
 
 Shells (coloured by `field`, deformed by `scale × u`) and line elements
-(dark lines, deformed by their end displacements) in one 3D view; the
-undeformed line elements in grey.
+(deformed by their end displacements) in one 3D view on a ground plane, true proportions;
+the undeformed line elements in light gray. `linecolor = :axial` colours members blue
+(tension) / red (compression) with width ∝ |N|; otherwise dark gray.
 """
 function fig_3d(model; field = :umag, scale = 0.0, title = "", geo = ShellGeo(model),
-    azimuth = 1.1π, elevation = 0.35, colormap = :viridis, size = (760, 640), linecolor = :frame)
-    fig = Figure(size = size)
-    ax = Axis3(fig[1, 1]; aspect = :data, title = title, azimuth = azimuth, elevation = elevation)
+    azimuth = 1.1π, elevation = 0.35, colormap = nothing, width = W_PLAN, ratio = 0.72, linecolor = :frame,
+    nodes = true, halo = true)
+    size_shells(geo) == 0 && return _fig_3d_lines(model; scale, title, azimuth, elevation, width, ratio,
+        linecolor, nodes, halo)
+    fig = Figure(size = (width, round(Int, ratio * width)))
+    ax = Axis3(fig[1, 1]; title = title, azimuth = azimuth, elevation = elevation)
     X0 = geo.nodes
     X = geo.nodes .+ scale .* geo.disp
     P = [Point3f(X[:, i]) for i in axes(X, 2)]
     if size_shells(geo) > 0
         ks = axes(geo.quads, 2)
-        vals = nodal_field(geo, field, ks)
+        vals = field_scale(field) .* nodal_field(geo, field, ks)
         used = unique(vec(geo.quads))
-        cr = field === :umag ? (0.0, max(maximum(vals[used]), eps())) : symmetric_range(vals[used])
-        m = mesh!(ax, P, tri_faces(geo.quads, ks); color = vals, colormap = colormap, colorrange = cr)
-        linesegments!(ax, reduce(vcat, [P[geo.quads[[a, mod1(a + 1, 4)], k]] for k in ks for a in 1:4]);
-            color = (:black, 0.25), linewidth = 0.4)
-        Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)))
+        cm, cr = field_colormap(field, vals[used])
+        colormap === nothing || (cm = colormap)
+        m = mesh!(ax, P, tri_faces(geo.quads, ks); color = vals, colormap = cm, colorrange = cr, shading = NoShading)
+        linesegments!(ax, quad_edges(P, geo.quads, ks); color = (kjl_black, 0.25), linewidth = 0.3)
+        Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)), height = Relative(0.6))
     end
     lines_ = [el for el in model.elements if el isa Union{FrameElement,TrussElement}]
     if !isempty(lines_)
@@ -299,27 +337,60 @@ function fig_3d(model; field = :umag, scale = 0.0, title = "", geo = ShellGeo(mo
             push!(seg0, Point3f(X0[:, i]), Point3f(X0[:, j]))
             push!(seg, P[i], P[j])
         end
-        scale == 0 || linesegments!(ax, seg0; color = (:gray, 0.5), linewidth = 1)
+        scale == 0 || linesegments!(ax, seg0; color = kjl_lightgray, linewidth = 0.5)
         if linecolor === :axial
             N = [axial_force(model.results, el) for el in lines_]
             Nmax = max(maximum(abs, N), eps())
-            cols = reduce(vcat, [[n < 0 ? kjl_blue : kjl_pink, n < 0 ? kjl_blue : kjl_pink] for n in N])
-            widths = reduce(vcat, [[0.5 + 4 * abs(n) / Nmax, 0.5 + 4 * abs(n) / Nmax] for n in N])
+            cols = reduce(vcat, [[force_color(n), force_color(n)] for n in N])
+            widths = reduce(vcat, [[0.4 + 2.6 * abs(n) / Nmax, 0.4 + 2.6 * abs(n) / Nmax] for n in N])
             linesegments!(ax, seg; color = cols, linewidth = widths)
         else
-            linesegments!(ax, seg; color = kjl_darkgray, linewidth = 2.5)
+            linesegments!(ax, seg; color = kjl_darkgray, linewidth = 1.2)
+        end
+        if nodes
+            nd = unique([P[el.nodeStart.index] for el in lines_] ∪ [P[el.nodeEnd.index] for el in lines_])
+            scatter!(ax, nd; color = :white, strokecolor = kjl_black, strokewidth = 0.5, markersize = 3.5)
         end
     end
+    structurestyle!(ax; ground = true)
+    fitlimits!(ax; pad = 0.02)
     return fig
 end
 
 size_shells(g::ShellGeo) = size(g.quads, 2)
 
+# line-only models: hidden-line vector drawing (kjlMakie `hiddenline!`), correct occlusion in PDF
+function _fig_3d_lines(model; scale, title, azimuth, elevation, width, ratio, linecolor, nodes, halo)
+    lines_ = [el for el in model.elements if el isa Union{FrameElement,TrussElement}]
+    u(nd) = scale == 0 ? zeros(3) : displacement(model.results, nd)[1:3]
+    S = Point3d[]; E = Point3d[]; C = Any[]; W = Float64[]
+    N = linecolor === :axial ? [axial_force(model.results, el) for el in lines_] : zeros(length(lines_))
+    Nmax = max(maximum(abs, N; init = 0.0), eps())
+    for (el, n) in zip(lines_, N)
+        push!(S, Point3d((el.nodeStart.position .+ scale .* u(el.nodeStart))...))
+        push!(E, Point3d((el.nodeEnd.position .+ scale .* u(el.nodeEnd))...))
+        push!(C, linecolor === :axial ? force_color(n) : kjl_darkgray)
+        push!(W, linecolor === :axial ? 0.4 + 2.6 * abs(n) / Nmax : 1.2)
+    end
+    used = unique([nd for el in lines_ for nd in (el.nodeStart, el.nodeEnd)])
+    nds = nodes ? [Point3d((nd.position .+ scale .* u(nd))...) for nd in used] : nothing
+    fig = Figure()
+    ax = Axis(fig[1, 1]; title = title)
+    if scale != 0                                              # undeformed reference, light, behind
+        P0, _ = project3d([Point3d(x.position...) for el in lines_ for x in (el.nodeStart, el.nodeEnd)], azimuth, elevation)
+        linesegments!(ax, P0; color = kjl_lightgray, linewidth = 0.4)
+    end
+    hiddenline!(ax, S, E; azimuth, elevation, color = C, linewidth = W, nodes = nds, nodesize = 2.5,
+        nodestrokecolor = kjl_black, nodestrokewidth = 0.5,
+        halo, ground = true, width = width)
+    structurestyle!(ax)
+    fitstructure!(fig, ax; width = width - 8, maxheight = ratio * width, padpt = 4)
+    return fig
+end
+
 # ── line elements (frames, trusses) ─────────────────────────────────────────
 
 view2d(X, plane) = plane === :XZ ? Point2f(X[1], X[3]) : plane === :XY ? Point2f(X[1], X[2]) : Point2f(X[2], X[3])
-const PLANE_LABELS = Dict(:XZ => ("x  [length]", "z  [length]"), :XY => ("x  [length]", "y  [length]"),
-    :YZ => ("y  [length]", "z  [length]"))
 
 # deformed polyline of a line element: exact curve for frames, straight for trusses
 function member_curve(model, el, scale; resolution = 20)
@@ -333,78 +404,104 @@ function member_curve(model, el, scale; resolution = 20)
 end
 
 """
-    fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = nothing, dscale = nothing, title)
+    fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = nothing, dscale = nothing,
+              title, labels = false, widths = nothing, width = W_WIDE, scalebar = false)
 
 2D view (`plane` = :XZ, :XY or :YZ) of the model's frame and truss members:
-undeformed in grey, deformed by `scale × u` along each member's EXACT
-deflected curve, coloured by axial force (blue compression, pink tension)
-with line width ∝ |N| (or `widths`, one per member, e.g. ∝ area). `diagram = :Mz` / `:My` overlays that bending-moment
-diagram normal to each frame member (scaled by `dscale`).
+undeformed in light gray, deformed by `scale × u` along each member's EXACT
+deflected curve, coloured by axial force (blue tension, red compression)
+with line width ∝ |N| (or `widths`, one per member [pt], e.g. ∝ area), nodes as white dots. `diagram = :Mz` / `:My`
+overlays that bending-moment diagram normal to each frame member (scaled by `dscale`):
+black outline, 50 % black fill (one internal force → black). `labels = true` prints each member's N.
 """
 function fig_lines(model; plane = :XZ, scale = 0.0, color = :axial, diagram = nothing, dscale = nothing,
-    title = "", size = (760, 460), labels = false, widths = nothing)
+    title = "", labels = false, widths = nothing, width = W_WIDE, maxheight = 0.7width, scalebar = false,
+    nodes = true)
     lines_ = [el for el in model.elements if el isa Union{FrameElement,TrussElement}]
-    fig = Figure(size = size)
-    xl, yl = PLANE_LABELS[plane]
-    ax = Axis(fig[1, 1]; aspect = DataAspect(), title = title, xlabel = xl, ylabel = yl,
-        xautolimitmargin = (0.06, 0.06), yautolimitmargin = (0.15, 0.15))
+    fig = Figure()
+    ax = Axis(fig[1, 1]; title = title)
     for el in lines_
-        lines!(ax, [view2d(el.nodeStart.position, plane), view2d(el.nodeEnd.position, plane)]; color = (:gray, 0.45), linewidth = 1)
+        lines!(ax, [view2d(el.nodeStart.position, plane), view2d(el.nodeEnd.position, plane)]; color = kjl_lightgray, linewidth = 0.6)
     end
     N = [axial_force(model.results, el) for el in lines_]
     Nmax = maximum(abs, N; init = 0.0); Nmax = Nmax == 0 ? 1.0 : Nmax
-    for (k, (el, n)) in enumerate(zip(lines_, N))
-        pts = [view2d(x, plane) for x in member_curve(model, el, scale)]
-        c = color === :axial ? (n < 0 ? kjl_blue : kjl_pink) : color
-        lw = widths !== nothing ? widths[k] : color === :axial ? 1 + 5 * abs(n) / Nmax : 2
-        lines!(ax, pts; color = c, linewidth = lw)
-    end
     if diagram !== nothing
         frames = [el for el in lines_ if el isa FrameElement]
-        Ms = [getproperty(InternalForces(model, el; resolution = 30), diagram) for el in frames]
+        fs = [InternalForces(model, el; resolution = 30) for el in frames]
+        Ms = [getproperty(f, diagram) for f in fs]
         Mmax = maximum(m -> maximum(abs, m), Ms; init = 0.0)
         span = maximum(el -> norm(el.nodeEnd.position - el.nodeStart.position), frames)
         ds = dscale === nothing ? 0.25 * span / max(Mmax, eps()) : dscale
-        for (el, M) in zip(frames, Ms)
-            f = InternalForces(model, el; resolution = 30)
+        fills = Vector{Point2f}[]
+        for (el, f, M) in zip(frames, fs, Ms)
             a, b = view2d(el.nodeStart.position, plane), view2d(el.nodeEnd.position, plane)
             t = (b - a) / norm(b - a); nrm = Point2f(-t[2], t[1])
             L = norm(el.nodeEnd.position - el.nodeStart.position)
             base = [a + (x / L) * (b - a) for x in f.x]
             curve = [p + ds * m * nrm for (p, m) in zip(base, M)]
-            poly!(ax, vcat(base, reverse(curve)); color = (kjl_green, 0.25))
-            lines!(ax, curve; color = kjl_green, linewidth = 1.2)
+            # one simple polygon per run of same-sign moment (split at zero crossings):
+            # per-segment quads would show hairline seams in vector output
+            run_b = [base[1]]; run_c = [curve[1]]
+            for k in 2:length(base)
+                if M[k-1] * M[k] < 0
+                    t = M[k-1] / (M[k-1] - M[k]); z = base[k-1] + t * (base[k] - base[k-1])
+                    push!(run_b, z); push!(run_c, z)
+                    push!(fills, vcat(run_b, reverse(run_c)))
+                    run_b = [z]; run_c = [z]
+                end
+                push!(run_b, base[k]); push!(run_c, curve[k])
+            end
+            push!(fills, vcat(run_b, reverse(run_c)))
+            lines!(ax, curve; color = kjl_black, linewidth = 0.8)
         end
+        isempty(fills) || poly!(ax, fills; color = (kjl_black, 0.5), strokewidth = 0)
+    end
+    for (k, (el, n)) in enumerate(zip(lines_, N))
+        pts = [view2d(x, plane) for x in member_curve(model, el, scale)]
+        c = color === :axial ? force_color(n) : color
+        lw = widths !== nothing ? widths[k] : color === :axial ? 0.75 + 3.5 * abs(n) / Nmax : 1.5
+        lines!(ax, pts; color = c, linewidth = lw)
+    end
+    if nodes
+        nds = unique([nd for el in lines_ for nd in (el.nodeStart, el.nodeEnd)])
+        u(nd) = displacement(model.results, nd)[1:3]
+        scatter!(ax, [view2d(nd.position .+ scale .* u(nd), plane) for nd in nds];
+            color = :white, strokecolor = kjl_black, strokewidth = 0.6, markersize = 4)
     end
     if labels
         for el in lines_
+            n = round(axial_force(model.results, el), digits = 1)
             text!(ax, view2d((el.nodeStart.position + el.nodeEnd.position) / 2, plane);
-                text = string(round(axial_force(model.results, el), digits = 1)), fontsize = 9, align = (:center, :bottom))
+                text = replace(string(n), "-" => "−"), fontsize = 6.5, color = kjl_darkgray, align = (:center, :bottom))
         end
     end
-    color === :axial && Legend(fig[1, 2], [LineElement(color = kjl_blue, linewidth = 3), LineElement(color = kjl_pink, linewidth = 3)] .|> identity,
-        ["compression", "tension"]; framevisible = false)
-    resize_to_layout!(fig)
+    color === :axial && Legend(fig[2, 1], [LineElement(color = kjl_tension, linewidth = 2.5), LineElement(color = kjl_compression, linewidth = 2.5)],
+        ["tension", "compression"]; orientation = :horizontal, tellwidth = false)
+    structurestyle!(ax; scale = scalebar, unit = "m")
+    fitstructure!(fig, ax; width = width - 8, maxheight = maxheight, padpt = labels ? 14 : 6)
     return fig
 end
 
 """
-    fig_member(model, el; title)
+    fig_member(model, el; title, width = W_HALF)
 
 Axial force, shear and bending-moment diagrams along one member (exact
-recovery: `InternalForces`, stations at load breakpoints).
+recovery: `InternalForces`, stations at load breakpoints), stacked; each a black outline with
+a 50 % black fill (`diagramband!`).
 """
-function fig_member(model, el; title = "")
+function fig_member(model, el; title = "", width = W_HALF, height = 1.2width)
     f = InternalForces(model, el; resolution = 60)
-    fig = Figure(size = (620, 560))
-    for (row, (y, lab, c)) in enumerate(((f.N, "N  [force]", kjl_darkgray), (f.Vy, "Vy  [force]", kjl_turquoise),
-                                          (f.Mz, "Mz  [force·length]", kjl_green)))
-        ax = Axis(fig[row, 1]; ylabel = lab, xlabel = row == 3 ? "x along member  [length]" : "",
-            title = row == 1 ? title : "")
-        band!(ax, f.x, zeros(length(y)), y; color = (c, 0.25))
-        lines!(ax, f.x, y; color = c, linewidth = 2)
-        hlines!(ax, [0.0]; color = :black, linewidth = 0.5)
+    fig = Figure(size = (width, height))
+    axs = Axis[]
+    for (row, (y, lab)) in enumerate(((f.N, "N  [kN]"), (f.Vy, rich("V", subscript("y"), "  [kN]")),
+                                      (f.Mz, rich("M", subscript("z"), "  [kN·m]"))))
+        ax = Axis(fig[row, 1]; aspect = nothing, ylabel = lab, xlabel = row == 3 ? "{x} along member [m]" : "",
+            title = row == 1 ? title : "", xticklabelsvisible = row == 3)
+        diagramband!(ax, f.x, y)
+        push!(axs, ax)
     end
+    linkxaxes!(axs...)
+    rowgap!(fig.layout, 6)
     return fig
 end
 

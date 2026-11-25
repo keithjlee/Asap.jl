@@ -80,9 +80,9 @@ end
 
 begin
     labels = ["beam $(i) $(pos == :start ? "start" : "end")" for i in 1:length(vec(beams)) for pos in (:start, :end)]
-    f = fig_bars(labels, log10.(xk); ylabel = "log₁₀ k  [kN·m/rad]", rotation = π / 4,
-        title = "optimized joint stiffness (drift = H/400): leeward beam ends carry it")
-    savefig("O3_joints.png", f)
+    f = fig_bars(labels, log10.(xk); ylabel = "log₁₀ {k} [kN·m/rad]", rotation = π / 4,
+        title = "joint stiffness ({H}/400)")
+    savefig("O3_joints.pdf", f)
 end
 
 #=

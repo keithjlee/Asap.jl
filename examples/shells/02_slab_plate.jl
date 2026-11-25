@@ -75,13 +75,13 @@ Both ratios ≈ 1. Deflection and bending-moment fields (plan view):
 =#
 begin
     mA, gridA, elsA = square_slab(16)          # the real 200 mm slab for the field plots
-    f = fig_slab(mA; field = :w, title = "SS slab: deflection", colormap = :viridis)
-    savefig("02_slab_ss_w.png", f)
+    f = fig_slab(mA; field = :w, title = "SS slab: deflection")
+    savefig("02_slab_ss_w.pdf", f)
 end
 
 begin
-    f = fig_slab(mA; field = :Mxx, title = "SS slab: Mxx (positive = tension on top face)")
-    savefig("02_slab_ss_Mxx.png", f)
+    f = fig_slab(mA; field = :Mxx, title = rich("SS SLAB: M", subscript("xx")))
+    savefig("02_slab_ss_Mxx.pdf", f)
 end
 
 #=
@@ -96,10 +96,10 @@ begin
     coeff(n, t) = (r = square_slab(n; t = t); -displacement(r[1].results, r[2][n÷2+1, n÷2+1])[3] * Dt(t) / (q * a^4))
     thin = [coeff(n, a / 300) for n in ns]
     real_ = [coeff(n, t) for n in ns]
-    f = fig_series(ns, [("thin, a/t = 300", thin), ("200 mm slab, a/t = 30", real_)];
-        xlabel = "elements per side", ylabel = "w·D/(q a⁴)", ref = 0.00406,
-        reflabel = "Kirchhoff (Timoshenko) 0.00406", title = "SS square slab: centre deflection")
-    savefig("02_slab_convergence.png", f)
+    f = fig_series(ns, [("thin, {a/t} = 300", thin), ("200 {mm} slab, {a/t} = 30", real_)];
+        xlabel = "elements per side", ylabel = "{w·D/(q a⁴)}", ref = 0.00406,
+        reflabel = "Kirchhoff 0.00406", title = "centre deflection", legendpos = :rb)
+    savefig("02_slab_convergence.pdf", f)
     @show thin real_
 end
 
@@ -117,13 +117,13 @@ begin
 end
 
 begin
-    f = fig_slab(mB; geo = gB, field = :w, title = "flat plate: deflection", colormap = :viridis)
-    savefig("02_flatplate_w.png", f)
+    f = fig_slab(mB; geo = gB, field = :w, title = "flat plate: deflection")
+    savefig("02_flatplate_w.pdf", f)
 end
 
 begin
-    f = fig_slab(mB; geo = gB, field = :Mxx, title = "flat plate: Mxx — column-strip hogging")
-    savefig("02_flatplate_Mxx.png", f)
+    f = fig_slab(mB; geo = gB, field = :Mxx, title = rich("FLAT PLATE: M", subscript("xx")))
+    savefig("02_flatplate_Mxx.pdf", f)
 end
 
 #=

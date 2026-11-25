@@ -83,8 +83,8 @@ end
 
 begin
     f = fig_lines(truss; plane = :XY, scale = 200.0, labels = true,
-        title = "Pratt truss: axial force [kN], deflection ×200")
-    savefig("A1_pratt.png", f)
+        title = "Pratt truss: N [kN], deflection ×200")
+    savefig("A1_pratt.pdf", f)
 end
 
 #=
@@ -96,8 +96,8 @@ truss in one line (see the other generators: `Pratt2D`, `SpaceFrame`,
 =#
 begin
     warren = Warren2D(11, 1.0, 1.5, bar; load = [0.0, -15.0, 0.0])
-    f = fig_lines(warren.model; plane = :XY, scale = 100.0, title = "Warren2D generator, deflection ×100")
-    savefig("A1_warren.png", f)
+    f = fig_lines(warren.model; plane = :XY, scale = 100.0, title = "Warren2D, deflection ×100", width = W_PLAN)
+    savefig("A1_warren.pdf", f)
 end
 
 #=
@@ -122,8 +122,8 @@ begin
     end
     depths = 1.0:0.25:3.0
     f = fig_series(collect(depths), [("midspan deflection", pratt_deflection.(depths))];
-        xlabel = "depth H [m]", ylabel = "deflection [mm]", title = "Pratt truss: depth study", legendpos = :rt)
-    savefig("A1_depth.png", f)
+        xlabel = "depth {H} [m]", ylabel = "deflection [mm]", title = "depth study", legendpos = :rt)
+    savefig("A1_depth.pdf", f)
 end
 
 #=

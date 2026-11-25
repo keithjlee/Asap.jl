@@ -93,14 +93,15 @@ end
 
 begin
     f = fig_bars(["initial", "size only", "shape only", "shape + size"], collect(values(results));
-        ylabel = "C·V (normalized to initial)", title = "what shape and size each buy")
-    savefig("O2_comparison.png", f)
+        ylabel = "{C·V} / initial", title = "shape vs size",
+        highlight = argmin(collect(values(results))), rotation = π / 6, width = 210)
+    savefig("O2_comparison.pdf", f)
 end
 
 begin
-    f = fig_lines(both; plane = :XY, widths = 1 .+ 14 .* xb ./ maximum(xb),
+    f = fig_lines(both; plane = :XY, widths = 0.5 .+ 6 .* xb ./ maximum(xb), width = W_FULL,
         title = "shape + size optimized (width ∝ area)")
-    savefig("O2_shape_size.png", f)
+    savefig("O2_shape_size.pdf", f)
 end
 
 #=
