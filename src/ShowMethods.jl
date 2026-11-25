@@ -292,6 +292,16 @@ end
 Base.show(io::IO, r::LinearResults) =
     print(io, "LinearResults(compliance=$(r.compliance))")
 
+function Base.show(io::IO, ::MIME"text/plain", cl::CaseLoads)
+    nc = length(cl.names)
+    println(io, "CaseLoads  ($nc case$(nc == 1 ? "" : "s"): ", join((":" * String(c) for c in cl.names), ", "), ")")
+    println(io, "  frame loads = $(length(cl.fef.loads))  (element loads re-evaluated at each design)")
+    println(io, "  quad shell loads = $(length(cl.fef.sloads)), triangle shell loads = $(length(cl.fef.tloads))")
+    print(io,   "  n_dof = $(size(cl.P, 1))  (rows of P, static, F0: one column per case)")
+end
+
+Base.show(io::IO, cl::CaseLoads) = print(io, "CaseLoads(", join((":" * String(c) for c in cl.names), ", "), ")")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Parametric structure generators
 # ─────────────────────────────────────────────────────────────────────────────

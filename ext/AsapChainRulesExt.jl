@@ -448,4 +448,74 @@ function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._shell3_fef),
     return y, shell3_fef_pullback
 end
 
+# the stacked (unscattered) fixed-end vectors of the load cases (`CaseLoads`):
+# the same per-load kernels as above, the pullback takes the stacked cotangent
+# directly (the case scatter is a plain sparse matvec Zygote handles itself)
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._frame_fef_q),
+        t::HOST.FEFTable, state::_F64State)
+    y = HOST._frame_fef_q(t, state)
+    base = _frame_fef_item(t, state)
+    function item(j)
+        load, s, nodes, e, ec, θ = base(j)
+        f = (sec, xs, ec) -> Asap.element_fef_global(load, sec, ec, xs[1], xs[2], θ)
+        return f, s, nodes, e, ec, 12
+    end
+    function frame_fef_q_pullback(Δy)
+        Δ = _cotvec(Δy)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.loads), item, Δ))
+    end
+    return y, frame_fef_q_pullback
+end
+
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._shell_fef_q),
+        t::HOST.FEFTable, state::_F64State)
+    y = HOST._shell_fef_q(t, state)
+    function item(j)
+        load = t.sloads[j]
+        f = (sec, xs, ec) -> HOST._shell_fef_global(load, sec, xs)
+        return f, t.selem[j], ntuple(k -> t.snodes[k, j], 4), 0, nothing, 24
+    end
+    function shell_fef_q_pullback(Δy)
+        Δ = _cotvec(Δy)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.sloads), item, Δ))
+    end
+    return y, shell_fef_q_pullback
+end
+
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._shell3_fef_q),
+        t::HOST.FEFTable, state::_F64State)
+    y = HOST._shell3_fef_q(t, state)
+    function item(j)
+        load = t.tloads[j]
+        f = (sec, xs, ec) -> HOST._shell_fef_global(load, sec, xs)
+        return f, t.telem[j], ntuple(k -> t.tnodes[k, j], Val(3)), 0, nothing, 18
+    end
+    function shell3_fef_q_pullback(Δy)
+        Δ = _cotvec(Δy)
+        Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.tloads), item, Δ))
+    end
+    return y, shell3_fef_q_pullback
+end
+
+function ChainRulesCore.rrule(config::_RevCfg, ::typeof(Asap.fef_local),
+        cl::Asap.CaseLoads, state::_F64State)
+    y = Asap.fef_local(cl, state)
+    t = cl.fef
+    base = _frame_fef_item(t, state)
+    function item(j)
+        load, s, nodes, e, ec, θ = base(j)
+        f = (sec, xs, ec) -> Asap.condensed_fef(load, sec, ec, xs[1], xs[2], θ)
+        return f, s, nodes, e, ec, 12
+    end
+    function case_fef_local_pullback(Δy)
+        Δ = _cotvec(Δy)
+        (Δ isa AbstractZero || isempty(t.loads)) && return (NoTangent(), NoTangent(), ZeroTangent())
+        return (NoTangent(), NoTangent(), _itemwise_tangent(config, state, length(t.loads), item, Δ))
+    end
+    return y, case_fef_local_pullback
+end
+
 end # module
