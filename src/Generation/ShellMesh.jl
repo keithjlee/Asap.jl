@@ -138,7 +138,7 @@ function _shell_mesh(::Type{T}, Q::Matrix{T}, cells, section, origin, e1, e2, fi
         o, a, b = _plane_axes(T, origin, e1, e2)
         nodes = [Node(o + Q[1, i] * a + Q[2, i] * b, fixity) for i in axes(Q, 2)]
         oriented = [_signed_area2(Q, ids) < 0 ? reverse(ids) : ids for ids in cells]
-        loops = _boundary_loops(oriented, l -> abs(_signed_area2(Q, l[1:end-1])))
+        loops = _boundary_loops(oriented, l -> abs(_signed_area2(Q, l[1:end-1])), Q)
     else
         # spatial (3 × n): global positions; the cells keep the mesher's orientation
         # (a consistently oriented surface keeps consistent element normals)
@@ -160,27 +160,30 @@ _signed_area2(Q, ids) = sum(k -> Q[1, ids[k]] * Q[2, ids[mod1(k + 1, length(ids)
 
 # closed boundary loops (node indices, first == last) from oriented cells: an
 # edge used by exactly one cell is a boundary edge, followed tail to head
-function _boundary_loops(cells, size_of)
+function _boundary_loops(cells, size_of, Q = nothing)
     count = Dict{Tuple{Int,Int},Int}()
     for c in cells, k in eachindex(c)
         e = minmax(c[k], c[mod1(k + 1, length(c))])
         count[e] = get(count, e, 0) + 1
     end
-    next = Dict{Int,Int}()
+    # boundary half-edges i → j (material on the left); a pinch vertex (a hole
+    # touching the outline or another hole at a point) has several outgoing
+    out = Dict{Int,Vector{Int}}()
     for c in cells, k in eachindex(c)
         i, j = c[k], c[mod1(k + 1, length(c))]
-        count[minmax(i, j)] == 1 && (next[i] = j)
+        count[minmax(i, j)] == 1 && push!(get!(out, i, Int[]), j)
     end
     loops = Vector{Vector{Int}}()
-    while !isempty(next)
-        start = minimum(keys(next))
+    while !isempty(out)
+        start = minimum(keys(out))
         loop = [start]
-        i = start
+        prev, i = 0, start
         while true
-            j = pop!(next, i)
+            j = _next_boundary(out, prev, i, Q)
             push!(loop, j)
-            j == start && break
-            i = j
+            prev, i = i, j
+            j == start && !haskey(out, start) && break
+            j == start && length(loop) > 1 && break
         end
         push!(loops, loop)
     end
@@ -188,6 +191,23 @@ function _boundary_loops(cells, size_of)
     # holes come out clockwise because cells are counter-clockwise)
     sort!(loops; by = l -> -size_of(l))
     return loops
+end
+
+# take (and remove) the outgoing boundary edge at i: the only one, or at a pinch
+# the first one clockwise from the incoming direction i → prev (keeps the material
+# on the left and splits a pinched boundary into simple loops)
+function _next_boundary(out, prev, i, Q)
+    cand = out[i]
+    k = 1
+    if length(cand) > 1 && Q !== nothing && size(Q, 1) == 2 && prev != 0
+        back = atan(Q[2, prev] - Q[2, i], Q[1, prev] - Q[1, i])
+        cw(j) = mod(back - atan(Q[2, j] - Q[2, i], Q[1, j] - Q[1, i]), 2π)
+        k = argmin(j -> cw(cand[j]) == 0 ? 2π : cw(cand[j]), eachindex(cand))
+    end
+    j = cand[k]
+    deleteat!(cand, k)
+    isempty(cand) && delete!(out, i)
+    return j
 end
 
 """
@@ -358,8 +378,11 @@ target edge length `h`). **Requires DelaunayTriangulation.jl**
 - `outline`: polygon vertices in plane coordinates (vector of 2-points or
   2 × n), any orientation; include as vertices every point where a support or
   a load starts or ends, so meshes nodes land there
-- `holes`: polygons strictly inside the outline (any orientation); circles via
-  [`circle_polygon`](@ref)
+- `holes`: polygons inside the outline (any orientation); circles via
+  [`circle_polygon`](@ref). Holes may TOUCH the outline or each other — at a
+  vertex, with a vertex on an edge, or along a shared edge (a notch drawn as a
+  hole, adjacent openings drawn as two) — but must not cross the outline or
+  overlap each other (refused with an `ArgumentError`)
 - `points`: extra interior points that must become nodes (point loads)
 - `origin`, `e1`, `e2`, `fixity`, `id`: as in [`shell_mesh`](@ref)
 - `seed`: the triangulator inserts points in random order; the seeded generator

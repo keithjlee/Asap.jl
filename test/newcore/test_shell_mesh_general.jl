@@ -49,10 +49,38 @@ import DelaunayTriangulation
         @test length(right) >= 3                                       # refined
         @test Set(right) == Set(nodes_on_segment(m, (6.0, 0.0), (6.0, 3.0)))
         @test length(boundary_nodes(m, 2)) >= 24                       # circle: all its vertices
-        # a hole along the outline edge (a notch) works; touching at a vertex is refused clearly
-        notch = mesh_polygon(outline, sec; holes = [[(2.0, 0.0), (3.0, 0.0), (3.0, 1.0), (2.0, 1.0)]], h = 0.5)
-        @test sum(Asap.area, notch.elements) ≈ 17.0 rtol = 1e-10
-        @test_throws ArgumentError mesh_polygon(outline, sec; holes = [[(0.0, 0.0), (1.0, 0.5), (0.5, 1.0)]], h = 0.5)
+        # holes may touch the outline or each other (vertex, vertex on an edge, shared
+        # edge: notches drawn as holes, adjacent openings as two); the mesh covers
+        # exactly the material, with the same quality
+        sq = [(0.0, 0.0), (6.0, 0.0), (6.0, 3.0), (0.0, 3.0)]
+        box(x0, y0, x1, y1) = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+        for (holes_, A) in (
+                ([box(2.0, 0.0, 3.0, 1.0)], 17.0),                                     # notch
+                ([[(0.0, 0.0), (1.0, 0.5), (0.5, 1.0)]], 17.625),                      # at the outline's corner
+                ([[(3.0, 0.0), (3.5, 0.8), (2.5, 0.8)]], 17.6),                        # vertex on the outline's edge
+                ([[(1.0, 1.0), (2.0, 1.0), (2.0, 2.0)], [(2.0, 2.0), (3.0, 2.0), (3.0, 2.5)]], 17.25),   # holes share a vertex
+                ([box(1.0, 1.0, 2.0, 2.0), box(2.0, 1.0, 3.0, 2.0)], 16.0),            # holes share an edge
+                ([box(1.0, 1.0, 2.0, 2.0), box(2.0, 1.5, 3.0, 2.5)], 16.0))            # part of an edge
+            mt = mesh_polygon(sq, sec; holes = holes_, h = 0.25)
+            @test sum(Asap.area, mt.elements) ≈ A rtol = 1e-10
+            @test minimum(mt.elements) do el
+                x = map(n -> n.position, el.nodes)
+                minimum(k -> acosd(clamp(dot(normalize(x[mod1(k + 1, 3)] - x[k]), normalize(x[mod1(k + 2, 3)] - x[k])), -1, 1)), 1:3)
+            end >= 25 - 1e-6
+        end
+        # a non-convex (L-shaped) outline with a hole touching its re-entrant corner
+        Lsh = [(0.0, 0.0), (4.0, 0.0), (4.0, 1.0), (1.0, 1.0), (1.0, 3.0), (0.0, 3.0)]
+        mL = mesh_polygon(Lsh, sec; holes = [box(1.0, 0.6, 1.6, 1.0)], h = 0.2)
+        @test sum(Asap.area, mL.elements) ≈ 6.0 - 0.24 rtol = 1e-10
+        # a notch's mouth lies on the outline: no material on either side of it, so only
+        # its two end nodes are mesh nodes (holes are stored clockwise: edge order reversed)
+        mt = mesh_polygon(sq, sec; holes = [box(2.0, 0.0, 3.0, 1.0)], h = 0.25)
+        mouth = only(filter(k -> all(n -> n.position[2] ≈ 0, boundary_nodes(mt, 2, k)), 1:4))
+        @test [n.position[1] for n in boundary_nodes(mt, 2, mouth)] ≈ [3.0, 2.0]
+        # refused: a hole crossing the outline, overlapping holes, a hole outside
+        @test_throws ArgumentError mesh_polygon(sq, sec; holes = [box(5.0, 1.0, 7.0, 2.0)], h = 0.5)
+        @test_throws ArgumentError mesh_polygon(sq, sec; holes = [box(1.0, 1.0, 2.0, 2.0), box(1.5, 1.5, 2.5, 2.5)], h = 0.5)
+        @test_throws ArgumentError mesh_polygon(sq, sec; holes = [box(7.0, 1.0, 8.0, 2.0)], h = 0.5)
         # reproducible: same input and seed → identical mesh
         m2 = mesh_polygon(outline, sec; holes = [circle, L], h = 0.25, min_angle = 25)
         @test m2.points == m.points

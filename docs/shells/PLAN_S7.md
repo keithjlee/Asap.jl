@@ -72,11 +72,12 @@ elements, adaptive refinement and nonlinear analysis are not required.
 - Zygote through triangle models works but uses no fast rules yet (the group rule is Val(4) only and
   the triangle kernels have no ForwardDiff rules): S7g.
 - Test helper renamed `shell_mesh` → `grid_shell_mesh` (the export took the name).
-- **Touching holes**: `mesh_polygon` handles holes strictly inside and holes whose edge lies along
-  the outline (notches), but NOT holes touching the outline or each other at a single vertex:
-  DelaunayTriangulation.jl classifies curves that share a vertex as separate outer regions. Refused
-  with a clear `ArgumentError` (merge the opening into the outline, or leave a gap). A real fix needs
-  a polygon union before meshing — open, needed for the STM v3 openings spec.
+- **Touching holes (DONE)**: `mesh_polygon` feeds DelaunayTriangulation a constrained-segment graph
+  (coincident vertices merged, edges split at T-junctions) instead of boundary curves, then keeps the
+  triangles whose centroid is in the material. Holes may touch the outline or each other at a vertex,
+  a vertex on an edge, or along a shared edge (STM v3 openings rule: touching allowed, overlap
+  refused); crossing/overlapping holes and holes outside are refused. Boundary-curve input could not
+  express touching curves (DT read a curve sharing a vertex as a separate outer region).
 - **Julia 1.10**: triangle kernels compile fast (primal 5.8 s, stiffness pullback 8.6 s, load
   pullback 0.2 s) — the 18×18 kernels are far lighter than the quad's 24×24.
 - **Mesh reproducibility**: DelaunayTriangulation inserts points in random order; `mesh_polygon` passes a
