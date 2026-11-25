@@ -2,7 +2,7 @@
 using Pkg
 Pkg.activate(; temp=true, io=devnull)
 Pkg.develop([PackageSpec(path=joinpath(@__DIR__, ".."))]; io=devnull)
-Pkg.add(["Zygote", "LinearSolve"]; io=devnull)
+Pkg.add(["Zygote", "LinearSolve", "DelaunayTriangulation"]; io=devnull)
 using Asap, LinearAlgebra
 
 # quick start ---------------------------------------------------------------
@@ -210,5 +210,16 @@ shears = [section_cut(wallmodel, e, c).F[1] for (e, c) in piers]
 @assert sum(shears) ≈ 60.0 rtol = 1e-10
 @assert length(shell_resultants(wallmodel, w.elements[1]).N) == 3
 println("shells OK")
+
+# general meshes (D-regions) --------------------------------------------------
+using DelaunayTriangulation
+panel = mesh_polygon([(0.0, 0.0), (0.5, 0.0), (5.5, 0.0), (6.0, 0.0), (6.0, 3.0), (0.0, 3.0)],
+    ShellSection(concrete, 0.3); holes = [circle_polygon((3.0, 1.5), 0.4)], h = 0.2,
+    e1 = [1.0, 0, 0], e2 = [0.0, 0, 1])
+foreach(n -> fixnode!(n, Bool[1, 0, 1, 0, 1, 0]), panel.nodes)
+brg = nodes_on_segment(panel, (0.0, 0.0), (0.5, 0.0))
+loads = edge_loads(panel, (0.0, 3.0), (6.0, 3.0), [0.0, 0.0, -40.0])
+@assert length(brg) >= 2 && !isempty(loads)
+println("general meshes OK")
 
 println("ALL README EXAMPLES PASS")

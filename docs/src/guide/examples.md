@@ -13,7 +13,9 @@ runs top to bottom. They share one environment and a set of figure generators.
   - shear walls with openings, slabs and plates;
   - a frame plus coupled-wall building with rigid diaphragms;
   - precast joints;
-  - wall-thickness design.
+  - wall-thickness design;
+  - a disturbed region (a deep transfer panel with openings, triangulated): reactions per
+    bearing and the principal-force field behind a strut-and-tie model.
 - **Optimization (AsapOptim):** truss size, shape vs size, connection stiffness.
 - **Automatic differentiation:** an Enzyme verification matrix across all scenario classes,
   and backend timings.
