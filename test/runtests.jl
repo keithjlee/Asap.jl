@@ -54,4 +54,5 @@ const CHAR_RELEASES = [:fixedfixed, :fixedfree, :freefixed, :freefree, :joist]
     include("newcore/test_group_ad_rules.jl")      # linear-cost Zygote group rules
     include("newcore/test_shell_parity.jl")
     include("newcore/test_shell_mitc4_bd85.jl")
+    include("newcore/test_shell_tri.jl")             # S7: ANDES-OPT + MITC3+ triangle kernels
 end

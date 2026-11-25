@@ -380,3 +380,52 @@ transformation because it touches far fewer code paths.
 6. Masters: an existing node, or an auto-created node at the centroid of the slaves, with its
    out-of-plane DOFs fixed. Diaphragm loads (story forces, accidental-torsion moments) are
    applied to the master.
+
+## 7. Triangle membrane: ANDES-OPT (S7b) — implemented
+
+Source: Felippa C.A. (2003), "A study of optimal membrane triangles with drilling freedoms",
+CMAME 192:2125–2168. Implemented from the paper's Mathematica module (Fig. 10), which is the
+authoritative form: the printed eq (31) omits the area factor that the module carries,
+`K_θ = (3/4)·β₀·h·A·(Q₄ᵀE_nat Q₄ + Q₅ᵀE_nat Q₅ + Q₆ᵀE_nat Q₆)`.
+
+- DOFs per node `(u, v, ψ)`, ψ = ½(∂v/∂x − ∂u/∂y), right-handed about e₃ (same as the ITW quad).
+- `K = K_b + K_h`. `K_b = L E Lᵀ/(hA)` with the force-lumping matrix L (eq 22, contains h/2),
+  α_b = 3/2. `K_h = T̃ᵀ_θu K_θ T̃_θu` with the hierarchical-rotation map T̃_θu (eq 16), natural
+  side strains (`E_nat = T_eᵀ E T_e`, eqs 11–13) and the Q matrices of eq 29 at the side
+  midpoints (eq 30).
+- OPT signature (eq 42): α_b = 3/2, β₁…β₉ = (1, 2, 1, 0, 1, −1, −1, −1, −2). β₀ from eq 44:
+  `β₀ = 2/Ῡ − 3/2`, Ῡ = (1/2π)∮E₁₁φC₁₁φ dφ (eq 43 for the rotated entries), clamped at 0.01.
+  Isotropic: ½(1−4ν²). Ῡ is taken as the exact 16-point trapezoidal average (degree-8
+  trigonometric polynomial), not the paper's closed-form W, to avoid transcription risk.
+- In Asap h = 1 and E = A, the thickness-integrated membrane rigidity: K is homogeneous of
+  degree 1 in E and β₀ is scale-invariant.
+
+Verified (`test/newcore/test_shell_tri.jl`): the paper's worked example (Fig. 11, eqs 50–52:
+eigenvalues 52.913 … 0.649 and entries, 5 digits); β₀ isotropic values and rotation invariance
+for orthotropic A; constant-strain patch test and rigid rotation; **exact in-plane pure bending**
+of two-triangle rectangular mesh units for aspect ratios 1–16 and ν = 0, ¼ (energy ratio 1 to
+1e-10, the optimality property).
+
+## 8. Triangle plate: MITC3+ (S7c) — implemented
+
+Source: Lee Y., Lee P.S., Bathe K.J. (2014), "The MITC3+ shell element and its performance",
+Comput. Struct. 138:12–23. For a flat element the continuum shell reduces to Reissner–Mindlin:
+
+- w = Σhᵢwᵢ (h₁ = 1−r−s, h₂ = r, h₃ = s); rotations of the normal β = (βx, βy) = (θy, −θx)
+  interpolated with fᵢ = hᵢ − f₄/3 (i = 1…3) plus the bubble f₄ = 27rs(1−r−s) carrying two
+  internal DOFs (βx₄, βy₄), condensed statically.
+- Bending κ = (βx,x, βy,y, βx,y + βy,x) from the enriched rotations; 7-point (degree 5) rule,
+  exact for the quartic integrand.
+- Transverse shear: covariant engineering strains e_r = w,r + β·x,r, e_s = w,s + β·x,s, tied at
+  A (1/6, 2/3), B (2/3, 1/6), C (1/6, 1/6) and D, E, F at distance d = 1/10 000 from the
+  barycentre (Table 1), assumed field eq 17:
+  `ê_r = ⅔(e_r^B − ½e_s^B) + ⅓(e_r^C + e_s^C) + ⅓ĉ(3s−1)`,
+  `ê_s = ⅔(e_s^A − ½e_r^A) + ⅓(e_r^C + e_s^C) + ⅓ĉ(1−3r)`,
+  `ĉ = (e_r^F − e_r^D) − (e_s^F − e_s^E)`; Cartesian γ = J⁻¹ê with J = [x,r y,r; x,s y,s].
+- The paper's continuum element applies no shear correction factor (its Table 3 is reproduced
+  exactly with S = G·t); Asap's sections supply S = (5/6)G·t as for MITC4.
+
+Verified: Table 3 single-element eigenvalues of the uncondensed 11×11 plate block (right
+triangle, t/L = 1e-4, d = 1e-4: all eight non-zero values incl. the in-plane twisting mode
+1.3599e-5, 5 digits); exactly three rigid modes after condensation; spatial isotropy (cyclic node
+relabelling permutes K); constant-curvature patch test with zero shear (exact energy).

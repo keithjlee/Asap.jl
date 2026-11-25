@@ -47,6 +47,7 @@ export EndSprings, EndConditions, rigid_end, pinned_end, RELEASES, release_symbo
 include("Elements/kernels/transformation.jl")
 include("Elements/kernels/stiffness.jl")
 include("Elements/kernels/shell.jl")
+include("Elements/kernels/shell_tri.jl")
 include("Elements/interface.jl")
 include("Elements/frame.jl")
 include("Elements/variable.jl")
@@ -57,6 +58,7 @@ export nodes, ndofs, n_internal_dofs, dof_signature, stiffness
 export endpoints, midpoint, local_frame
 export n_segments, segment_fractions, locate_segment
 export ShellElement, shell_frame, shell_stiffness, itw_membrane_stiffness
+export andes_membrane_stiffness, andes_beta0, mitc3p_plate_stiffness
 export shell_resultants, shell_envelope, section_cut, LinkElement
 
 # ── springs ─────────────────────────────────────────────────────────────────

@@ -1,0 +1,60 @@
+# S7: triangles and general meshes — plan and tracker
+
+> **Status: APPROVED 2026-11-24 (Keith). In progress.** Branch `triangles` (off `main` @ `8a49467`,
+> Asap 1.3.0). Target: Asap **1.4.0** (additive). Follows `PLAN.md` (S0–S6, released as 1.3).
+> Formulations and benchmark values: `DERIVATION.md` §7 onward (added as each element lands).
+
+## Why now
+
+Strut-and-tie modelling of disturbed regions (panels, deep beams, dapped ends, corbels, walls with
+openings) needs a **plane-stress solve of an arbitrary polygon with polygon or circular holes**:
+principal stress magnitudes and directions (load-path tracing, stress-field underlays), support
+reactions per bearing, and envelopes over load cases. `mesh_wall` covers rectangles with
+rectangular openings only. The general case needs triangles and a general mesher. Higher-order
+elements, adaptive refinement and nonlinear analysis are not required.
+
+## Decisions (Keith, 2026-11-24)
+
+1. **Membrane: ANDES-OPT** (Felippa 2003, CMAME 192:2125). The optimal 3-node drilling triangle:
+   exact in-plane pure bending of rectangular mesh units, closed form, no spurious modes. Same
+   element as OpenSees `ShellANDeS` (independent cross-check).
+   - `K = V⁻¹LELᵀ + (3/4)β₀ T̃ᵀ_θu K_θ T̃_θu` (Felippa eqs 21–32), α_b = 3/2, β₁…β₉ =
+     (1, 2, 1, 0, 1, −1, −1, −1, −2) (eq 42).
+   - Isotropic β₀ = max(½(1−4ν²), 0.01). General (cracked, orthotropic `ShellRigiditySection`):
+     β₀ = 2/Ῡ − 3/2 with Ῡ the 2π-average of E₁₁φ·C₁₁φ (eq 44), clamped at 0.01. The average of a
+     degree-8 trigonometric polynomial is exact with 16 equally spaced samples: closed form, AD-safe.
+   - With h = 1 and E = A (membrane rigidity, already thickness-integrated).
+2. **Plate: MITC3+** (Lee, Lee & Bathe 2014, Comput. Struct. 138:12). Reissner–Mindlin like MITC4,
+   so mixed quad/triangle meshes use one plate theory and triangles report Q.
+   - Rotations enriched by a cubic bubble f₄ = 27rs(1−r−s) (2 internal DOFs, condensed);
+     f_i = h_i − f₄/3.
+   - Assumed transverse shear (eq 17) tied at A (1/6, 2/3), B (2/3, 1/6), C (1/6, 1/6) and
+     D (1/3+d, 1/3−2d), E (1/3−2d, 1/3+d), F (1/3+d, 1/3+d), d = 1/10 000.
+   - Check: single-element eigenvalues of the uncondensed plate block against Table 3.
+3. **Mesher: DelaunayTriangulation.jl as a weak-dependency extension** (pure Julia, constrained
+   Delaunay with holes, quality refinement). Plus, in core: an array constructor (points + cells,
+   triangles and quads) and a dependency-free Gmsh `.msh` (v4 ASCII) reader.
+
+## Progress tracker
+
+| Phase | Content | Gate | Status |
+|---|---|---|---|
+| S7a | N-generic shell infrastructure: `ShellElement{T,3}`, `shell_frame` for 3 nodes, FEF table node rows per element, group rules for any N, results/geo/envelope dispatch, AsapOptim shell paths | quad models bitwise identical; lockstep | ☐ |
+| S7b | ANDES-OPT membrane kernel (9×9) | patch tests; bending optimality r = 1 on rectangle pairs; Cook's membrane; rank and rigid modes | ☐ |
+| S7c | MITC3+ plate kernel (9×9 after condensation) | Table 3 eigenvalues; patch tests; clamped plate convergence; isotropy (node-order invariance) | ☐ |
+| S7d | Triangle shell: 18×18 assembly, consistent loads, resultants (N, M, Q), `section_cut`, `ShellGeo`, `shell_envelope` | Scordelis–Lo and pinched cylinder on triangles; mixed quad/triangle meshes; equilibrium | ☐ |
+| S7e | Meshing: `shell_mesh(points, cells, section)`, `read_gmsh`, `AsapDelaunayExt` → `mesh_polygon(outline; holes, max_area, min_angle)` returning boundary edge sets | polygon with circular and L-shaped holes; mesh quality; node reuse | ☐ |
+| S7f | D-region workflow: loads and bearings along boundary segments, patch loads, reactions per bearing, principal fields | deep beam and dapped end against hand statics; reactions sum to loads | ☐ |
+| S7g | AD and optimization: plain kernels + ForwardDiff rules (width 4), Enzyme/Mooncake bridges, `ThicknessVariable` on triangles, Enzyme matrix triangle case | gradients vs FD; Enzyme matrix 1.13 + 1.12; Julia 1.10 compile time | ☐ |
+| S7h | Walkthrough `examples/shells/06_polygon_panel.jl` + PDF report; docs; release notes 1.4.0 | strict docs build; lockstep | ☐ |
+| later | Warped-quad correction; MITC4+ (distorted quads) | | ☐ |
+
+## Rules carried over from 1.3
+
+- Every pure-path change must pass the Enzyme matrix (`examples/ad/run_enzyme_matrix.sh`, 1.13
+  and 1.12) before commit. Zygote-only speedups go in `RuleConfig` rrules; the primal Enzyme sees
+  stays byte-for-byte.
+- ForwardDiff kernel rules use dual width 4 (wide duals compile for many minutes on Julia 1.10).
+- Julia 1.10 is the floor: check compile time and the suite on 1.10 for every new kernel.
+- Report sources stay private (`examples/reports-src/`); only PDFs are published.
+- No client or product names in this public repo.
