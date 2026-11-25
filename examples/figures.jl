@@ -153,6 +153,11 @@ _corners(g::ShellGeo, k) = _istri(g.quads, k) ? (1:3) : (1:4)
 # columns of g.quads belonging to a set of elements
 shell_columns(g::ShellGeo, model, els) = [findfirst(==(findfirst(e -> e === el, model.elements)), g.elements) for el in els]
 
+# Coloured meshes are rasterized inside the vector PDF (scale factor MESH_RASTER on the
+# figure resolution): CairoMakie writes per-vertex colours as a PDF mesh gradient, which
+# PDF viewers and Typst render white or wrongly. Lines, text and nodes stay vector.
+const MESH_RASTER = 2
+
 # quads (and degenerate-quad triangles) → triangles for mesh!
 tri_faces(q::AbstractMatrix{Int}, ks) =
     reduce(vcat, [_istri(q, k) ? [q[1, k] q[2, k] q[3, k]] : [q[1, k] q[2, k] q[3, k]; q[1, k] q[3, k] q[4, k]] for k in ks])
@@ -230,7 +235,8 @@ function _contour_figure(P0, P, quads, ks, vals, field; title, colormap, colorra
     colorrange === nothing || (cr = colorrange)
     fine = length(ks) > FINE_MESH
     P0 === nothing || linesegments!(ax, (fine ? outline_edges : quad_edges)(P0, quads, ks); color = kjl_lightgray, linewidth = 0.4)
-    m = mesh!(ax, P, tri_faces(quads, ks); color = vals, colormap = cm, colorrange = cr, shading = NoShading)
+    m = mesh!(ax, P, tri_faces(quads, ks); color = vals, colormap = cm, colorrange = cr, shading = NoShading,
+        rasterize = MESH_RASTER)
     linesegments!(ax, quad_edges(P, quads, ks); color = (kjl_black, fine ? 0.08 : 0.35), linewidth = fine ? 0.2 : 0.3)
     fine && linesegments!(ax, outline_edges(P, quads, ks); color = kjl_black, linewidth = 0.6)
     Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)))
@@ -447,6 +453,7 @@ function fig_3d(model; field = :umag, scale = 0.0, title = "", geo = ShellGeo(mo
     m = hiddenface!(ax, P, tris, S, E; azimuth, elevation, facecolor = vals, colormap = cm, colorrange = cr,
         edges = (es, ee), color = C, linewidth = W, nodes = nds, nodesize = 2.5, nodestrokecolor = kjl_black,
         nodestrokewidth = 0.5, halo, ground = true, width = width - 60)
+    m.rasterize = MESH_RASTER                     # see MESH_RASTER
     Colorbar(fig[1, 2], m; label = get(FIELD_LABELS, field, string(field)), height = Relative(0.6))
     structurestyle!(ax)
     fitstructure!(fig, ax; width = width - 68, maxheight = ratio * width, padpt = 4)
