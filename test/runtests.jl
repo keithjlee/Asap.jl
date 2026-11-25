@@ -2,9 +2,8 @@
 #
 # The regression backbone is the Phase 0 characterization data (exact
 # numerics pinned from the legacy v0.2.x implementation and from the
-# DiffAnalysis_2024 publication environment) — see docs/MODERNIZATION.md.
-# Deliberate deviations from legacy behavior are documented there and
-# asserted explicitly where they occur.
+# DiffAnalysis_2024 publication environment). Deliberate deviations from
+# legacy behavior are asserted explicitly where they occur.
 
 using Asap
 using Test

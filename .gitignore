@@ -24,6 +24,8 @@ PROGRESS.md
 docs/MIGRATION_v1.md
 docs/MODERNIZATION.md
 docs/AUTHORING.md
+docs/shells/PLAN.md
+docs/shells/PLAN_S7.md
 
 # Documenter build artifacts
 docs/build/

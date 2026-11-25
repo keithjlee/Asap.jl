@@ -271,7 +271,7 @@ ChainRulesCore.frule((_, _, ΔK, ΔF), ::typeof(HOST.solve_free), solver,
 # (`@from_rrule`) only ever import config-free rules for named kernels, so they
 # keep differentiating the unchanged primal natively. Restructuring the primal
 # itself (gather + `map` over `Vector{Any}`) fixed Zygote but made Enzyme
-# reverse throw and Enzyme forward silently wrong (docs/shells/PLAN.md S6d).
+# reverse throw and Enzyme forward silently wrong.
 
 const _RevCfg = RuleConfig{>:HasReverseMode}
 

@@ -9,8 +9,6 @@ results (`LinearResults`, returned by `solve!`). One set of pure element
 kernels feeds both an in-place zero-allocation assembly path and a pure
 functional path (`ModelState` → `solve`) that automatic differentiation
 engines traverse natively (see `ext/AsapChainRulesExt.jl`).
-
-See `docs/MODERNIZATION.md` for the architecture and roadmap.
 """
 module Asap
 
