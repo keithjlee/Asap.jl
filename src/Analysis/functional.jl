@@ -101,16 +101,20 @@ function _group_entries_nnode_all(g::ElementGroup, state::ModelState, ::Val{N}) 
     end)
 end
 
+# a shell's quad-edge flags (drilling lumping α = 1) from the group's plain-data mirror
+_group_quadedge(g::ElementGroup, e::Int, ::Val{N}) where {N} = ntuple(k -> g.quadedge[k, e], Val(N))
+
 function _group_entries_nnode(g::ElementGroup, e::Int, section, X::NTuple)
     Ke = stiffness(g.elements[e], X...)
     slots = g.slots[e]
     return Base.length(slots) == size(Ke, 1) ? vec(Ke) : vec(Ke[slots, slots])
 end
 
-# shells: the kernel takes only (section, positions) — no element-struct reads
-# inside the differentiated closure; every slot is active (no slicing)
-_group_entries_nnode(::ElementGroup{<:ShellElement}, e::Int, section, X::NTuple) =
-    vec(shell_stiffness(section, X...))
+# shells: the kernel takes only (section, positions, drilling lumping from the
+# plain-data mirror) — no element-struct reads inside the differentiated
+# closure; every slot is active (no slicing)
+_group_entries_nnode(g::ElementGroup{<:ShellElement}, e::Int, section, X::NTuple) =
+    vec(_shell_stiffness_q(section, X, _group_quadedge(g, e, Val(length(X)))))
 
 # line elements: per-element kernel evaluation from the two endpoint columns
 function _group_entries_all(g::ElementGroup{<:AbstractLineElement}, state::ModelState)

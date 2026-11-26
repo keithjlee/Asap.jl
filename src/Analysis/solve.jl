@@ -8,6 +8,9 @@ The analysis pipeline: process! (once per topology) → solve! (per state).
 Build the model's analysis structure: assign node/element indices, classify
 DOFs (free / fixed / inactive), group elements by type, and freeze the
 free×free sparsity pattern with its scatter maps (see [`AnalysisCache`](@ref)).
+It also sets each triangular shell's per-edge drilling force lumping
+(`ShellElement.drilling`): 1 on the edges it shares with a quadrilateral,
+α_b = 3/2 elsewhere, so mixed quad/triangle meshes pass the patch test.
 
 Call once per *topology*. Geometry, section, spring-value, and load changes
 do NOT require re-processing — they are picked up by the next `solve!`.
@@ -28,6 +31,7 @@ function process!(model::Model{T}) where {T}
             offset += n_internal_dofs(el)
         end
     end
+    _drilling_lumping!(model.elements)        # triangles beside quadrilaterals
     model.cache = build_cache(model)
     cm = model.cache.constraint
     cm === nothing || _refresh_constraint!(cm, model)

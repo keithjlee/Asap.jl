@@ -150,6 +150,8 @@ function Base.show(io::IO, ::MIME"text/plain", el::ShellElement{T,N}) where {T,N
     R = local_frame(el)
     println(io, "  area   = $(area(el))  [length²]")
     println(io, "  normal = $(collect(R[3, :]))  (local e₃; right-hand rule over the node order)")
+    N == 3 && el.drilling != _ANDES_DRILL &&
+        println(io, "  drilling lumping = $(el.drilling)  (per edge; 1 where a quadrilateral shares it)")
     print(io,   "  section: ", el.section)
 end
 

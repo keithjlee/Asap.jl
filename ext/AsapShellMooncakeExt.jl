@@ -47,4 +47,10 @@ Mooncake.@from_rrule(
     Tuple{typeof(Asap._shell_fef_plain),M3,V3,V3,V3,V3,V3},
 )
 
+# triangles beside a quadrilateral (per-edge drilling lumping, constant)
+Mooncake.@from_rrule(
+    Mooncake.DefaultCtx,
+    Tuple{typeof(Asap._shell3_K_plain),M3,M3,M2,Float64,V3,V3,V3,NTuple{3,Bool}},
+)
+
 end # module

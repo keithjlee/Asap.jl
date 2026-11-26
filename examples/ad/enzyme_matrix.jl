@@ -4,7 +4,7 @@ Enzyme across Asap — one case × mode per process (run via run_enzyme_matrix.s
     julia --project=examples examples/ad/enzyme_matrix.jl <case> <mode>
 
 case ∈ truss_area, truss_shape, spaceframe, frame_lineload, frame_joints,
-       springs, variable_element, shells, shells_tri, diaphragm, cases
+       springs, variable_element, shells, shells_tri, shells_mixed, diaphragm, cases
 mode ∈ reverse, forward
 
 Reference: Zygote. Prints one line: `RESULT case mode OK rel_err time_ms first_s`.
@@ -113,6 +113,27 @@ function case(name)
         rest = [el for el in tris if !(el in half)]
         p = OptParams(m, AbstractVariable[ThicknessVariable(half, 0.1, 0.5), ThicknessVariable(rest, 0.1, 0.5)])
         return x -> compliance(solve_structure(x, p), p), [0.25, 0.18]
+    elseif name == "shells_mixed"
+        # the wall with its right half triangulated: the triangles beside the quads take the
+        # quad's drilling lumping on the shared edges (Asap._shell3_K_plain and its rule)
+        conc = Material(3.0e4, 2.4e-3, 0.2)
+        sec = ShellSection(conc, 0.2)
+        w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 3.0, 2.0, sec; size = 0.5)
+        els = AbstractElement{Float64}[]
+        for el in w.elements
+            sum(n -> n.position[1], el.nodes) / 4 > 1.5 ?
+                append!(els, (ShellElement((el.nodes[1], el.nodes[2], el.nodes[3]), sec),
+                              ShellElement((el.nodes[1], el.nodes[3], el.nodes[4]), sec))) : push!(els, el)
+        end
+        top = [w.grid[i, end] for i in eachindex(w.s)]
+        m = Model(w.nodes, els,
+            AbstractLoad{Float64}[[SelfWeight(el; g = [0.0, 0, -9.81]) for el in els]..., [NodeForce(n, [0.5, 0, 0]) for n in top]...])
+        solve!(m)
+        tris = [el for el in els if el isa ShellElement{Float64,3}]
+        quads = [el for el in els if el isa ShellElement{Float64,4}]
+        p = OptParams(m, AbstractVariable[ThicknessVariable(quads, 0.1, 0.5), ThicknessVariable(tris, 0.1, 0.5),
+            SpatialVariable(w.grid[4, 2], 0.0, -0.2, 0.2, :X)])
+        return x -> compliance(solve_structure(x, p), p), [0.25, 0.18, 0.05]
     elseif name == "diaphragm"
         base = [Node([x, y, 0.0], :fixed) for (x, y) in ((0.0, 0.0), (6.0, 0.0), (0.0, 4.0), (6.0, 4.0))]
         top = [Node([x, y, 3.0], :free) for (x, y) in ((0.0, 0.0), (6.0, 0.0), (0.0, 4.0), (6.0, 4.0))]

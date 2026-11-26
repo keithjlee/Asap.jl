@@ -12,7 +12,7 @@ function _recover_forces!(reactions, isfixed, cache::AnalysisCache{T},
     X = map(n -> n.position, el.nodes)
     R = shell_frame(X...)[1]
     g = element_global_dofs(el)
-    Ke = shell_stiffness(el.section, X...)
+    Ke = _shell_stiffness_d(el.section, X, el.drilling)
     Qg = _rotate_nodes(R', SVector{6N,T}(cache.q_local[el.index][1]))
     f_global = Ke * SVector{6N,T}(ntuple(i -> u[g[i]], Val(6N))) + Qg
     @inbounds for i in 1:6N
@@ -74,7 +74,8 @@ function shell_resultants(model::Model{T}, el::ShellElement{T,3};
     X = map(n -> n.position, el.nodes)
     R, xy, _ = shell_frame(X...)
     a = _rotate18(R, SVector{18,T}(_element_u(res, el)))
-    r = shell_resultants_local(el.section, xy, a; at = at)
+    r = shell_resultants_local(el.section, xy, a; at = at,
+        drilling = el.drilling == _ANDES_DRILL ? nothing : el.drilling)
     return (N = r.N, M = r.M, Q = r.Q, frame = R)
 end
 

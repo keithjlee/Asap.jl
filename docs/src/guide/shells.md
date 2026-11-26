@@ -7,7 +7,9 @@ using Asap
 Asap's [`ShellElement`](@ref) is a flat shell in two shapes, which mix freely in one mesh:
 
 - **Quadrilateral** (4 nodes): a drilling-rotation membrane (Ibrahimbegović–Taylor–Wilson, with two complementary incompatible modes) combined with the MITC4 Reissner–Mindlin plate.
-- **Triangle** (3 nodes): Felippa's ANDES-OPT drilling membrane (exact in-plane bending of rectangular two-triangle units) combined with the MITC3+ Reissner–Mindlin plate.
+- **Triangle** (3 nodes): Felippa's ANDES-OPT drilling membrane combined with the MITC3+ Reissner–Mindlin plate. ANDES-OPT is optimal in energy for in-plane bending of rectangular two-triangle units (the strain energy is exact). The pointwise stresses are not exact: the centroid membrane force of a two-triangle-per-cell beam is off by about 1/(6·rows) of the extreme-fibre value.
+
+In a mixed mesh, a triangle uses the quadrilateral's drilling force lumping on every edge it shares with a quadrilateral (the element's `drilling` field, set by [`process!`](@ref)). Both membranes then lump a constant stress state alike, so mixed meshes pass the patch test exactly. Only those transition triangles give up the ANDES bending optimality.
 
 Shells mix freely with frames and trusses, and the drilling DOF lets an in-plane beam transfer moment into a wall at a shared node.
 
@@ -38,7 +40,7 @@ w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 6.0, 3.0, wall;
 
 ## General planar meshes
 
-For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygonal holes (constrained Delaunay with quality refinement; load DelaunayTriangulation.jl to enable it). Put a vertex wherever a support or a load starts or ends, and use [`circle_polygon`](@ref) for round openings. Meshes from any other mesher (points and triangle/quad cells) become elements through [`shell_mesh`](@ref), and Gmsh files (MSH 4.1 ASCII) through [`read_gmsh`](@ref), which keeps Gmsh's physical groups as named node and element sets ([`group_nodes`](@ref), [`group_elements`](@ref)) and reads curved surfaces as spatial meshes. `mesh_polygon` is reproducible: the same input and `seed` give the same mesh. Both return a [`ShellMesh`](@ref), which keeps the in-plane coordinates for region queries:
+For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygonal holes (constrained Delaunay with quality refinement; load DelaunayTriangulation.jl to enable it). Put a vertex wherever a support or a load starts or ends (or pass the point in `points`: a point on an edge splits that edge, so it stays on it even on a sloped edge, where rounding puts it a hair off the line), and use [`circle_polygon`](@ref) for round openings. Meshes from any other mesher (points and triangle/quad cells) become elements through [`shell_mesh`](@ref), and Gmsh files (MSH 4.1 ASCII) through [`read_gmsh`](@ref), which keeps Gmsh's physical groups as named node and element sets ([`group_nodes`](@ref), [`group_elements`](@ref)) and reads curved surfaces as spatial meshes. `mesh_polygon` is reproducible: the same input and `seed` give the same mesh. Both return a [`ShellMesh`](@ref), which keeps the in-plane coordinates for region queries:
 
 - [`nodes_on_segment`](@ref) and [`boundary_nodes`](@ref): nodes along a bearing or a loaded edge;
 - [`edge_loads`](@ref) with a segment: consistent line loads along a boundary, drilling moments included;

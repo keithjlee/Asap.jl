@@ -143,6 +143,29 @@ function ChainRulesCore.rrule(::typeof(Asap._shell_K_plain), A, D, S, γt, X1, X
     return K, shell_K3_pullback
 end
 
+# the triangle beside a quadrilateral: per-edge quad-lumping flags α (constant data)
+function ChainRulesCore.rrule(::typeof(Asap._shell3_K_plain), A, D, S, γt, X1, X2, X3, α::NTuple{3,Bool})
+    K = Asap._shell3_K_plain(A, D, S, γt, X1, X2, X3, α)
+    function shell3_K_pullback(ΔK)
+        Δ = reshape(_cot(Val(324), unthunk(ΔK)), Size(18, 18))
+        As, Ds, Ss, γ = SMatrix{3,3,Float64}(A), SMatrix{3,3,Float64}(D), SMatrix{2,2,Float64}(S), Float64(γt)
+        X = (_sv3(X1), _sv3(X2), _sv3(X3))
+        gm = _grad(vec(As), Val(_CHUNK)) do p
+            sum(Δ .* Asap._shell3_K_plain(_m3(p, 0), Ds, Ss, γ, X..., α))
+        end
+        gp = _grad(vcat(vec(Ds), vec(Ss)), Val(_CHUNK)) do p
+            sum(Δ .* Asap._shell3_K_plain(As, _m3(p, 0), SMatrix{2,2}(p[10], p[11], p[12], p[13]), γ, X..., α))
+        end
+        gx = _grad(vcat(X...), Val(_CHUNK)) do p
+            sum(Δ .* Asap._shell3_K_plain(As, Ds, Ss, γ, _x3(p)..., α))
+        end
+        x1, x2, x3 = _x3(gx)
+        return (NoTangent(), _m3(gm, 0), _m3(gp, 0), SMatrix{2,2}(gp[10], gp[11], gp[12], gp[13]),
+            zero(γ), x1, x2, x3, NoTangent())
+    end
+    return K, shell3_K_pullback
+end
+
 function ChainRulesCore.rrule(::typeof(Asap._shell_fef_plain), A, qg, ql, X1, X2, X3)
     f = Asap._shell_fef_plain(A, qg, ql, X1, X2, X3)
     function shell_fef3_pullback(Δf)

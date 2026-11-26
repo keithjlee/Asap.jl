@@ -157,6 +157,75 @@ end
         end
     end
 
+    @testset "mixed quad/triangle mesh: patch tests (drilling lumping conforms)" begin
+        # 2 × 2 patch, left column quads, right column triangles, interior node off-grid.
+        # A constant stress state lumps drilling moments ∓α·t_n·ℓ²/12 at the ends of each
+        # edge (ITW quad α = 1, ANDES triangle α_b = 3/2): with unequal interface edges
+        # they only cancel when the triangle takes α = 1 on the edges it shares with a
+        # quad. Before that fix the interior ψ residual was 3.7 % (tension) of E·t·ε.
+        function mixed_patch(sec; xi = (0.83, 1.21))
+            nodes = [Node([x, y, 0.0], Bool[1, 1, 1, 1, 1, 1]) for y in (0.0, 1.0, 2.0) for x in (0.0, 1.0, 2.0)]
+            nodes[5] = Node([xi[1], xi[2], 0.0], Bool[1, 1, 1, 1, 1, 1])
+            g(i, j) = nodes[3j+i+1]
+            els = AbstractElement{Float64}[]
+            for j in 0:1, i in 0:1
+                a, b, c, d = g(i, j), g(i + 1, j), g(i + 1, j + 1), g(i, j + 1)
+                i == 0 ? push!(els, ShellElement((a, b, c, d), sec)) :
+                isodd(i + j) ? push!(els, ShellElement((a, b, d), sec), ShellElement((b, c, d), sec)) :
+                               push!(els, ShellElement((a, b, c), sec), ShellElement((a, c, d), sec))
+            end
+            m = Model(nodes, els, AbstractLoad{Float64}[NodeForce(nodes[1], [0.0, 0, 0])])
+            process!(m)
+            K = zeros(54, 54)
+            for el in els
+                d = reduce(vcat, [6(n.index-1)+1:6n.index for n in el.nodes])
+                K[d, d] .+= Asap.element_stiffness(el)
+            end
+            return m, K
+        end
+        sec = ShellSection(Material(1000.0, 1.0, 0.25), 0.1)
+        m, K = mixed_patch(sec)
+        # process! assigned the lumping: α = 1 exactly on the triangle edges a quad shares
+        tris = filter(el -> el isa ShellElement{Float64,3}, m.elements)
+        @test count(el -> el.drilling != (1.5, 1.5, 1.5), tris) == 2
+        @test all(el -> el.drilling == (1.0, 1.0, 1.0, 1.0), filter(el -> el isa ShellElement{Float64,4}, m.elements))
+        qedges = Set(Set((el.nodes[k], el.nodes[mod1(k + 1, 4)]))
+                     for el in m.elements if el isa ShellElement{Float64,4} for k in 1:4)
+        @test all(tris) do el
+            all(k -> el.drilling[k] == (Set((el.nodes[k], el.nodes[mod1(k + 1, 3)])) in qedges ? 1.0 : 1.5), 1:3)
+        end
+        # membrane: u = a x + b y, v = c x + d y, ψ = (c − b)/2 (tension, shear, rotation)
+        for (a, b, c, d) in ((1e-3, 0, 0, 0), (0, 1e-3, 1e-3, 0), (0, 2e-3, 0, 0), (2e-4, -1e-3, 3e-4, 5e-4))
+            u = zeros(54)
+            for n in m.nodes
+                x, y = n.position
+                u[6n.index-5:6n.index-4] .= (a * x + b * y, c * x + d * y)
+                u[6n.index] = (c - b) / 2
+            end
+            r = K * u
+            @test norm(r[25:30]) <= 1e-12 * 1000 * 0.1 * 1e-3         # interior node 5
+        end
+        # plate: constant curvature w = (a x² + b y² + c xy)/2, θx = w,y, θy = −w,x
+        # (thin and thick); MITC4 and MITC3+ conform along the shared edges
+        for t in (0.001, 0.05)
+            m, K = mixed_patch(ShellSection(Material(1e6, 1.0, 0.25), t))
+            a, b, c = 1e-3, -2e-3, 1.5e-3
+            u = zeros(54)
+            for n in m.nodes
+                x, y = n.position
+                u[6n.index-3:6n.index-1] .= ((a * x^2 + b * y^2 + c * x * y) / 2, b * y + c * x / 2, -(a * x + c * y / 2))
+            end
+            f = K * u
+            @test maximum(abs, f) > 1e-8                       # the field does load the patch
+            @test norm(f[27:29]) <= 1e-12 * maximum(abs, K) * maximum(abs, u)   # interior w, θx, θy
+        end
+        # a pure triangle model keeps the default lumping on every edge
+        nodes = [Node([0.0, 0, 0], :fixed), Node([1.0, 0, 0], :free), Node([0.0, 1, 0], :free)]
+        tri = ShellElement((nodes[1], nodes[2], nodes[3]), sec)
+        process!(Model(nodes, [tri], [NodeForce(nodes[2], [1.0, 0, 0])]))
+        @test tri.drilling == (1.5, 1.5, 1.5)
+    end
+
     @testset "mixed quad/triangle mesh: equilibrium, area loads, resultants" begin
         sec = ShellSection(Material(3.0e4, 2.4e-3, 0.2), 0.2)
         grid, quads = grid_shell_mesh(4, 3, (i, j) -> (1.5i, 0.0, 1.0j), sec;

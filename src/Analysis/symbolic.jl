@@ -31,6 +31,7 @@ struct ElementGroup{E<:AbstractElement}
     rollangles::Vector{Float64}              # roll angles (0 for truss)
     endss::Vector{Any}               # EndConditions per element (immutable; unused for truss)
     Cinc::SparseMatrixCSC{Float64,Int}   # group incidence (nel × nnodes): −1 at i1, +1 at i2
+    quadedge::Matrix{Bool}           # shells: edge takes the quad drilling lumping (α = 1), N × nel; 0 × nel otherwise
 end
 
 """
@@ -230,7 +231,8 @@ function build_cache(model::Model{T}) where {T}
         ne = Base.length(els)
         Cinc = sparse([1:ne; 1:ne], [i1; i2], [fill(-1.0, ne); fill(1.0, ne)],
             ne, Base.length(model.nodes))
-        push!(groups, ElementGroup{E}(els, idxs, slots_all, gdofs_all, nzmaps, i1, i2, inodes, rollangles, endss, Cinc))
+        quadedge = E <: ShellElement ? reduce(hcat, [collect(el.drilling .== 1.0) for el in els]) : zeros(Bool, 0, ne)
+        push!(groups, ElementGroup{E}(els, idxs, slots_all, gdofs_all, nzmaps, i1, i2, inodes, rollangles, endss, Cinc, quadedge))
     end
 
     spring_entries = Tuple{Int,Int,Int}[]

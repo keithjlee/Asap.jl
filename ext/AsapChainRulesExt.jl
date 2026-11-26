@@ -360,8 +360,11 @@ end
 function ChainRulesCore.rrule(config::_RevCfg, ::typeof(HOST._group_entries_nnode_all),
         g::HOST.ElementGroup{<:Asap.ShellElement}, state::_F64State, v::Val{N}) where {N}
     V = HOST._group_entries_nnode_all(g, state, v)
-    shellK = (sec, xs, ec) -> vec(Asap.shell_stiffness(sec, xs...))
-    item(e) = (shellK, g.model_indices[e], ntuple(k -> g.inodes[k, e], Val(N)), 0, nothing, (6N)^2)
+    function item(e)
+        q = HOST._group_quadedge(g, e, Val(N))
+        shellK = (sec, xs, ec) -> vec(HOST._shell_stiffness_q(sec, xs, q))
+        return (shellK, g.model_indices[e], ntuple(k -> g.inodes[k, e], Val(N)), 0, nothing, (6N)^2)
+    end
     function shell_group_pullback(ΔV)
         Δ = _cotvec(ΔV)
         Δ isa AbstractZero && return (NoTangent(), NoTangent(), ZeroTangent(), NoTangent())

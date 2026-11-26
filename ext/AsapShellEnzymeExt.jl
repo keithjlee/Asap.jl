@@ -34,6 +34,10 @@ function __init__()
             SMatrix{2,2,Float64,4}, Float64, SVector{3,Float64}, SVector{3,Float64}, SVector{3,Float64})
         Enzyme.@import_rrule(typeof(Asap._shell_fef_plain), SMatrix{3,3,Float64,9}, SVector{3,Float64},
             SVector{3,Float64}, SVector{3,Float64}, SVector{3,Float64}, SVector{3,Float64})
+        # triangles beside a quadrilateral (per-edge drilling lumping)
+        Enzyme.@import_rrule(typeof(Asap._shell3_K_plain), SMatrix{3,3,Float64,9}, SMatrix{3,3,Float64,9},
+            SMatrix{2,2,Float64,4}, Float64, SVector{3,Float64}, SVector{3,Float64}, SVector{3,Float64},
+            NTuple{3,Bool})
     end
     return nothing
 end

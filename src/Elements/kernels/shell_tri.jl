@@ -20,6 +20,11 @@ drilling rotation and the plate using the normal's rotations
 
 # OPT signature (Felippa 2003, eq 42): α_b and β₁…β₉; β₀ follows the material
 const _ANDES_ALPHA_B = 1.5
+# per-edge force-lumping parameters (edge k joins node k → k+1) of a triangle
+# with no quadrilateral neighbour; an edge shared with a quadrilateral uses 1.0,
+# the ITW quad's own lumping, so the drilling moments of a constant stress
+# state cancel across that edge (see `drilling_lumping`)
+const _ANDES_DRILL = (1.5, 1.5, 1.5)
 const _ANDES_BETA = (1.0, 2.0, 1.0, 0.0, 1.0, -1.0, -1.0, -1.0, -2.0)
 
 """
@@ -48,7 +53,7 @@ function andes_beta0(A::AbstractMatrix)
 end
 
 """
-    andes_membrane_stiffness(xy, A) -> SMatrix{9,9}
+    andes_membrane_stiffness(xy, A[, α]) -> SMatrix{9,9}
 
 Local ANDES-OPT membrane stiffness of a flat triangle over the DOFs
 `(u, v, ψ)` of nodes 1…3 (Felippa 2003): `K = K_b + K_h`, with the basic
@@ -58,13 +63,22 @@ along the sides (β₁…β₉ of the optimal signature, β₀ from [`andes_beta
 
 - `xy`: local in-plane node coordinates, counter-clockwise [length]
 - `A`: membrane rigidity (thickness-integrated, `N = A·ε`) [force/length]
+- `α`: optional per-edge force-lumping parameters `(α₁, α₂, α₃)` (edge k
+  joins node k → k+1) [-]; default α_b = 3/2 on every edge. An edge shared
+  with a quadrilateral takes 1 (the quad's lumping), so that a constant stress
+  state puts cancelling drilling moments on both sides of it. The higher-order
+  stiffness acts only on deviatoric drilling rotations, which vanish in
+  constant-strain states, so the element passes the patch test for any `α`.
 
-Exact for in-plane pure bending of rectangular two-triangle mesh units of any
-aspect ratio; passes the individual element test (patch test) for any β.
+Optimal in ENERGY for in-plane pure bending of rectangular two-triangle mesh
+units of any aspect ratio (Felippa's optimality: the strain energy is exact).
+The pointwise response is not: the centroid membrane force of a
+two-triangle-per-cell beam is off by about 1/(6·rows) of the extreme-fibre
+value. Passes the individual element test (patch test) for any β.
 """
-function andes_membrane_stiffness(xy, A::AbstractMatrix)
+function andes_membrane_stiffness(xy, A::AbstractMatrix, α = nothing)
     E = SMatrix{3,3}(A)
-    L, Ar, Tθu, Te, Q1, Q2, Q3 = _andes_parts(xy)
+    L, Ar, Tθu, Te, Q1, Q2, Q3 = _andes_parts(xy, α)
     Kb = L * E * L' / Ar
     Enat = Te' * E * Te
     Q4, Q5, Q6 = (Q1 + Q2) / 2, (Q2 + Q3) / 2, (Q3 + Q1) / 2
@@ -72,10 +86,41 @@ function andes_membrane_stiffness(xy, A::AbstractMatrix)
     return Kb + Tθu' * Kθ * Tθu
 end
 
+# force-lumping matrix L (9×3, h = 1, Felippa 2003 eq 22). Default: α_b = 3/2 on
+# every edge, Felippa's factored form. Per edge: each drilling entry is the
+# difference of the two edges meeting at the node, e.g. node 1, σxx column:
+# α_b·y23·(y13 − y21)/12 = α_b·(y13² − y21²)/12 (y23 = y13 + y21), so edge k's
+# parameter scales its own term: (α₃·y13² − α₁·y21²)/12
+function _andes_L(::Nothing, x12, x23, x31, y12, y23, y31)
+    x21, x32, x13 = -x12, -x23, -x31
+    y21, y32, y13 = -y12, -y23, -y31
+    ab = _ANDES_ALPHA_B
+    return SMatrix{9,3}(
+        y23, 0, ab * y23 * (y13 - y21) / 6, y31, 0, ab * y31 * (y21 - y32) / 6, y12, 0, ab * y12 * (y32 - y13) / 6,
+        0, x32, ab * x32 * (x31 - x12) / 6, 0, x13, ab * x13 * (x12 - x23) / 6, 0, x21, ab * x21 * (x23 - x31) / 6,
+        x32, y23, ab * (x31 * y13 - x12 * y21) / 3, x13, y31, ab * (x12 * y21 - x23 * y32) / 3,
+        x21, y12, ab * (x23 * y32 - x31 * y13) / 3) / 2
+end
+
+function _andes_L(α::NTuple{3}, x12, x23, x31, y12, y23, y31)
+    # the default lumping keeps Felippa's factored form (bitwise the same as `nothing`)
+    α == _ANDES_DRILL && return _andes_L(nothing, x12, x23, x31, y12, y23, y31)
+    x21, x32, x13 = -x12, -x23, -x31
+    y21, y32, y13 = -y12, -y23, -y31
+    a1, a2, a3 = α                                    # edges 1→2, 2→3, 3→1
+    return SMatrix{9,3}(
+        y23, 0, (a3 * y13^2 - a1 * y21^2) / 6, y31, 0, (a1 * y21^2 - a2 * y32^2) / 6,
+        y12, 0, (a2 * y32^2 - a3 * y13^2) / 6,
+        0, x32, (a3 * x31^2 - a1 * x12^2) / 6, 0, x13, (a1 * x12^2 - a2 * x23^2) / 6,
+        0, x21, (a2 * x23^2 - a3 * x31^2) / 6,
+        x32, y23, (a3 * x31 * y13 - a1 * x12 * y21) / 3, x13, y31, (a1 * x12 * y21 - a2 * x23 * y32) / 3,
+        x21, y12, (a2 * x23 * y32 - a3 * x31 * y13) / 3) / 2
+end
+
 # geometry-only parts of the ANDES template (Felippa 2003 module, Fig. 10):
 # force-lumping matrix L (9×3, h = 1, eq 22), signed area, hierarchical-rotation
 # map Tθu (eq 16), natural-to-Cartesian strain map Te (eq 12) and Q₁…Q₃ (eq 29)
-function _andes_parts(xy)
+function _andes_parts(xy, α = nothing)
     (x1, y1), (x2, y2), (x3, y3) = xy[1], xy[2], xy[3]
     x12, x23, x31 = x1 - x2, x2 - x3, x3 - x1
     y12, y23, y31 = y1 - y2, y2 - y3, y3 - y1
@@ -83,12 +128,7 @@ function _andes_parts(xy)
     y21, y32, y13 = -y12, -y23, -y31
     Ar = (y21 * x13 - x21 * y13) / 2                  # signed area (> 0 counter-clockwise)
     A2, A4 = 2Ar, 4Ar
-    ab = _ANDES_ALPHA_B
-    L = SMatrix{9,3}(
-        y23, 0, ab * y23 * (y13 - y21) / 6, y31, 0, ab * y31 * (y21 - y32) / 6, y12, 0, ab * y12 * (y32 - y13) / 6,
-        0, x32, ab * x32 * (x31 - x12) / 6, 0, x13, ab * x13 * (x12 - x23) / 6, 0, x21, ab * x21 * (x23 - x31) / 6,
-        x32, y23, ab * (x31 * y13 - x12 * y21) / 3, x13, y31, ab * (x12 * y21 - x23 * y32) / 3,
-        x21, y12, ab * (x23 * y32 - x31 * y13) / 3) / 2
+    L = _andes_L(α, x12, x23, x31, y12, y23, y31)
     Tθu = SMatrix{3,9}(
         x32, x32, x32, y32, y32, y32, A4, 0, 0,
         x13, x13, x13, y13, y13, y13, 0, A4, 0,
@@ -111,8 +151,8 @@ end
 # e = Lᵀa/area + Te·β₀ᵉ·(Q₁ζ₁ + Q₂ζ₂ + Q₃ζ₃)·Tθu·a (Felippa eq 49), with the
 # recommended recovery scaling β₀ᵉ = 3/2. At the centroid the higher-order term
 # vanishes (the OPT element is energy-orthogonal: Q₁ + Q₂ + Q₃ = 0).
-function _andes_strain(xy, a::SVector{9}, r, s)
-    L, Ar, Tθu, Te, Q1, Q2, Q3 = _andes_parts(xy)
+function _andes_strain(xy, a::SVector{9}, r, s, α = nothing)
+    L, Ar, Tθu, Te, Q1, Q2, Q3 = _andes_parts(xy, α)
     Qζ = (1 - r - s) * Q1 + r * Q2 + s * Q3
     return L' * a / Ar + Te * ((3 / 2) * (Qζ * (Tθu * a)))
 end
@@ -288,15 +328,46 @@ Global stiffness of a 3-node flat shell (ANDES-OPT membrane ⊕ MITC3+ plate)
 given its node positions; local matrices are built in the element plane
 ([`shell_frame`](@ref)) and rotated blockwise. The drilling rotation is a
 genuine membrane DOF of the ANDES triangle, so the section's drilling penalty
-`drilling_rigidity` is not used (it belongs to the ITW quad).
+`drilling_rigidity` is not used (it belongs to the ITW quad). This is the
+lone-triangle stiffness (α_b = 3/2 on every edge); in a model the element's
+`drilling` lumping applies (see [`ShellElement`](@ref)).
 """
 shell_stiffness(section::AbstractShellSection, X1, X2, X3) =
     _shell_K_plain(_shell_rigidities(section)..., X1, X2, X3)
+
+# per-edge flags "edge k takes the quadrilateral's drilling lumping (α = 1)"
+# from the lumping parameters (`ShellElement.drilling`)
+_quad_edges(d::NTuple{3,Float64}) = (d[1] == 1.0, d[2] == 1.0, d[3] == 1.0)
+
+# stiffness of a shell from its plain data and its quad-edge flags `q`
+# (pure path, results). Triangles always take the per-edge kernel: NO branch on
+# the data here, where Enzyme compiles (a value branch between the two kernels
+# cost 15× the compile time, 58 → 889 s for a triangle wall); the default
+# shortcut sits inside the kernel, behind its imported rule. The flags are
+# Bools so Enzyme never treats them as active (a Float64 tuple argument of an
+# imported rule fails: `zero(::Active{NTuple})`).
+_shell_stiffness_q(section, X::Tuple{Any,Any,Any,Any}, q) = shell_stiffness(section, X...)
+_shell_stiffness_q(section, X::Tuple{Any,Any,Any}, q::NTuple{3,Bool}) =
+    _shell3_K_plain(_shell_rigidities(section)..., X..., q)
+# from an element's lumping parameters (in-place path, results)
+_shell_stiffness_d(section, X::Tuple{Any,Any,Any,Any}, d) = shell_stiffness(section, X...)
+_shell_stiffness_d(section, X::Tuple{Any,Any,Any}, d::NTuple{3,Float64}) =
+    _shell_stiffness_q(section, X, _quad_edges(d))
 
 # the triangle kernel on plain data (rigidities + positions): the AD rule's target
 function _shell_K_plain(A, D, S, γt, X1, X2, X3)
     R, xy, _ = shell_frame(X1, X2, X3)
     Km = andes_membrane_stiffness(xy, A)
+    Kp = mitc3p_plate_stiffness(xy, D, S)
+    return _rotate_shell3(_shell_local3(Km, Kp), R)
+end
+
+# the same with per-edge drilling force lumping (a triangle beside a quad): edge k
+# takes α = 1 where q[k], else α_b = 3/2 (all false: bitwise `_shell_K_plain`)
+function _shell3_K_plain(A, D, S, γt, X1, X2, X3, q::NTuple{3,Bool})
+    R, xy, _ = shell_frame(X1, X2, X3)
+    α = ntuple(k -> q[k] ? 1.0 : _ANDES_ALPHA_B, Val(3))
+    Km = andes_membrane_stiffness(xy, A, α)
     Kp = mitc3p_plate_stiffness(xy, D, S)
     return _rotate_shell3(_shell_local3(Km, Kp), R)
 end

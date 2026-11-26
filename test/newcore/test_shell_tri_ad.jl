@@ -27,6 +27,14 @@ import ForwardDiff
         pf(v) = (A, SVector{3}(v[1:3]), SVector{3}(v[4:6]), SVector{3}(v[7:9]), SVector{3}(v[10:12]), SVector{3}(v[13:15]))
         gf = ForwardDiff.gradient(v -> hf(pf(v)...), Vector(vcat(qg, ql, X...)))
         @test vcat(gz[2], gz[3], gz[4], gz[5], gz[6]) ≈ gf rtol = 1e-12
+        # per-edge drilling lumping (a triangle beside a quadrilateral): constant data
+        α = (true, false, true)                                 # edges 1 and 3 beside quads
+        h3(args...) = sum(W .* Asap._shell3_K_plain(args..., α))
+        gz = Zygote.gradient(h3, A, D, S, γ, X...)
+        gf = ForwardDiff.gradient(v -> h3(pk(v)...), Vector(vcat(vec(A), vec(D), vec(S), γ, X...)))
+        @test vcat(vec(gz[1]), vec(gz[2]), vec(gz[3]), gz[4], gz[5], gz[6], gz[7]) ≈ gf rtol = 1e-12
+        # the per-edge form with α_b everywhere is the default kernel
+        @test Asap._shell3_K_plain(A, D, S, γ, X..., (false, false, false)) == Asap._shell_K_plain(A, D, S, γ, X...)
     end
 
     @testset "model gradients: positions, thickness, triangle surface loads" begin
@@ -57,5 +65,35 @@ import ForwardDiff
         gfd = FiniteDifferences.grad(central_fdm(5, 1), f, x0)[1]
         @test gz ≈ gfd rtol = 1e-6
         @test norm(gz[nX+1:end]) > 0
+    end
+
+    @testset "model gradients on a mixed quad/triangle mesh (transition triangles)" begin
+        w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 3.0, 2.0, sec; size = 0.5)
+        els = AbstractElement{Float64}[]
+        for el in w.elements                  # right half triangulated
+            c = sum(n -> n.position, el.nodes) / 4
+            c[1] > 1.5 ? append!(els, (ShellElement((el.nodes[1], el.nodes[2], el.nodes[3]), sec),
+                                       ShellElement((el.nodes[1], el.nodes[3], el.nodes[4]), sec))) :
+                         push!(els, el)
+        end
+        top = [w.grid[i, end] for i in eachindex(w.s)]
+        loads = AbstractLoad{Float64}[[SelfWeight(el; g = [0.0, 0, -9.81]) for el in els]...,
+            [NodeForce(n, [1.0, 0.2, 0]) for n in top]...]
+        m = Model(w.nodes, els, loads)
+        solve!(m)
+        @test any(el -> el isa ShellElement{Float64,3} && el.drilling != (1.5, 1.5, 1.5), els)
+        st = extract_state(m)
+        @test solve(m, st) ≈ m.results.u rtol = 1e-9            # pure path ≡ in-place
+        nX = length(st.X)
+        idx = eachindex(els)
+        function f(x)
+            X = reshape(x[1:nX], 3, :)
+            secs = map(i -> ShellSection(sec.material, x[nX+i]), idx)
+            return compliance(m, ModelState{Float64}(X, secs))
+        end
+        x0 = vcat(vec(st.X), 0.2 .+ 0.01 .* sin.(idx))
+        gz = Zygote.gradient(f, x0)[1]
+        gfd = FiniteDifferences.grad(central_fdm(5, 1), f, x0)[1]
+        @test gz ≈ gfd rtol = 1e-6
     end
 end

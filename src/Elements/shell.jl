@@ -26,6 +26,11 @@ in separate type-stable groups.
   [`ShellRigiditySection`](@ref))
 - `id::Symbol`: user tag
 - `index::Int`: position in `model.elements` (assigned by `process!`)
+- `drilling::NTuple{N,Float64}`: drilling force-lumping parameter of each
+  edge (edge k joins node k → k+1) [-] (assigned by `process!`). Quadrilateral:
+  1 (the ITW membrane's lumping, fixed). Triangle: α_b = 3/2 (ANDES-OPT), but 1
+  on an edge it shares with a quadrilateral, so the two membranes lump a
+  constant stress state alike and mixed meshes pass the patch test.
 
 # Local axes
 `e₃` = normalized cross product of the diagonals (quad) or of edges 1 and 3
@@ -50,13 +55,14 @@ mutable struct ShellElement{T,N,S<:AbstractShellSection{T}} <: AbstractElement{T
     section::S
     id::Symbol
     index::Int
+    drilling::NTuple{N,Float64}
 
     function ShellElement(nodes::NTuple{N,Node{T}}, section::S,
         id::Symbol = :shell) where {T,N,S<:AbstractShellSection{T}}
         N in (3, 4) || throw(ArgumentError(
             "ShellElement with $N nodes is not implemented (triangles: N = 3, quadrilaterals: N = 4)"))
         allunique(nodes) || throw(ArgumentError("shell element nodes must be distinct"))
-        return new{T,N,S}(nodes, section, id, 0)
+        return new{T,N,S}(nodes, section, id, 0, N == 3 ? _ANDES_DRILL : ntuple(_ -> 1.0, Val(N)))
     end
 end
 
@@ -82,7 +88,7 @@ Global element stiffness at the given node positions (see
 [`shell_stiffness`](@ref)).
 """
 stiffness(el::ShellElement{T,4}, x1, x2, x3, x4) where {T} = shell_stiffness(el.section, x1, x2, x3, x4)
-stiffness(el::ShellElement{T,3}, x1, x2, x3) where {T} = shell_stiffness(el.section, x1, x2, x3)
+stiffness(el::ShellElement{T,3}, x1, x2, x3) where {T} = _shell_stiffness_d(el.section, (x1, x2, x3), el.drilling)
 
 """
     local_frame(el::ShellElement) -> SMatrix{3,3}
@@ -90,6 +96,31 @@ stiffness(el::ShellElement{T,3}, x1, x2, x3) where {T} = shell_stiffness(el.sect
 Rows are the element's local axes `e₁, e₂, e₃` in global coordinates.
 """
 local_frame(el::ShellElement) = shell_frame(map(n -> n.position, el.nodes)...)[1]
+
+# Per-edge drilling force lumping of the triangles (called by `process!`, after
+# node indexing). A constant stress state puts drilling moments ∓α·t_n·ℓ²/12 at
+# the ends of every element edge: the ITW quad lumps with α = 1, the ANDES-OPT
+# triangle with α_b = 3/2. Across an edge shared by two elements the forces
+# cancel, but the moments cancel only if both use the same α, so a triangle
+# takes α = 1 on every edge a quadrilateral shares (also at folds and
+# non-manifold junctions: matching α removes the in-plane part of the mismatch
+# and is neutral otherwise). All other triangle edges keep α_b = 3/2.
+function _drilling_lumping!(elements)
+    quad_edges = Set{NTuple{2,Int}}()
+    for el in elements
+        el isa ShellElement{<:Any,4} || continue
+        for k in 1:4
+            push!(quad_edges, minmax(el.nodes[k].index, el.nodes[mod1(k + 1, 4)].index))
+        end
+    end
+    for el in elements
+        el isa ShellElement{<:Any,3} || continue
+        el.drilling = ntuple(Val(3)) do k
+            minmax(el.nodes[k].index, el.nodes[mod1(k + 1, 3)].index) in quad_edges ? 1.0 : _ANDES_DRILL[k]
+        end
+    end
+    return elements
+end
 
 """
     area(el::ShellElement) -> T

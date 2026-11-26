@@ -305,9 +305,10 @@ end
     edge_loads(el::ShellElement{T,3}, edge, w; case = :LC1) -> Vector{NodeLoad}
 
 Triangle version (edges 1…3, edge k joins nodes k → k+1): forces `w·l/2` at
-both ends and drilling moments `∓α_b·(w·n)·l²/12` with α_b = 3/2, the
-ANDES-OPT force-lumping parameter (Felippa 2003), where `n` is the edge's
-outward in-plane normal. With these moments a uniform traction reproduces a
+both ends and drilling moments `∓α_b·(w·n)·l²/12` with α_b the edge's
+ANDES-OPT force-lumping parameter (Felippa 2003; 3/2, or 1 on an edge shared
+with a quadrilateral, `el.drilling`), where `n` is the edge's outward in-plane
+normal. With these moments a uniform traction reproduces a
 uniform stress field exactly (patch test).
 """
 function edge_loads(el::ShellElement{T,3}, edge::Int, w::AbstractVector; case::Symbol = :LC1) where {T}
@@ -319,7 +320,7 @@ function edge_loads(el::ShellElement{T,3}, edge::Int, w::AbstractVector; case::S
     n = normalize(cross(d, e3))
     ws = SVector{3,T}(w)
     F = ws * (l / 2)
-    m = (_ANDES_ALPHA_B * dot(ws, n) * l^2 / 12) * SVector{3,T}(e3)
+    m = (el.drilling[edge] * dot(ws, n) * l^2 / 12) * SVector{3,T}(e3)
     return NodeLoad{T}[NodeForce(nJ, F; case = case), NodeForce(nK, F; case = case),
                        NodeMoment(nJ, -m; case = case), NodeMoment(nK, m; case = case)]
 end

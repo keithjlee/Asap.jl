@@ -192,7 +192,7 @@ function _mitc_gamma(xy, ap, ξ, η)
 end
 
 """
-    shell_resultants_local(section, xy, a18; at = (1/3, 1/3)) -> NamedTuple
+    shell_resultants_local(section, xy, a18; at = (1/3, 1/3), drilling = nothing) -> NamedTuple
 
 Triangle version: stress resultants at triangular coordinates
 `at = (r, s)` (node 1 at (0, 0), node 2 at (1, 0), node 3 at (0, 1); default the
@@ -201,14 +201,16 @@ centroid) from LOCAL nodal displacements `a18` (node-major
 (Felippa 2003, eq 49; exact basic strain at the centroid); plate `M = D·κ`
 and `Q = S·γ` from MITC3+ with the rotation bubble recovered by condensation.
 Surface loads do not enter: the triangle has no load-dependent internal modes.
+`drilling`: the element's per-edge drilling force lumping (`nothing` = α_b =
+3/2 on every edge), which enters the basic strain.
 """
 function shell_resultants_local(section::AbstractShellSection, xy, a18::SVector{18};
-    at = (1 / 3, 1 / 3))
+    at = (1 / 3, 1 / 3), drilling = nothing)
     r, s = at
     A, D, S, _ = _shell_rigidities(section)
     am = a18[SVector(1, 2, 6, 7, 8, 12, 13, 14, 18)]
     ap = a18[SVector(3, 4, 5, 9, 10, 11, 15, 16, 17)]
-    N = A * _andes_strain(xy, am, r, s)
+    N = A * _andes_strain(xy, am, r, s, drilling)
     K11 = _mitc3p_K11(xy, D, S)
     b = SVector(10, 11)
     α = -(K11[b, b] \ (K11[b, SOneTo(9)] * ap))
