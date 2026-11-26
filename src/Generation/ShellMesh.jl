@@ -408,7 +408,11 @@ target edge length `h`). **Requires DelaunayTriangulation.jl**
   are found with [`nodes_on_segment`](@ref). A segment may end on the outline,
   a hole or another segment, but must not cross them (split it at the
   crossing point instead)
-- `points`: extra interior points that must become nodes (point loads)
+- `points`: extra points that must become nodes (point loads, the ends of a
+  loaded length on an edge), inside the material or on its boundary (refused
+  with an `ArgumentError` outside the outline or inside a hole). A point on an
+  edge is inserted by splitting that edge, so it stays on it even when
+  rounding puts it a hair off a sloped line
 - `origin`, `e1`, `e2`, `fixity`, `id`: as in [`shell_mesh`](@ref)
 - `seed`: the triangulator inserts points in random order; the seeded generator
   makes the mesh reproducible (same input and seed → same mesh)

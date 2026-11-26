@@ -92,10 +92,16 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
         return length(pts)
     end
     ids = [[vid(p) for p in poly] for poly in polys]
-    foreach(p -> vid((Float64(p[1]), Float64(p[2]))), points)
-    # interior segments (cut lines, load lines): both ends in the material
+    # in the material: inside or on the outline, not strictly inside a hole
     inmaterial(q) = (_inside(outer, q...) || any(k -> _on_edge(q, outer, k, tol), eachindex(outer))) &&
                     !any(H -> _inside(H, q...) && !any(k -> _on_edge(q, H, k, tol), eachindex(H)), hs)
+    # extra points (point loads, ends of loaded lengths): must lie in the material
+    for (k, p) in enumerate(points)
+        q = (Float64(p[1]), Float64(p[2]))
+        inmaterial(q) || throw(ArgumentError("mesh_polygon: point $k $(q) does not lie in the material"))
+        vid(q)
+    end
+    # interior segments (cut lines, load lines): both ends in the material
     segs = map(enumerate(segments)) do (k, sg)
         a, b = (Float64(sg[1][1]), Float64(sg[1][2])), (Float64(sg[2][1]), Float64(sg[2][2]))
         a == b && throw(ArgumentError("mesh_polygon: segment $k has zero length"))
@@ -116,6 +122,7 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     # edge shared by two polygons (a hole along the outline or another hole) once
     edges = Set{NTuple{2,Int}}()
     raw = [[(poly[k], poly[mod1(k + 1, length(poly))]) for poly in ids for k in eachindex(poly)]; segs]
+    chains = Vector{Int}[]             # each input edge with the vertices on it, in order
     for (i, j) in raw
         a, b = pts[i], pts[j]
         dx, dy = b[1] - a[1], b[2] - a[2]
@@ -127,6 +134,7 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
             abs((p[1] - a[1]) * dy - (p[2] - a[2]) * dx) / L <= tol && tol < s < L - tol && push!(on, (s, m))
         end
         chain = [i; last.(sort!(on)); j]
+        push!(chains, chain)
         for q in 1:length(chain)-1
             push!(edges, minmax(chain[q], chain[q+1]))
         end
@@ -140,15 +148,21 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
             "and must not overlap each other (touching is allowed); segments must not cross an edge or " *
             "each other (split them at the crossing point)"))
     end
-    # triangulate the segment graph (seeded: the same input gives the same mesh)
-    tri = triangulate(pts; segments = edges, rng = DT.Random.Xoshiro(seed))
+    tri = _triangulate(pts, ids[1], chains, tol, seed)
     amax = max_area !== nothing ? Float64(max_area) :
            h !== nothing ? sqrt(3) / 4 * Float64(h)^2 : nothing
+    # a cap on the vertex count turns any remaining runaway into an error
+    Amat = (_area2(outer) + sum(_area2, hs; init = 0.0)) / 2
+    cap = max(20_000, 10 * length(pts) + (amax === nothing ? 0 : ceil(Int, 20 * Amat / amax)))
     if amax === nothing
-        refine!(tri; min_angle = Float64(min_angle), rng = DT.Random.Xoshiro(seed))
+        refine!(tri; min_angle = Float64(min_angle), max_points = cap, rng = DT.Random.Xoshiro(seed))
     else
-        refine!(tri; min_angle = Float64(min_angle), max_area = amax, rng = DT.Random.Xoshiro(seed))
+        refine!(tri; min_angle = Float64(min_angle), max_area = amax, max_points = cap, rng = DT.Random.Xoshiro(seed))
     end
+    DT.num_solid_vertices(tri) >= cap && throw(ErrorException(
+        "mesh_polygon: refinement stopped at $cap vertices without meeting the quality targets. " *
+        "Usual causes: two input vertices closer together than the mesh size (a point a hair off an " *
+        "edge, near-duplicate polygon vertices), or a tiny `min_angle`-violating input feature."))
     # keep the material: inside the outline, outside every hole (centroid test)
     P = DT.get_points(tri)
     cells = Vector{Int}[]
@@ -163,6 +177,76 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
     boundary = [[_edge_nodes(mesh, poly[k], poly[mod1(k + 1, length(poly))], tol) for k in eachindex(poly)]
                 for poly in polys]
     return ShellMesh(mesh.nodes, mesh.elements, mesh.points, boundary, mesh.origin, mesh.e1, mesh.e2)
+end
+
+# Triangulate the input graph (seeded: the same input gives the same mesh).
+#
+# The outline is the domain's boundary curve, so nothing outside it is
+# triangulated or refined: with segments alone the domain is the convex hull,
+# and a vertex a rounding error outside an edge (a load point on a sloped edge
+# lands ±1e-16 off it) leaves a sliver between hull and outline that Ruppert
+# refinement splits without end. Holes and interior segments stay constrained
+# segments, which is what lets holes touch the outline and each other.
+#
+# Vertices lying ON an input edge (T-junctions: load points, touching hole
+# corners, segment ends, reused nodes) are not triangulated as free points:
+# off-line by rounding, a run of them would give zero-area slivers. They are
+# skipped at first and then inserted by splitting the edge they lie on, as the
+# refinement itself splits segments, which keeps them on the edge
+# topologically whatever their rounding.
+function _triangulate(pts, outer, chains, tol, seed)
+    S = Set{Int}()                                   # vertices interior to an input edge
+    foreach(c -> union!(S, c[2:end-1]), chains)
+    setdiff!(S, outer)                               # outline corners stay corners
+    nout = length(outer)
+    whole = Set{NTuple{2,Int}}()                     # edges entered as they are
+    pending = Vector{Int}[]                          # edges with an endpoint still to insert
+    for (r, c) in enumerate(chains)
+        r <= nout && continue                        # outline edges: the boundary curve
+        c[1] in S || c[end] in S ? push!(pending, c) : push!(whole, minmax(c[1], c[end]))
+    end
+    tri = triangulate(pts; boundary_nodes = [outer; outer[1]],
+        segments = isempty(whole) ? nothing : whole, skip_points = collect(S),
+        rng = DT.Random.Xoshiro(seed))
+    todo = copy(S)
+    while !isempty(todo) || !isempty(pending)
+        progress = false
+        for v in collect(todo)                       # split the segment v lies on
+            e = _segment_through(tri, pts, v, tol)
+            e === nothing && continue
+            DT.complete_split_edge_and_legalise!(tri, e[1], e[2], v)
+            delete!(todo, v)
+            progress = true
+        end
+        for c in collect(pending)                    # edges whose ends are now in place
+            (c[1] in todo || c[end] in todo) && continue
+            q = filter(v -> !(v in todo), c)
+            for k in 1:length(q)-1
+                DT.contains_segment(tri, q[k], q[k+1]) || DT.add_segment!(tri, q[k], q[k+1])
+            end
+            filter!(!=(c), pending)
+            progress = true
+        end
+        if !progress                                 # cyclic overlaps of collinear edges
+            v = pop!(todo)
+            DT.add_point!(tri, v)
+        end
+    end
+    return tri
+end
+
+# the constrained edge of `tri` that vertex v lies on, strictly between its ends
+function _segment_through(tri, pts, v, tol)
+    p = pts[v]
+    for e in DT.each_segment(tri)
+        i, j = DT.initial(e), DT.terminal(e)
+        a, b = pts[i], pts[j]
+        dx, dy = b[1] - a[1], b[2] - a[2]
+        L = hypot(dx, dy)
+        s = ((p[1] - a[1]) * dx + (p[2] - a[2]) * dy) / L
+        abs((p[1] - a[1]) * dy - (p[2] - a[2]) * dx) / L <= tol && tol < s < L - tol && return (i, j)
+    end
+    return nothing
 end
 
 function _edge_nodes(mesh, a, b, tol)

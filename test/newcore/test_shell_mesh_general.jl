@@ -87,6 +87,42 @@ import DelaunayTriangulation
         # an extra point becomes a node
         mp = mesh_polygon(outline, sec; h = 0.5, points = [(3.0, 1.5)])
         @test any(n -> n.position ≈ [3.0, 1.5, 0.0], mp.nodes)
+        @test_throws ArgumentError mesh_polygon(outline, sec; h = 0.5, points = [(7.0, 1.5)])      # outside
+        @test_throws ArgumentError mesh_polygon(outline, sec; holes = [circle], h = 0.5, points = [(1.6, 1.5)])  # in a hole
+    end
+
+    @testset "mesh_polygon: points on sloped edges (rounding off the line)" begin
+        # points on a sloped edge land ±2e-16 either side of it in floating point.
+        # This used to refine without end (the exterior hull sliver) and runs of such
+        # points gave zero-area triangles; now: the outline bounds the domain and
+        # on-edge points are inserted by splitting their edge
+        minangle(m) = minimum(m.elements) do el
+            x = map(n -> n.position, el.nodes)
+            minimum(k -> acosd(clamp(dot(normalize(x[mod1(k + 1, 3)] - x[k]), normalize(x[mod1(k + 2, 3)] - x[k])), -1, 1)), 1:3)
+        end
+        ol = [(0.0, 0.0), (3.0, 1.0), (3.0, 2.0), (0.0, 2.0)]
+        @test 3.0 * 0.4 - 1.2 > 0 && 3.0 * 0.6 - 1.8 < 0          # the two points straddle the edge
+        for kw in ((;), (; h = 0.1))
+            m = mesh_polygon(ol, sec; points = [(1.2, 0.4), (1.8, 0.6)], kw...)
+            @test sum(Asap.area, m.elements) ≈ 4.5 rtol = 1e-12
+            @test minangle(m) >= 25 - 1e-6
+            on = nodes_on_segment(m, (0.0, 0.0), (3.0, 1.0))
+            @test any(n -> n.position ≈ [1.2, 0.4, 0], on) && any(n -> n.position ≈ [1.8, 0.6, 0], on)
+        end
+        # a dense run of near-collinear points on the outline and on a hole's sloped edge
+        m = mesh_polygon(ol, sec; points = [(x, x / 3) for x in 0.1:0.1:2.9], h = 0.3)
+        @test sum(Asap.area, m.elements) ≈ 4.5 rtol = 1e-12
+        @test minangle(m) >= 25 - 1e-6
+        @test length(nodes_on_segment(m, (0.0, 0.0), (3.0, 1.0))) >= 31
+        sq = [(0.0, 0.0), (6.0, 0.0), (6.0, 4.0), (0.0, 4.0)]
+        H = [(1.0, 1.0), (4.0, 2.0), (4.0, 3.0), (1.0, 2.0)]
+        m = mesh_polygon(sq, sec; holes = [H], points = [(1.0 + 3t, 1.0 + t) for t in 0.05:0.05:0.95], h = 0.3)
+        @test sum(Asap.area, m.elements) ≈ 21.0 rtol = 1e-12
+        @test minangle(m) >= 25 - 1e-6
+        # a hole edge passing through the outline's re-entrant corner
+        Lsh = [(0.0, 0.0), (4.0, 0.0), (4.0, 1.0), (1.0, 1.0), (1.0, 3.0), (0.0, 3.0)]
+        m = mesh_polygon(Lsh, sec; holes = [[(0.5, 0.6), (1.6, 0.6), (1.6, 1.0), (0.5, 1.0)]], h = 0.2)
+        @test sum(Asap.area, m.elements) ≈ 6.0 - 0.44 rtol = 1e-12
     end
 
     @testset "read_gmsh: MSH 4.1 ASCII, physical groups, planar and curved" begin
