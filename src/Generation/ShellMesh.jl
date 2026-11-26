@@ -398,6 +398,13 @@ target edge length `h`). **Requires DelaunayTriangulation.jl**
 - `outline`: polygon vertices in plane coordinates (vector of 2-points or
   2 × n), any orientation; include as vertices every point where a support or
   a load starts or ends, so meshes nodes land there
+- `h`: target edge length [length], a number (uniform mesh) or a function
+  `(x, y) -> h` of the in-plane position (graded mesh: small near loads,
+  supports and re-entrant corners, large elsewhere). A triangle is refined
+  while its area exceeds that of the equilateral triangle of edge `h` (at its
+  centroid). `max_area` [length²] caps the area as well; `min_angle` holds
+  either way. Example, grading toward a corner at `c`:
+  `h = (x, y) -> 0.05 + 0.2 * hypot(x - c[1], y - c[2])`
 - `holes`: polygons inside the outline (any orientation); circles via
   [`circle_polygon`](@ref). Holes may TOUCH the outline or each other — at a
   vertex, with a vertex on an edge, or along a shared edge (a notch drawn as a

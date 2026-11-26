@@ -149,16 +149,36 @@ function Asap.mesh_polygon(outline, section::AbstractShellSection{T};
             "each other (split them at the crossing point)"))
     end
     tri = _triangulate(pts, ids[1], chains, tol, seed)
+    # size: a number (uniform target edge length) or a function (x, y) -> h of the
+    # in-plane position (graded meshes), both as the area of an equilateral triangle
+    # of edge h; `max_area` caps either
+    hfun = h isa Function
     amax = max_area !== nothing ? Float64(max_area) :
-           h !== nothing ? sqrt(3) / 4 * Float64(h)^2 : nothing
-    # a cap on the vertex count turns any remaining runaway into an error
+           h !== nothing && !hfun ? sqrt(3) / 4 * Float64(h)^2 : nothing
+    # a cap on the vertex count turns any remaining runaway into an error; graded:
+    # the expected count ∫ dA / (√3/4·h²) from a sampling of the material
     Amat = (_area2(outer) + sum(_area2, hs; init = 0.0)) / 2
-    cap = max(20_000, 10 * length(pts) + (amax === nothing ? 0 : ceil(Int, 20 * Amat / amax)))
-    if amax === nothing
-        refine!(tri; min_angle = Float64(min_angle), max_points = cap, rng = DT.Random.Xoshiro(seed))
-    else
-        refine!(tri; min_angle = Float64(min_angle), max_area = amax, max_points = cap, rng = DT.Random.Xoshiro(seed))
+    est = amax === nothing ? 0.0 : Amat / amax
+    hfun && (est = max(est, _graded_count(h, outer, hs)))
+    cap = max(20_000, 10 * length(pts) + ceil(Int, 20 * est))
+    kw = (; min_angle = Float64(min_angle), max_points = cap, rng = DT.Random.Xoshiro(seed))
+    amax === nothing || (kw = (; kw..., max_area = amax))
+    if hfun
+        # refine a material triangle whose area exceeds √3/4·h(centroid)²
+        # (triangles inside holes are left alone: they are dropped)
+        too_big = function (t, T)
+            i, j, k = DT.triangle_vertices(T)
+            p, q, r = DT.get_point(t, i, j, k)
+            cx, cy = (p[1] + q[1] + r[1]) / 3, (p[2] + q[2] + r[2]) / 3
+            any(H -> _inside(H, cx, cy), hs) && return false
+            hc = Float64(h(cx, cy))
+            hc > 0 || throw(ArgumentError("mesh_polygon: h($cx, $cy) = $hc must be positive"))
+            A = abs((q[1] - p[1]) * (r[2] - p[2]) - (r[1] - p[1]) * (q[2] - p[2])) / 2
+            return A > sqrt(3) / 4 * hc^2
+        end
+        kw = (; kw..., custom_constraint = too_big)
     end
+    refine!(tri; kw...)
     DT.num_solid_vertices(tri) >= cap && throw(ErrorException(
         "mesh_polygon: refinement stopped at $cap vertices without meeting the quality targets. " *
         "Usual causes: two input vertices closer together than the mesh size (a point a hair off an " *
@@ -247,6 +267,22 @@ function _segment_through(tri, pts, v, tol)
         abs((p[1] - a[1]) * dy - (p[2] - a[2]) * dx) / L <= tol && tol < s < L - tol && return (i, j)
     end
     return nothing
+end
+
+# expected triangle count of a graded mesh: ∫ dA / (√3/4·h²) over the material,
+# by midpoint sampling on a 64 × 64 grid over the outline's bounding box
+function _graded_count(h, outer, hs)
+    xs, ys = first.(outer), last.(outer)
+    x0, x1, y0, y1 = minimum(xs), maximum(xs), minimum(ys), maximum(ys)
+    n = 64
+    dx, dy = (x1 - x0) / n, (y1 - y0) / n
+    total = 0.0
+    for a in 1:n, b in 1:n
+        x, y = x0 + (a - 0.5) * dx, y0 + (b - 0.5) * dy
+        _inside(outer, x, y) && !any(H -> _inside(H, x, y), hs) || continue
+        total += dx * dy / (sqrt(3) / 4 * Float64(h(x, y))^2)
+    end
+    return total
 end
 
 function _edge_nodes(mesh, a, b, tol)

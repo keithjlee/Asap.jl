@@ -61,4 +61,23 @@ using StaticArrays, LinearAlgebra
         str = sprint(show, MIME"text/plain"(), m)
         @test occursin("shell", str)
     end
+    @testset "nodal_average weights: count, area, angle" begin
+        # a 2 × 1 quad (area 2) and a right triangle (area 1/2) sharing nodes (2,0) and (2,1)
+        P = [0.0 2.0 2.0 0.0 3.0; 0.0 0.0 1.0 1.0 0.0]
+        sec = ShellSection(Material(3.0e4, 2.4e-3, 0.2), 0.2)
+        mesh = shell_mesh(P, [(1, 2, 3, 4), (2, 5, 3)], sec)
+        foreach(n -> fixnode!(n, :fixed), mesh.nodes[[1, 4]])
+        m = Model(mesh.nodes, AbstractElement{Float64}[mesh.elements...],
+            AbstractLoad{Float64}[NodeForce(mesh.nodes[5], [1.0, 0, 0])])
+        solve!(m)
+        g = ShellGeo(m)
+        v = [el isa ShellElement{Float64,4} ? 1.0 : 3.0 for el in m.elements[g.elements]]
+        n3 = findfirst(n -> n.position ≈ [2.0, 1, 0], m.nodes)   # quad corner 90°, triangle corner 45°
+        n1 = findfirst(n -> n.position ≈ [0.0, 0, 0], m.nodes)   # quad only
+        @test nodal_average(g, v)[n3] ≈ 2.0
+        @test nodal_average(g, v; weight = :area)[n3] ≈ (2 * 1 + 0.5 * 3) / 2.5
+        @test nodal_average(g, v; weight = :angle)[n3] ≈ (π / 2 * 1 + π / 4 * 3) / (3π / 4)
+        @test all(w -> nodal_average(g, v; weight = w)[n1] ≈ 1.0, (:count, :area, :angle))
+        @test_throws ArgumentError nodal_average(g, v; weight = :volume)
+    end
 end

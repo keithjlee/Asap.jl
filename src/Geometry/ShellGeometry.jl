@@ -73,23 +73,49 @@ function ShellGeo(model::Model{Float64}; results = model.results, factors = noth
 end
 
 """
-    nodal_average(g::ShellGeo, values::AbstractVector) -> Vector{Float64}
+    nodal_average(g::ShellGeo, values::AbstractVector; weight = :count) -> Vector{Float64}
 
 Average a per-shell-element field (length `n_shells`, e.g. `g.N[1, :]`) to
 the nodes (length `n_nodes`; 0 at nodes no shell touches) — the usual
 smoothing for contour plots. Explicit and opt-in: averaging across
 discontinuities (wall/slab junctions, thickness changes) blurs real jumps.
+
+`weight` sets each element's share at a node:
+- `:count`: equal shares (a plain mean of the elements meeting there)
+- `:area`: proportional to the element's area [length²], so the many small
+  elements of a graded region don't outvote the large ones beside it
+- `:angle`: proportional to the element's interior angle at the node [rad]
+  (independent of element size; on a regular mesh close to `:area`)
+
+Average Cartesian components (`g.N[1, :]`, `g.N[2, :]`, `g.N[3, :]`, in a
+common frame) and derive principal forces and directions from the averaged
+components ([`principal_forces`](@ref)); never average `N1`, `N2` or `θ`
+themselves (principal values are not linear in the field, and angles wrap).
 """
-function nodal_average(g::ShellGeo, values::AbstractVector)
+function nodal_average(g::ShellGeo, values::AbstractVector; weight::Symbol = :count)
     length(values) == size(g.quads, 2) || throw(DimensionMismatch("one value per shell element"))
-    acc = zeros(size(g.nodes, 2)); cnt = zeros(Int, size(g.nodes, 2))
-    for k in axes(g.quads, 2), a in 1:4
-        a == 4 && g.quads[4, k] == g.quads[3, k] && continue     # triangle
-        acc[g.quads[a, k]] += values[k]
-        cnt[g.quads[a, k]] += 1
+    weight in (:count, :area, :angle) ||
+        throw(ArgumentError("weight must be :count, :area or :angle (got :$weight)"))
+    acc = zeros(size(g.nodes, 2)); wsum = zeros(size(g.nodes, 2))
+    pos(i) = SVector{3}(g.nodes[1, i], g.nodes[2, i], g.nodes[3, i])
+    for k in axes(g.quads, 2)
+        n = g.quads[4, k] == g.quads[3, k] ? 3 : 4           # triangle: row 4 repeats node 3
+        ids = ntuple(a -> g.quads[a, k], 4)
+        A = weight === :area ? _polygon_area(map(pos, ids[1:n])) : 1.0
+        for a in 1:n
+            w = weight === :angle ? _corner_angle(pos(ids[mod1(a - 1, n)]), pos(ids[a]), pos(ids[mod1(a + 1, n)])) : A
+            acc[ids[a]] += w * values[k]
+            wsum[ids[a]] += w
+        end
     end
-    return [c > 0 ? s / c : 0.0 for (s, c) in zip(acc, cnt)]
+    return [w > 0 ? s / w : 0.0 for (s, w) in zip(acc, wsum)]
 end
+
+# area of a flat (or nearly flat) polygon: half the norm of Σ xₖ × xₖ₊₁
+_polygon_area(X) = norm(sum(k -> cross(X[k], X[mod1(k + 1, length(X))]), eachindex(X))) / 2
+
+# interior angle at b of the corner a–b–c [rad]
+_corner_angle(a, b, c) = atan(norm(cross(a - b, c - b)), dot(a - b, c - b))
 
 """
     shell_faces(g::ShellGeo) -> Matrix{Int}

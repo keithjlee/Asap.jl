@@ -125,6 +125,38 @@ import DelaunayTriangulation
         @test sum(Asap.area, m.elements) ≈ 6.0 - 0.44 rtol = 1e-12
     end
 
+    @testset "mesh_polygon: graded size function h(x, y)" begin
+        minangle(m) = minimum(m.elements) do el
+            x = map(n -> n.position, el.nodes)
+            minimum(k -> acosd(clamp(dot(normalize(x[mod1(k + 1, 3)] - x[k]), normalize(x[mod1(k + 2, 3)] - x[k])), -1, 1)), 1:3)
+        end
+        rect = [(0.0, 0.0), (4.0, 0.0), (4.0, 2.0), (0.0, 2.0)]
+        hg(x, y) = 0.05 + 0.15 * hypot(x, y)              # fine at the corner (0, 0)
+        m = mesh_polygon(rect, sec; h = hg)
+        @test sum(Asap.area, m.elements) ≈ 8.0 rtol = 1e-12
+        @test minangle(m) >= 25 - 1e-6
+        cen(el) = sum(n -> n.position, el.nodes) / 3
+        near = filter(el -> norm(cen(el)) < 0.3, m.elements)
+        far = filter(el -> norm(cen(el)) > 3.5, m.elements)
+        @test !isempty(near) && !isempty(far)
+        @test maximum(Asap.area, near) < minimum(Asap.area, far)
+        # every triangle meets the target at its centroid
+        @test all(el -> Asap.area(el) <= sqrt(3) / 4 * hg(cen(el)[1], cen(el)[2])^2 * (1 + 1e-9), m.elements)
+        # between the uniform meshes at the extreme sizes
+        n_fine = length(mesh_polygon(rect, sec; h = 0.05).elements)
+        n_coarse = length(mesh_polygon(rect, sec; h = hg(4.0, 2.0)).elements)
+        @test n_coarse < length(m.elements) < n_fine
+        # a constant function is the number form; max_area still caps a function
+        @test mesh_polygon(rect, sec; h = (x, y) -> 0.3).points == mesh_polygon(rect, sec; h = 0.3).points
+        mc = mesh_polygon(rect, sec; h = hg, max_area = 0.01)
+        @test maximum(Asap.area, mc.elements) <= 0.01 * (1 + 1e-9)
+        # with holes: graded toward an opening, nothing inside it
+        mh = mesh_polygon(rect, sec; holes = [circle_polygon((2.0, 1.0), 0.4; n = 24)],
+            h = (x, y) -> 0.04 + 0.2 * abs(hypot(x - 2, y - 1) - 0.4))
+        @test sum(Asap.area, mh.elements) ≈ 8.0 - 12 * 0.4^2 * sin(2π / 24) rtol = 1e-10
+        @test_throws ArgumentError mesh_polygon(rect, sec; h = (x, y) -> x - 2.0)
+    end
+
     @testset "read_gmsh: MSH 4.1 ASCII, physical groups, planar and curved" begin
         # 2 × 1 panel: one quad (1,2,5,6) and two triangles; physical curve "bottom"
         # (y = 0) and physical surface "panel"; nodes shifted by `shift(x, y)`

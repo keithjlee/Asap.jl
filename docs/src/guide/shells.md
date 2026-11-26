@@ -40,7 +40,7 @@ w = mesh_wall([0.0, 0, 0], [1.0, 0, 0], [0.0, 0, 1], 6.0, 3.0, wall;
 
 ## General planar meshes
 
-For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygonal holes (constrained Delaunay with quality refinement; load DelaunayTriangulation.jl to enable it). Put a vertex wherever a support or a load starts or ends (or pass the point in `points`: a point on an edge splits that edge, so it stays on it even on a sloped edge, where rounding puts it a hair off the line), and use [`circle_polygon`](@ref) for round openings. Meshes from any other mesher (points and triangle/quad cells) become elements through [`shell_mesh`](@ref), and Gmsh files (MSH 4.1 ASCII) through [`read_gmsh`](@ref), which keeps Gmsh's physical groups as named node and element sets ([`group_nodes`](@ref), [`group_elements`](@ref)) and reads curved surfaces as spatial meshes. `mesh_polygon` is reproducible: the same input and `seed` give the same mesh. Both return a [`ShellMesh`](@ref), which keeps the in-plane coordinates for region queries:
+For any other outline, [`mesh_polygon`](@ref) triangulates a polygon with polygonal holes (constrained Delaunay with quality refinement; load DelaunayTriangulation.jl to enable it). Put a vertex wherever a support or a load starts or ends (or pass the point in `points`: a point on an edge splits that edge, so it stays on it even on a sloped edge, where rounding puts it a hair off the line), and use [`circle_polygon`](@ref) for round openings. Meshes from any other mesher (points and triangle/quad cells) become elements through [`shell_mesh`](@ref), and Gmsh files (MSH 4.1 ASCII) through [`read_gmsh`](@ref), which keeps Gmsh's physical groups as named node and element sets ([`group_nodes`](@ref), [`group_elements`](@ref)) and reads curved surfaces as spatial meshes. `mesh_polygon` is reproducible: the same input and `seed` give the same mesh. The target edge length `h` is a number or a function `(x, y) -> h` of the in-plane position, which grades the mesh: fine near loads, bearings and re-entrant corners, coarse elsewhere. Both return a [`ShellMesh`](@ref), which keeps the in-plane coordinates for region queries:
 
 - [`nodes_on_segment`](@ref) and [`boundary_nodes`](@ref): nodes along a bearing or a loaded edge;
 - [`edge_loads`](@ref) with a segment: consistent line loads along a boundary, drilling moments included;
@@ -128,7 +128,7 @@ displacement(storey.results, floor.master)[[1, 2, 6]]   # ux, uy, θz: torsion f
   combinations (the shell counterpart of [`envelope`](@ref)).
 - [`ShellGeo`](@ref) extracts plot-ready arrays: quads, displacements, centre resultants and
   principal forces ([`principal_forces`](@ref)).
-- [`nodal_average`](@ref) smooths any per-element field to the nodes for contour plots.
+- [`nodal_average`](@ref) smooths any per-element field to the nodes for contour plots, with equal, area or angle weights (`weight = :area` on graded meshes). Average the Cartesian components and derive principal values from them, never the principal values or angles themselves.
 - [`Geo`](@ref) / `ModelGeo` cover the frame and truss elements of a mixed model.
 
 ## Walkthroughs
